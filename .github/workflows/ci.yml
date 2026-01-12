@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Aiken
+        run: |
+          curl -sSfL https://install.aiken-lang.org | bash
+          echo "$HOME/.aiken/bin" >> $GITHUB_PATH
+      
+      - name: Check contracts
+        working-directory: contracts
+        run: aiken check
+      
+      - name: Build contracts
+        working-directory: contracts
+        run: aiken build
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: plutus-scripts
+          path: contracts/plutus.json

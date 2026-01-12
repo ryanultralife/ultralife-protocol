@@ -1,0 +1,12 @@
+{
+  "name": "ultralife-scripts",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "deploy": "node deploy.mjs"
+  },
+  "dependencies": {
+    "@blockfrost/blockfrost-js": "^5.5.0",
+    "@meshsdk/core": "^1.6.0"
+  }
+}

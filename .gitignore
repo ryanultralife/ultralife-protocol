@@ -1,0 +1,25 @@
+# Build outputs
+contracts/plutus.json
+contracts/build/
+
+# Dependencies
+node_modules/
+scripts/node_modules/
+
+# Deployment records
+deployment-*.json
+
+# Environment
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
