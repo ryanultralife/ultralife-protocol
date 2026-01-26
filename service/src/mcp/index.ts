@@ -557,10 +557,26 @@ export class UltraLifeMcpServer {
           limit: args.limit as number || 10,
         });
 
+      // === TREASURY & BONDING CURVE ===
+      case 'get_token_price':
+        return this.indexer.getTokenPrice();
+
+      case 'simulate_purchase':
+        return this.indexer.simulatePurchase(args.ada_amount as number);
+
+      case 'get_founder_status':
+        return this.indexer.getFounderStatus();
+
+      case 'get_treasury_status':
+        return this.indexer.getTreasuryState();
+
+      case 'build_purchase_tokens':
+        return this.buildPurchaseTokens(args);
+
       // === BIOREGION ===
       case 'list_bioregions':
         return this.indexer.listBioregions();
-      
+
       case 'get_bioregion':
         return this.indexer.getBioregion(args.bioregion_id as string);
 
@@ -897,6 +913,45 @@ export class UltraLifeMcpServer {
       summary: result.summary,
       note: 'Testnet rate: 1 ADA = 100 tokens',
       next_step: 'Sign this transaction with your wallet to purchase tokens',
+    };
+  }
+
+  private async buildPurchaseTokens(args: Record<string, unknown>): Promise<object> {
+    const buyerPnft = args.buyer_pnft as string;
+    const adaAmount = args.ada_amount as number;
+
+    // Verify buyer has valid pNFT
+    const pnft = await this.indexer.getPnft(buyerPnft);
+    if (!pnft) {
+      throw new Error('Buyer pNFT not found');
+    }
+
+    // Get current price info
+    const priceInfo = await this.indexer.getTokenPrice();
+    const simulation = await this.indexer.simulatePurchase(adaAmount);
+
+    // Build transaction that queues purchase for epoch settlement
+    const result = await this.builder.buildPurchaseFromPool({
+      buyerAddress: pnft.owner, // Use pNFT owner address
+      adaAmount: BigInt(Math.floor(adaAmount * 1_000_000)),
+    });
+
+    return {
+      action: 'Purchase Tokens (Epoch Settlement)',
+      transaction: {
+        unsigned_cbor: result.tx.toString(),
+        tx_hash: result.tx.toHash(),
+      },
+      purchase_details: {
+        ada_amount: adaAmount,
+        current_price: priceInfo.pricePerToken,
+        estimated_tokens: simulation.tokensReceived,
+        price_impact: `${simulation.priceImpact.toFixed(4)}%`,
+      },
+      note: 'Purchase will be settled at epoch boundary using bonding curve price. ' +
+            'Actual tokens received may vary based on other purchases in the same epoch.',
+      summary: result.summary,
+      next_step: 'Sign this transaction with your wallet to queue your purchase',
     };
   }
 
