@@ -3,10 +3,18 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "deploy": "node deploy.mjs"
+    "deploy": "node deploy.mjs",
+    "deploy:testnet": "node deploy-testnet.mjs",
+    "deploy:references": "node deploy-references.mjs --all",
+    "deploy:references:one": "node deploy-references.mjs --validator",
+    "init:genesis": "node init-genesis.mjs",
+    "mint:pnft": "node mint-pnft.mjs",
+    "mint:pnft:basic": "node mint-pnft.mjs --level Basic",
+    "mint:pnft:standard": "node mint-pnft.mjs --level Standard"
   },
   "dependencies": {
     "@blockfrost/blockfrost-js": "^5.5.0",
-    "@meshsdk/core": "^1.6.0"
+    "@meshsdk/core": "^1.6.0",
+    "dotenv": "^16.3.1"
   }
 }
