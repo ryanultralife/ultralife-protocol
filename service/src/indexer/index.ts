@@ -553,6 +553,230 @@ export class UltraLifeIndexer {
   }
 
   // ===========================================================================
+  // TREASURY & BONDING CURVE QUERIES
+  // ===========================================================================
+
+  /**
+   * Get current bonding curve state
+   * Price formula: tokens_distributed / 400B (linear curve)
+   */
+  async getTreasuryState(): Promise<{
+    totalSupply: bigint;
+    distributed: bigint;
+    reserved: bigint;
+    adaReserve: bigint;
+    currentPrice: number;
+    nextEpochQueue: bigint;
+    founderAccrued: bigint;
+    founderClaimed: bigint;
+    lastSettlement: number;
+  }> {
+    try {
+      const utxos = await this.api.addressesUtxos(this.config.contracts.treasury);
+
+      // Find treasury datum UTxO
+      let treasuryData = {
+        totalSupply: 400_000_000_000_000_000n, // 400B tokens (with 6 decimals)
+        distributed: 0n,
+        reserved: 400_000_000_000_000_000n,
+        adaReserve: 0n,
+        currentPrice: 0.0000000025, // Starting: 1 ADA = 400B tokens
+        nextEpochQueue: 0n,
+        founderAccrued: 0n,
+        founderClaimed: 0n,
+        lastSettlement: 0,
+      };
+
+      for (const utxo of utxos) {
+        // Sum up ADA in treasury
+        const adaAmount = utxo.amount.find(a => a.unit === 'lovelace');
+        if (adaAmount) {
+          treasuryData.adaReserve += BigInt(adaAmount.quantity);
+        }
+
+        // Decode treasury datum if present
+        if (utxo.inline_datum) {
+          try {
+            const decoded = this.decodeTreasuryDatum(utxo.inline_datum);
+            treasuryData = { ...treasuryData, ...decoded };
+          } catch {
+            // Skip malformed datums
+          }
+        }
+      }
+
+      // Calculate current price based on distribution
+      // Linear bonding curve: price = distributed / totalSupply
+      const distributedRatio = Number(treasuryData.distributed) / Number(treasuryData.totalSupply);
+      treasuryData.currentPrice = distributedRatio > 0
+        ? distributedRatio
+        : 0.0000000025; // Floor price
+
+      return treasuryData;
+    } catch (error) {
+      console.error('Error fetching treasury state:', error);
+      // Return default state
+      return {
+        totalSupply: 400_000_000_000_000_000n,
+        distributed: 0n,
+        reserved: 400_000_000_000_000_000n,
+        adaReserve: 0n,
+        currentPrice: 0.0000000025,
+        nextEpochQueue: 0n,
+        founderAccrued: 0n,
+        founderClaimed: 0n,
+        lastSettlement: 0,
+      };
+    }
+  }
+
+  /**
+   * Get current token price from bonding curve
+   */
+  async getTokenPrice(): Promise<{
+    pricePerToken: number;
+    pricePerAda: number;
+    distributed: string;
+    remaining: string;
+    percentDistributed: number;
+  }> {
+    const treasury = await this.getTreasuryState();
+
+    const pricePerToken = treasury.currentPrice;
+    const pricePerAda = pricePerToken > 0 ? 1 / pricePerToken : 400_000_000_000;
+    const percentDistributed = (Number(treasury.distributed) / Number(treasury.totalSupply)) * 100;
+
+    return {
+      pricePerToken,
+      pricePerAda,
+      distributed: this.formatTokenAmount(treasury.distributed),
+      remaining: this.formatTokenAmount(treasury.reserved),
+      percentDistributed,
+    };
+  }
+
+  /**
+   * Simulate token purchase - calculate tokens received for ADA amount
+   */
+  async simulatePurchase(adaAmount: number): Promise<{
+    adaSpent: number;
+    tokensReceived: string;
+    averagePrice: number;
+    priceImpact: number;
+    newPrice: number;
+  }> {
+    const treasury = await this.getTreasuryState();
+    const lovelace = BigInt(Math.floor(adaAmount * 1_000_000));
+
+    // Calculate tokens using bonding curve integral
+    // For linear curve: tokens = sqrt(2 * ada * totalSupply / slope) - distributed
+    // Simplified: tokens = ada / currentPrice (approximate for small purchases)
+
+    const currentPrice = treasury.currentPrice;
+    const tokensReceived = currentPrice > 0
+      ? BigInt(Math.floor(Number(lovelace) / currentPrice))
+      : 0n;
+
+    // Calculate new state after purchase
+    const newDistributed = treasury.distributed + tokensReceived;
+    const newPrice = Number(newDistributed) / Number(treasury.totalSupply);
+
+    // Price impact = (newPrice - currentPrice) / currentPrice * 100
+    const priceImpact = currentPrice > 0
+      ? ((newPrice - currentPrice) / currentPrice) * 100
+      : 0;
+
+    const averagePrice = tokensReceived > 0n
+      ? Number(lovelace) / Number(tokensReceived)
+      : currentPrice;
+
+    return {
+      adaSpent: adaAmount,
+      tokensReceived: this.formatTokenAmount(tokensReceived),
+      averagePrice,
+      priceImpact,
+      newPrice,
+    };
+  }
+
+  /**
+   * Get founder compensation status
+   * $10,000/month since Jan 2020, settled per epoch at curve price
+   */
+  async getFounderStatus(): Promise<{
+    monthlyUsd: number;
+    startDate: string;
+    totalMonths: number;
+    totalOwed: number;
+    tokensAccrued: string;
+    tokensClaimed: string;
+    tokensAvailable: string;
+    nextSettlement: string;
+  }> {
+    const treasury = await this.getTreasuryState();
+
+    const startDate = new Date('2020-01-01');
+    const now = new Date();
+    const totalMonths = (now.getFullYear() - startDate.getFullYear()) * 12 +
+                        (now.getMonth() - startDate.getMonth());
+    const totalOwed = totalMonths * 10000; // $10,000/month
+
+    // Founder tokens are accrued based on curve price at each epoch
+    // This is tracked in the treasury datum
+    const tokensAccrued = treasury.founderAccrued;
+    const tokensClaimed = treasury.founderClaimed;
+    const tokensAvailable = tokensAccrued - tokensClaimed;
+
+    // Next settlement at epoch boundary (every 5 days on Cardano)
+    const epochLength = 5 * 24 * 60 * 60 * 1000; // 5 days in ms
+    const lastSettlement = treasury.lastSettlement || Date.now();
+    const nextSettlement = new Date(lastSettlement + epochLength);
+
+    return {
+      monthlyUsd: 10000,
+      startDate: '2020-01-01',
+      totalMonths,
+      totalOwed,
+      tokensAccrued: this.formatTokenAmount(tokensAccrued),
+      tokensClaimed: this.formatTokenAmount(tokensClaimed),
+      tokensAvailable: this.formatTokenAmount(tokensAvailable),
+      nextSettlement: nextSettlement.toISOString(),
+    };
+  }
+
+  private decodeTreasuryDatum(inlineDatum: string): Partial<{
+    distributed: bigint;
+    reserved: bigint;
+    nextEpochQueue: bigint;
+    founderAccrued: bigint;
+    founderClaimed: bigint;
+    lastSettlement: number;
+  }> {
+    const decoded = cbor.decode(Buffer.from(inlineDatum, 'hex'));
+
+    return {
+      distributed: BigInt(decoded[0] || 0),
+      reserved: BigInt(decoded[1] || 0),
+      nextEpochQueue: BigInt(decoded[2] || 0),
+      founderAccrued: BigInt(decoded[3] || 0),
+      founderClaimed: BigInt(decoded[4] || 0),
+      lastSettlement: Number(decoded[5]) || 0,
+    };
+  }
+
+  private formatTokenAmount(amount: bigint): string {
+    const withDecimals = Number(amount) / 1_000_000;
+    if (withDecimals >= 1_000_000_000) {
+      return `${(withDecimals / 1_000_000_000).toFixed(2)}B`;
+    } else if (withDecimals >= 1_000_000) {
+      return `${(withDecimals / 1_000_000).toFixed(2)}M`;
+    } else if (withDecimals >= 1_000) {
+      return `${(withDecimals / 1_000).toFixed(2)}K`;
+    }
+    return withDecimals.toFixed(2);
+  }
+
+  // ===========================================================================
   // PROTOCOL STATS
   // ===========================================================================
 

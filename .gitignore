@@ -1,6 +1,7 @@
 # Build outputs
 contracts/plutus.json
 contracts/build/
+build/
 
 # Dependencies
 node_modules/
@@ -12,6 +13,7 @@ deployment-*.json
 # Environment
 .env
 .env.*
+!.env.example
 
 # IDE
 .vscode/

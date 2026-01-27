@@ -1,7 +1,9 @@
 name = "ultralife/protocol"
-version = "0.1.0"
+version = "1.0.0"
+compiler = "v1.1.21"
+plutus = "v3"
 license = "Apache-2.0"
-description = "UltraLife Protocol — Bioregional stewardship through transparent economics"
+description = "UltraLife Protocol - Transparent economy for bioregional stewardship"
 
 [repository]
 user = "ultralife"
@@ -10,41 +12,8 @@ platform = "github"
 
 [[dependencies]]
 name = "aiken-lang/stdlib"
-version = "v2.2.0"
+version = "v3.0.0"
 source = "github"
 
 [config]
-# PRC-37 timing constants
-cycle_slots = 3196800  # 37 days in slots
-
-# Economic parameters
-total_supply = 400000000000  # 400 billion (single bonding curve pool)
-treasury_pool = 400000000000  # 400 billion
-grants_pool = 400000000000   # 400 billion
-grant_per_user = 50
-
-# Governance thresholds (basis points)
-quorum_bps = 3700      # 37%
-majority_bps = 5000    # 50%
-supermajority_bps = 6300  # 63%
-resonance_threshold = 37
-
-# Impact parameters
-high_magnitude_threshold = 500
-impact_fee = 5  # tokens
-
-# UBI parameters  
-base_ubi = 100  # tokens per cycle
-min_multiplier = 5000   # 50%
-max_multiplier = 15000  # 150%
-
-# Bonding curve
-base_price = 1       # micro-units
-max_price_mult = 1000  # 1000x at full distribution
-sell_discount_bps = 9000  # 90% of buy price
-
-# Verification levels
-level_basic = 0
-level_standard = 1
-level_verified = 2
-level_steward = 3
+# Config parameters are now defined in lib/ultralife/config.ak
