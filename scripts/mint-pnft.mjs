@@ -72,24 +72,32 @@ function formatAda(lovelace) {
 // =============================================================================
 // PNFT DATUM BUILDER
 // =============================================================================
+// Aligned with PnftDatum from lib/ultralife/types.ak:34-59
+// Fields: pnft_id, owner, level, bioregion, dna_hash, guardian, ward_since, created_at, upgraded_at, consumer_impact, nutrition_profile
 
 function buildPnftDatum(pnftId, owner, level, options = {}) {
   return {
     constructor: 0,
     fields: [
-      { bytes: Buffer.from(pnftId).toString('hex') },       // pnft_id
-      { bytes: owner },                                       // owner (pubkey hash)
-      { constructor: VERIFICATION_LEVELS[level], fields: [] }, // level
-      options.bioregion                                        // bioregion
-        ? { constructor: 0, fields: [{ bytes: options.bioregion }] }
-        : { constructor: 1, fields: [] },
-      options.dnaHash                                          // dna_hash
-        ? { constructor: 0, fields: [{ bytes: options.dnaHash }] }
-        : { constructor: 1, fields: [] },
-      { int: Date.now() },                                    // created_at
-      { constructor: 1, fields: [] },                         // upgraded_at (None)
-      { constructor: 1, fields: [] },                         // consumer_impacts (None)
-      { int: 0 },                                             // care_credits
+      { bytes: Buffer.from(pnftId).toString('hex') },         // pnft_id: ByteArray
+      { bytes: owner },                                        // owner: VerificationKeyHash
+      { constructor: VERIFICATION_LEVELS[level], fields: [] }, // level: VerificationLevel
+      options.bioregion                                        // bioregion: Option<ByteArray>
+        ? { constructor: 0, fields: [{ bytes: options.bioregion }] }  // Some
+        : { constructor: 1, fields: [] },                             // None
+      options.dnaHash                                          // dna_hash: Option<ByteArray>
+        ? { constructor: 0, fields: [{ bytes: options.dnaHash }] }    // Some
+        : { constructor: 1, fields: [] },                             // None
+      options.guardian                                         // guardian: Option<AssetName>
+        ? { constructor: 0, fields: [{ bytes: options.guardian }] }   // Some
+        : { constructor: 1, fields: [] },                             // None
+      options.wardSince                                        // ward_since: Option<Int>
+        ? { constructor: 0, fields: [{ int: options.wardSince }] }    // Some
+        : { constructor: 1, fields: [] },                             // None
+      { int: Date.now() },                                     // created_at: Int
+      { constructor: 1, fields: [] },                          // upgraded_at: Option<Int> (None initially)
+      { constructor: 1, fields: [] },                          // consumer_impact: Option<ConsumerImpactRecord> (None)
+      { constructor: 1, fields: [] },                          // nutrition_profile: Option<NutritionProfile> (None)
     ],
   };
 }
@@ -110,10 +118,12 @@ async function main() {
   const levelIdx = args.indexOf('--level');
   const dnaIdx = args.indexOf('--dna-hash');
   const bioregionIdx = args.indexOf('--bioregion');
+  const guardianIdx = args.indexOf('--guardian');
 
   const level = levelIdx >= 0 ? args[levelIdx + 1] : 'Basic';
   const dnaHash = dnaIdx >= 0 ? args[dnaIdx + 1] : null;
   const bioregion = bioregionIdx >= 0 ? args[bioregionIdx + 1] : null;
+  const guardian = guardianIdx >= 0 ? args[guardianIdx + 1] : null;
 
   // Validate level
   if (!VERIFICATION_LEVELS.hasOwnProperty(level)) {
@@ -122,7 +132,14 @@ async function main() {
     process.exit(1);
   }
 
-  // Check requirements for higher levels
+  // Check requirements for specific levels
+  if (level === 'Ward') {
+    if (!guardian) {
+      log.warn('Ward level requires a guardian pNFT.');
+      log.info('Use --guardian <pnft_id> to specify guardian.');
+    }
+  }
+
   if (level === 'Standard' || level === 'Verified' || level === 'Steward') {
     if (!dnaHash) {
       log.warn(`Level ${level} typically requires DNA verification.`);
@@ -194,6 +211,8 @@ async function main() {
   const datum = buildPnftDatum(pnftId, ownerHash, level, {
     dnaHash: dnaHash ? Buffer.from(dnaHash).toString('hex') : null,
     bioregion: bioregion ? Buffer.from(bioregion).toString('hex') : null,
+    guardian: guardian ? Buffer.from(guardian).toString('hex') : null,
+    wardSince: level === 'Ward' ? Date.now() : null,
   });
 
   log.info('pNFT datum constructed');
@@ -209,6 +228,7 @@ async function main() {
     options: {
       dnaHash: dnaHash || null,
       bioregion: bioregion || null,
+      guardian: guardian || null,
     },
   };
 
@@ -226,6 +246,7 @@ async function main() {
 ║  Level:     ${level.padEnd(48)}║
 ║  DNA:       ${(dnaHash || 'Not provided').slice(0, 48).padEnd(48)}║
 ║  Bioregion: ${(bioregion || 'Not assigned').slice(0, 48).padEnd(48)}║
+║  Guardian:  ${(guardian || 'None (not a ward)').slice(0, 48).padEnd(48)}║
 ║  Status:    ${'Prepared (ready for on-chain mint)'.padEnd(48)}║
 ╚═══════════════════════════════════════════════════════════════╝
 

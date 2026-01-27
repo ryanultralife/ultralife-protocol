@@ -64,55 +64,77 @@ function formatAda(lovelace) {
 // =============================================================================
 // GENESIS DATUM BUILDERS
 // =============================================================================
+// Aligned with Aiken type definitions in validators/genesis.ak and lib/ultralife/types.ak
 
 function buildGenesisDatum() {
-  // Genesis datum contains protocol-wide parameters
+  // GenesisDatum from validators/genesis.ak:65-76
+  // Fields: verifications_completed, stewards_created, bioregions_created, registered_oracles, genesis_active
   return {
     constructor: 0,
     fields: [
-      { bytes: Buffer.from(CONFIG.protocolName).toString('hex') },
-      { int: Date.now() }, // Genesis timestamp
-      { int: 0 },          // Genesis cycle (starts at 0)
-      { bytes: '' },       // Admin key hash (would be set in production)
+      { int: 0 },                                    // verifications_completed
+      { int: 0 },                                    // stewards_created
+      { int: 0 },                                    // bioregions_created
+      { list: [] },                                  // registered_oracles (empty initially)
+      { constructor: 1, fields: [] },                // genesis_active = True (constructor 1 for True in Aiken)
     ],
   };
 }
 
 function buildTreasuryDatum() {
+  // TreasuryDatum from lib/ultralife/types.ak:643-654
+  // Fields: tokens_distributed, ada_reserves, btc_reserves, last_update, multisig
   return {
     constructor: 0,
     fields: [
-      { int: Number(CONFIG.initialTreasuryAda) }, // Total value
-      { int: 0 },                                  // Distributed
-      { int: 0 },                                  // Reserved
-      { list: [] },                                // Allocations
+      { int: 0 },                                    // tokens_distributed
+      { int: Number(CONFIG.initialTreasuryAda) },    // ada_reserves (lovelace)
+      { int: 0 },                                    // btc_reserves (satoshis)
+      { int: Date.now() },                           // last_update (slot)
+      {                                              // multisig: MultisigConfig
+        constructor: 0,
+        fields: [
+          { list: [] },                              // signers (empty initially)
+          { int: 1 },                                // threshold
+        ],
+      },
     ],
   };
 }
 
 function buildBioregionDatum() {
+  // BioregionDatum from lib/ultralife/types.ak:139-156
+  // Fields: bioregion_id, name_hash, bounds_hash, health_index, resident_count, treasury, created_at, last_health_update
   return {
     constructor: 0,
     fields: [
-      { bytes: Buffer.from(CONFIG.testBioregion.id).toString('hex') },
-      { bytes: Buffer.from(CONFIG.testBioregion.name).toString('hex') },
-      { bytes: CONFIG.testBioregion.boundsHash },
-      { int: 0 },    // Population
-      { int: 1000 }, // Health index (0-1000 scale)
-      { int: 0 },    // Current cycle
+      { bytes: Buffer.from(CONFIG.testBioregion.id).toString('hex') },     // bioregion_id
+      { bytes: Buffer.from(CONFIG.testBioregion.name).toString('hex') },   // name_hash
+      { bytes: CONFIG.testBioregion.boundsHash },                          // bounds_hash
+      { int: 10000 },                                                      // health_index (0-10000 = 0-100.00%)
+      { int: 0 },                                                          // resident_count
+      { bytes: '' },                                                       // treasury (script hash, set during deploy)
+      { int: Date.now() },                                                 // created_at (slot)
+      { int: 0 },                                                          // last_health_update (cycle)
     ],
   };
 }
 
 function buildUbiPoolDatum() {
+  // UbiPoolDatum from lib/ultralife/types.ak:740-759
+  // Fields: bioregion, cycle, fees_collected, ubi_pool, eligible_count, total_engagement_weight, claims_count, distributed, distribution_start
   return {
     constructor: 0,
     fields: [
-      { bytes: Buffer.from(CONFIG.testBioregion.id).toString('hex') },
-      { int: 0 },                                     // Current cycle
-      { int: Number(CONFIG.initialUbiPoolAda) },      // Available
-      { int: 0 },                                     // Claims count
-      { int: Date.now() },                            // Distribution start
+      { bytes: Buffer.from(CONFIG.testBioregion.id).toString('hex') },    // bioregion
+      { int: 0 },                                                         // cycle
+      { int: 0 },                                                         // fees_collected
+      { int: Number(CONFIG.initialUbiPoolAda) },                          // ubi_pool
+      { int: 0 },                                                         // eligible_count
+      { int: 0 },                                                         // total_engagement_weight
+      { int: 0 },                                                         // claims_count
+      { int: 0 },                                                         // distributed
+      { int: Date.now() },                                                // distribution_start
     ],
   };
 }

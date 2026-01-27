@@ -55,6 +55,8 @@ const CONFIG = {
 const DEPLOY_ORDER = [
   // Phase 1: Bootstrap
   { name: 'genesis', purpose: 'spend' },
+  { name: 'ultralife_validator', purpose: 'spend', title: 'ultralife_validator.ultralife_validator.spend' },
+  { name: 'fee_pool', purpose: 'spend', title: 'ultralife_validator.fee_pool.spend' },
 
   // Phase 2: Identity
   { name: 'pnft', purpose: 'mint', title: 'pnft.pnft_policy' },
@@ -67,12 +69,16 @@ const DEPLOY_ORDER = [
   { name: 'grants', purpose: 'spend' },
 
   // Phase 4: Place
+  { name: 'bioregion', purpose: 'mint', title: 'bioregion.bioregion_beacon.mint' },
   { name: 'bioregion', purpose: 'spend' },
+  { name: 'commons', purpose: 'spend' },
 
   // Phase 5: Consequence
+  { name: 'impact', purpose: 'mint', title: 'impact.impact_policy.mint' },
   { name: 'impact', purpose: 'spend' },
   { name: 'asset_impact', purpose: 'spend' },
   { name: 'remediation', purpose: 'spend' },
+  { name: 'impact_market', purpose: 'spend' },
 
   // Phase 6: Distribution
   { name: 'ubi', purpose: 'spend' },
@@ -84,10 +90,17 @@ const DEPLOY_ORDER = [
   { name: 'records', purpose: 'spend' },
   { name: 'memory', purpose: 'spend' },
 
-  // Phase 9: Additional
+  // Phase 9: Markets & Resources
+  { name: 'marketplace', purpose: 'spend' },
+  { name: 'work_auction', purpose: 'spend' },
+  { name: 'energy', purpose: 'spend' },
+  { name: 'spending_bucket', purpose: 'spend' },
+
+  // Phase 10: Additional
   { name: 'care', purpose: 'spend' },
   { name: 'collective', purpose: 'spend' },
   { name: 'registry', purpose: 'spend' },
+  { name: 'registry_thing', purpose: 'spend', title: 'registry.thing.spend' },
   { name: 'stake_pool', purpose: 'spend' },
   { name: 'land_rights', purpose: 'spend' },
   { name: 'preservation', purpose: 'spend' },

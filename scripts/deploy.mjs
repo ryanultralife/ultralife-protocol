@@ -59,7 +59,7 @@ async function main() {
   console.log(`   Contracts: ${DEPLOY_ORDER.length}\n`);
 
   // Load compiled contracts
-  const plutusPath = '../contracts/plutus.json';
+  const plutusPath = '../plutus.json';
   if (!fs.existsSync(plutusPath)) {
     console.error('Error: plutus.json not found. Run `aiken build` first.');
     process.exit(1);
