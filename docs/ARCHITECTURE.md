@@ -1,5 +1,7 @@
 # UltraLife Protocol Architecture
 
+> **Status: Development Complete** — Now deploying to Cardano Preview Testnet.
+
 This document provides a comprehensive overview of the UltraLife Protocol system design, validator interactions, and data flows.
 
 ## Table of Contents

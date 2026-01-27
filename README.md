@@ -121,7 +121,7 @@ cd service && npm install && npm start
 | [L2 Security: pNFT Termination](docs/L2_SECURITY_PNFT.md) | Every L2 tx must end at verified pNFT |
 | [Fraud Analysis](docs/FRAUD_ANALYSIS.md) | Attack vectors, mitigations, residual risks |
 | [Oracle Specification](docs/ORACLE_SPECIFICATION.md) | Real-world data feeds |
-| [Deployment](docs/DEPLOYMENT.md) | How to deploy to mainnet |
+| [Deployment](docs/DEPLOYMENT.md) | Testnet and mainnet deployment |
 | [SPO Quick Brief](docs/SPO_QUICK_BRIEF.md) | For technical testers |
 
 ---
@@ -285,7 +285,7 @@ ultralife-protocol/
 │   │   └── prc37.ak        # 37-day cycle functions
 │   ├── tests/              # Test suites
 │   └── aiken.toml          # Aiken configuration
-├── docs/                   # 30+ documentation files
+├── docs/                   # 33+ documentation files
 ├── service/                # MCP service for LLM integration
 │   ├── indexer/            # Read chain state via Blockfrost
 │   ├── builder/            # Construct unsigned transactions
