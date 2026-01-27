@@ -138,10 +138,17 @@ export function getAllValidators(plutusJson) {
   const validators = {};
 
   for (const v of plutusJson.validators || []) {
-    // Extract validator name from title (e.g., "pnft.pnft_policy" -> "pnft_policy")
+    // Extract validator name from title
+    // Format: "module.validator_name.purpose" (e.g., "pnft.pnft_policy.mint")
+    // We want the middle part (validator_name), or first two parts joined
     const parts = v.title.split('.');
-    const name = parts[parts.length - 1];
-    validators[name] = v;
+    if (parts.length >= 2) {
+      // Use "module.validator" as key (e.g., "pnft.pnft_policy")
+      const name = parts.slice(0, 2).join('.');
+      if (!validators[name]) {
+        validators[name] = v;
+      }
+    }
   }
 
   return validators;
