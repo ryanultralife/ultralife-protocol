@@ -23,6 +23,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import 'dotenv/config';
 
+import {
+  atomicWriteSync,
+  estimateCurrentSlot,
+} from './utils.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // =============================================================================
@@ -126,7 +131,7 @@ class TestHarness {
   }
 
   saveResults() {
-    fs.writeFileSync(CONFIG.testResultsPath, JSON.stringify(this.results, null, 2));
+    atomicWriteSync(CONFIG.testResultsPath, this.results);
     console.log(`\nResults saved to: ${CONFIG.testResultsPath}`);
   }
 
@@ -199,6 +204,9 @@ const phase1Tests = (harness) => ({
 
 const phase2Tests = (harness) => ({
   'Can build Basic pNFT datum': async () => {
+    // Use estimated slot for test datum (not Date.now() milliseconds!)
+    const currentSlot = estimateCurrentSlot('preview');
+
     const datum = {
       constructor: 0,
       fields: [
@@ -209,7 +217,7 @@ const phase2Tests = (harness) => ({
         { constructor: 1, fields: [] }, // None dna_hash
         { constructor: 1, fields: [] }, // None guardian
         { constructor: 1, fields: [] }, // None ward_since
-        { int: Date.now() },
+        { int: currentSlot },           // created_at (slot number)
         { constructor: 1, fields: [] }, // None upgraded_at
         { constructor: 1, fields: [] }, // None consumer_impact
         { constructor: 1, fields: [] }, // None nutrition_profile
@@ -222,7 +230,9 @@ const phase2Tests = (harness) => ({
   },
 
   'Can build Ward pNFT datum': async () => {
+    const currentSlot = estimateCurrentSlot('preview');
     const guardianId = 'guardian_pnft_001';
+
     const datum = {
       constructor: 0,
       fields: [
@@ -232,8 +242,8 @@ const phase2Tests = (harness) => ({
         { constructor: 1, fields: [] },
         { constructor: 1, fields: [] },
         { constructor: 0, fields: [{ bytes: Buffer.from(guardianId).toString('hex') }] }, // Some guardian
-        { constructor: 0, fields: [{ int: Date.now() }] }, // Some ward_since
-        { int: Date.now() },
+        { constructor: 0, fields: [{ int: currentSlot }] }, // Some ward_since (slot)
+        { int: currentSlot },           // created_at (slot)
         { constructor: 1, fields: [] },
         { constructor: 1, fields: [] },
         { constructor: 1, fields: [] },
@@ -243,6 +253,9 @@ const phase2Tests = (harness) => ({
   },
 
   'Can build Steward pNFT datum': async () => {
+    const currentSlot = estimateCurrentSlot('preview');
+    const oneDayInSlots = 86400; // 1 day = 86400 slots (1 slot per second)
+
     const datum = {
       constructor: 0,
       fields: [
@@ -253,8 +266,8 @@ const phase2Tests = (harness) => ({
         { constructor: 0, fields: [{ bytes: '00'.repeat(32) }] }, // DNA hash
         { constructor: 1, fields: [] },
         { constructor: 1, fields: [] },
-        { int: Date.now() },
-        { constructor: 0, fields: [{ int: Date.now() - 86400000 }] }, // Upgraded yesterday
+        { int: currentSlot },                                        // created_at
+        { constructor: 0, fields: [{ int: currentSlot - oneDayInSlots }] }, // Upgraded yesterday (slot)
         { constructor: 1, fields: [] },
         { constructor: 1, fields: [] },
       ],
@@ -277,13 +290,15 @@ const phase2Tests = (harness) => ({
 
 const phase3Tests = (harness) => ({
   'Can build Treasury datum': async () => {
+    const currentSlot = estimateCurrentSlot('preview');
+
     const datum = {
       constructor: 0,
       fields: [
         { int: 0 },           // tokens_distributed
         { int: 100_000_000 }, // ada_reserves (100 ADA)
         { int: 0 },           // btc_reserves
-        { int: Date.now() },  // last_update
+        { int: currentSlot }, // last_update (slot number)
         {                     // multisig
           constructor: 0,
           fields: [
@@ -322,6 +337,8 @@ const phase3Tests = (harness) => ({
 
 const phase4Tests = (harness) => ({
   'Can build Bioregion datum': async () => {
+    const currentSlot = estimateCurrentSlot('preview');
+
     const datum = {
       constructor: 0,
       fields: [
@@ -331,7 +348,7 @@ const phase4Tests = (harness) => ({
         { int: 10000 },             // health_index (100%)
         { int: 0 },                 // resident_count
         { bytes: '' },              // treasury
-        { int: Date.now() },        // created_at
+        { int: currentSlot },       // created_at (slot number)
         { int: 0 },                 // last_health_update
       ],
     };
@@ -342,6 +359,8 @@ const phase4Tests = (harness) => ({
   },
 
   'Can build UBI Pool datum': async () => {
+    const currentSlot = estimateCurrentSlot('preview');
+
     const datum = {
       constructor: 0,
       fields: [
@@ -353,7 +372,7 @@ const phase4Tests = (harness) => ({
         { int: 0 },           // total_engagement_weight
         { int: 0 },           // claims_count
         { int: 0 },           // distributed
-        { int: Date.now() },  // distribution_start
+        { int: currentSlot }, // distribution_start (slot number)
       ],
     };
     if (datum.fields.length !== 9) {

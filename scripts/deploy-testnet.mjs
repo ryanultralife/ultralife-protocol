@@ -163,12 +163,16 @@ async function checkPrerequisites() {
     }
   }
 
-  // Check plutus.json exists
+  // Check plutus.json exists and is valid
   if (!fs.existsSync(CONFIG.plutusPath)) {
     issues.push(`plutus.json not found at ${CONFIG.plutusPath}`);
   } else {
-    const plutus = JSON.parse(fs.readFileSync(CONFIG.plutusPath, 'utf8'));
-    log.success(`plutus.json found with ${plutus.validators.length} validators`);
+    const plutus = safeReadJson(CONFIG.plutusPath);
+    if (!plutus) {
+      issues.push('plutus.json exists but is invalid (failed to parse)');
+    } else {
+      log.success(`plutus.json found with ${plutus.validators.length} validators`);
+    }
   }
 
   if (issues.length > 0) {

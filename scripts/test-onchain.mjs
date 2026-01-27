@@ -16,12 +16,19 @@ import {
   MeshWallet,
   MeshTxBuilder,
   serializePlutusScript,
+  deserializeAddress,
 } from '@meshsdk/core';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import 'dotenv/config';
+
+import {
+  getCurrentSlot,
+  atomicWriteSync,
+  formatAda,
+} from './utils.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -205,11 +212,14 @@ const onChainTests = {
   'datum-output': async (ctx) => {
     log.info('Test: Create output with inline datum');
 
+    // Use slot for on-chain timestamp, not Date.now() milliseconds
+    const currentSlot = await getCurrentSlot(ctx.provider, CONFIG.network);
+
     const testDatum = {
       constructor: 0,
       fields: [
         { bytes: Buffer.from('test_datum').toString('hex') },
-        { int: Date.now() },
+        { int: currentSlot },
       ],
     };
 
@@ -245,10 +255,13 @@ const onChainTests = {
     log.info('Test: Prepare pNFT datum (simulation)');
 
     const pnftId = generateId('pnft');
-    const ownerHash = crypto.createHash('sha256')
-      .update(ctx.address)
-      .digest('hex')
-      .slice(0, 56);
+
+    // CRITICAL: Use real verification key hash from address, not SHA256 fake
+    const deserialized = deserializeAddress(ctx.address);
+    const ownerHash = deserialized.pubKeyHash;
+
+    // Get current slot for timestamp (not Date.now() milliseconds!)
+    const currentSlot = await getCurrentSlot(ctx.provider, CONFIG.network);
 
     const pnftDatum = {
       constructor: 0,
@@ -260,7 +273,7 @@ const onChainTests = {
         { constructor: 1, fields: [] }, // None dna_hash
         { constructor: 1, fields: [] }, // None guardian
         { constructor: 1, fields: [] }, // None ward_since
-        { int: Date.now() },
+        { int: currentSlot },            // created_at (slot number, not milliseconds!)
         { constructor: 1, fields: [] }, // None upgraded_at
         { constructor: 1, fields: [] }, // None consumer_impact
         { constructor: 1, fields: [] }, // None nutrition_profile
@@ -316,13 +329,16 @@ const onChainTests = {
   'prepare-treasury': async (ctx) => {
     log.info('Test: Prepare Treasury datum (simulation)');
 
+    // Use slot for on-chain timestamp
+    const currentSlot = await getCurrentSlot(ctx.provider, CONFIG.network);
+
     const treasuryDatum = {
       constructor: 0,
       fields: [
         { int: 0 },           // tokens_distributed
         { int: 100_000_000 }, // ada_reserves (100 ADA)
         { int: 0 },           // btc_reserves
-        { int: Date.now() },  // last_update
+        { int: currentSlot }, // last_update (slot number)
         {                     // multisig
           constructor: 0,
           fields: [
@@ -346,19 +362,22 @@ const onChainTests = {
   'prepare-ubi': async (ctx) => {
     log.info('Test: Prepare UBI Pool datum (simulation)');
 
+    // Use slot for on-chain timestamp
+    const currentSlot = await getCurrentSlot(ctx.provider, CONFIG.network);
+
     const bioregionId = 'bioregion_test_001';
     const ubiDatum = {
       constructor: 0,
       fields: [
         { bytes: Buffer.from(bioregionId).toString('hex') },
-        { int: 0 },          // cycle
-        { int: 0 },          // fees_collected
-        { int: 50_000_000 }, // ubi_pool (50 ADA)
-        { int: 0 },          // eligible_count
-        { int: 0 },          // total_engagement_weight
-        { int: 0 },          // claims_count
-        { int: 0 },          // distributed
-        { int: Date.now() }, // distribution_start
+        { int: 0 },           // cycle
+        { int: 0 },           // fees_collected
+        { int: 50_000_000 },  // ubi_pool (50 ADA)
+        { int: 0 },           // eligible_count
+        { int: 0 },           // total_engagement_weight
+        { int: 0 },           // claims_count
+        { int: 0 },           // distributed
+        { int: currentSlot }, // distribution_start (slot number)
       ],
     };
 
