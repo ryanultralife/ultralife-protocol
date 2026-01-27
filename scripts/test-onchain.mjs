@@ -117,11 +117,19 @@ class TestContext {
     this.address = this.wallet.getChangeAddress();
 
     if (fs.existsSync(CONFIG.deploymentPath)) {
-      this.deployment = JSON.parse(fs.readFileSync(CONFIG.deploymentPath, 'utf8'));
+      try {
+        this.deployment = JSON.parse(fs.readFileSync(CONFIG.deploymentPath, 'utf8'));
+      } catch (error) {
+        log.warn(`Failed to parse deployment.json: ${error.message}`);
+      }
     }
 
     if (fs.existsSync(CONFIG.plutusPath)) {
-      this.plutus = JSON.parse(fs.readFileSync(CONFIG.plutusPath, 'utf8'));
+      try {
+        this.plutus = JSON.parse(fs.readFileSync(CONFIG.plutusPath, 'utf8'));
+      } catch (error) {
+        log.warn(`Failed to parse plutus.json: ${error.message}`);
+      }
     }
 
     // Check balance

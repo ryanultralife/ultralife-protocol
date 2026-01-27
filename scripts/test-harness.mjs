@@ -76,7 +76,11 @@ class TestHarness {
     });
 
     if (fs.existsSync(CONFIG.deploymentPath)) {
-      this.deployment = JSON.parse(fs.readFileSync(CONFIG.deploymentPath, 'utf8'));
+      try {
+        this.deployment = JSON.parse(fs.readFileSync(CONFIG.deploymentPath, 'utf8'));
+      } catch (error) {
+        console.error(`Failed to parse deployment.json: ${error.message}`);
+      }
     }
 
     const address = this.wallet.getChangeAddress();

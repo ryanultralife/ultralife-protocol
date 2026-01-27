@@ -19,6 +19,7 @@ import {
   BlockfrostProvider,
   MeshWallet,
   MeshTxBuilder,
+  deserializeAddress,
 } from '@meshsdk/core';
 import fs from 'fs';
 import path from 'path';
@@ -58,6 +59,37 @@ const log = {
   error: (msg) => console.log(`❌ ${msg}`),
 };
 
+/**
+ * Get current Cardano slot from Blockfrost
+ */
+async function getCurrentSlot(provider) {
+  try {
+    const tip = await provider.fetchBlockchainTip();
+    return tip.slot;
+  } catch (error) {
+    log.warn(`Could not fetch current slot: ${error.message}`);
+    // Fallback: estimate slot from time (Preview testnet started ~slot 0 at specific time)
+    // This is approximate but better than using Date.now() milliseconds
+    const previewGenesisTime = 1666656000; // Preview testnet genesis (approx)
+    const currentTime = Math.floor(Date.now() / 1000);
+    return currentTime - previewGenesisTime;
+  }
+}
+
+/**
+ * Extract verification key hash from a Cardano address
+ */
+function getVerificationKeyHash(address) {
+  try {
+    const deserialized = deserializeAddress(address);
+    // The pubKeyHash is the verification key hash we need
+    return deserialized.pubKeyHash;
+  } catch (error) {
+    log.error(`Failed to deserialize address: ${error.message}`);
+    throw new Error('Invalid Cardano address - cannot extract verification key hash');
+  }
+}
+
 function generatePnftId() {
   // Generate unique pNFT ID: pnft_ + timestamp + random bytes
   const timestamp = Date.now().toString(36);
@@ -76,6 +108,9 @@ function formatAda(lovelace) {
 // Fields: pnft_id, owner, level, bioregion, dna_hash, guardian, ward_since, created_at, upgraded_at, consumer_impact, nutrition_profile
 
 function buildPnftDatum(pnftId, owner, level, options = {}) {
+  // CRITICAL: Use Cardano slot number, NOT JavaScript milliseconds (Date.now())
+  const createdAtSlot = options.currentSlot || 0;
+
   return {
     constructor: 0,
     fields: [
@@ -91,10 +126,10 @@ function buildPnftDatum(pnftId, owner, level, options = {}) {
       options.guardian                                         // guardian: Option<AssetName>
         ? { constructor: 0, fields: [{ bytes: options.guardian }] }   // Some
         : { constructor: 1, fields: [] },                             // None
-      options.wardSince                                        // ward_since: Option<Int>
+      options.wardSince                                        // ward_since: Option<Int> (slot number)
         ? { constructor: 0, fields: [{ int: options.wardSince }] }    // Some
         : { constructor: 1, fields: [] },                             // None
-      { int: Date.now() },                                     // created_at: Int
+      { int: createdAtSlot },                                  // created_at: Int (slot number)
       { constructor: 1, fields: [] },                          // upgraded_at: Option<Int> (None initially)
       { constructor: 1, fields: [] },                          // consumer_impact: Option<ConsumerImpactRecord> (None)
       { constructor: 1, fields: [] },                          // nutrition_profile: Option<NutritionProfile> (None)
@@ -163,7 +198,13 @@ async function main() {
   // Load deployment record
   let deployment = {};
   if (fs.existsSync(CONFIG.deploymentPath)) {
-    deployment = JSON.parse(fs.readFileSync(CONFIG.deploymentPath, 'utf8'));
+    try {
+      deployment = JSON.parse(fs.readFileSync(CONFIG.deploymentPath, 'utf8'));
+    } catch (error) {
+      log.error(`Failed to parse deployment.json: ${error.message}`);
+      log.info('The file may be corrupted. Check the JSON syntax.');
+      process.exit(1);
+    }
   }
   deployment.pnfts = deployment.pnfts || [];
 
@@ -201,18 +242,21 @@ async function main() {
   log.info(`pNFT ID: ${pnftId}`);
   log.info(`Level: ${level}`);
 
-  // Get owner pubkey hash (simplified - would derive from address in production)
-  const ownerHash = crypto.createHash('sha256')
-    .update(address)
-    .digest('hex')
-    .slice(0, 56);
+  // Get current slot for timestamp fields
+  const currentSlot = await getCurrentSlot(provider);
+  log.info(`Current slot: ${currentSlot}`);
+
+  // Get actual verification key hash from address (CRITICAL: not a fake hash!)
+  const ownerHash = getVerificationKeyHash(address);
+  log.info(`Owner key hash: ${ownerHash.slice(0, 20)}...`);
 
   // Build pNFT datum
   const datum = buildPnftDatum(pnftId, ownerHash, level, {
     dnaHash: dnaHash ? Buffer.from(dnaHash).toString('hex') : null,
     bioregion: bioregion ? Buffer.from(bioregion).toString('hex') : null,
     guardian: guardian ? Buffer.from(guardian).toString('hex') : null,
-    wardSince: level === 'Ward' ? Date.now() : null,
+    wardSince: level === 'Ward' ? currentSlot : null,
+    currentSlot: currentSlot,
   });
 
   log.info('pNFT datum constructed');

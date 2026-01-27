@@ -57,6 +57,23 @@ const log = {
   step: (n, msg) => console.log(`\n[Step ${n}] ${msg}`),
 };
 
+/**
+ * Get current Cardano slot from Blockfrost
+ * CRITICAL: Use slot numbers, not milliseconds, for all on-chain timestamps
+ */
+async function getCurrentSlot(provider) {
+  try {
+    const tip = await provider.fetchBlockchainTip();
+    return tip.slot;
+  } catch (error) {
+    log.warn(`Could not fetch current slot: ${error.message}`);
+    // Fallback: estimate slot from time (Preview testnet)
+    const previewGenesisTime = 1666656000;
+    const currentTime = Math.floor(Date.now() / 1000);
+    return currentTime - previewGenesisTime;
+  }
+}
+
 function formatAda(lovelace) {
   return (Number(lovelace) / 1_000_000).toFixed(2) + ' ADA';
 }
@@ -81,16 +98,17 @@ function buildGenesisDatum() {
   };
 }
 
-function buildTreasuryDatum() {
+function buildTreasuryDatum(currentSlot) {
   // TreasuryDatum from lib/ultralife/types.ak:643-654
   // Fields: tokens_distributed, ada_reserves, btc_reserves, last_update, multisig
+  // CRITICAL: last_update must be slot number, NOT milliseconds
   return {
     constructor: 0,
     fields: [
       { int: 0 },                                    // tokens_distributed
       { int: Number(CONFIG.initialTreasuryAda) },    // ada_reserves (lovelace)
       { int: 0 },                                    // btc_reserves (satoshis)
-      { int: Date.now() },                           // last_update (slot)
+      { int: currentSlot },                          // last_update (slot number)
       {                                              // multisig: MultisigConfig
         constructor: 0,
         fields: [
@@ -102,9 +120,10 @@ function buildTreasuryDatum() {
   };
 }
 
-function buildBioregionDatum() {
+function buildBioregionDatum(currentSlot) {
   // BioregionDatum from lib/ultralife/types.ak:139-156
   // Fields: bioregion_id, name_hash, bounds_hash, health_index, resident_count, treasury, created_at, last_health_update
+  // CRITICAL: created_at must be slot number, NOT milliseconds
   return {
     constructor: 0,
     fields: [
@@ -114,15 +133,16 @@ function buildBioregionDatum() {
       { int: 10000 },                                                      // health_index (0-10000 = 0-100.00%)
       { int: 0 },                                                          // resident_count
       { bytes: '' },                                                       // treasury (script hash, set during deploy)
-      { int: Date.now() },                                                 // created_at (slot)
+      { int: currentSlot },                                                // created_at (slot number)
       { int: 0 },                                                          // last_health_update (cycle)
     ],
   };
 }
 
-function buildUbiPoolDatum() {
+function buildUbiPoolDatum(currentSlot) {
   // UbiPoolDatum from lib/ultralife/types.ak:740-759
   // Fields: bioregion, cycle, fees_collected, ubi_pool, eligible_count, total_engagement_weight, claims_count, distributed, distribution_start
+  // CRITICAL: distribution_start must be slot number, NOT milliseconds
   return {
     constructor: 0,
     fields: [
@@ -134,7 +154,7 @@ function buildUbiPoolDatum() {
       { int: 0 },                                                         // total_engagement_weight
       { int: 0 },                                                         // claims_count
       { int: 0 },                                                         // distributed
-      { int: Date.now() },                                                // distribution_start
+      { int: currentSlot },                                               // distribution_start (slot number)
     ],
   };
 }
@@ -161,7 +181,15 @@ async function main() {
     log.error('No deployment.json found. Run deploy-testnet.mjs first.');
     process.exit(1);
   }
-  const deployment = JSON.parse(fs.readFileSync(CONFIG.deploymentPath, 'utf8'));
+
+  let deployment;
+  try {
+    deployment = JSON.parse(fs.readFileSync(CONFIG.deploymentPath, 'utf8'));
+  } catch (error) {
+    log.error(`Failed to parse deployment.json: ${error.message}`);
+    log.info('The file may be corrupted. Check the JSON syntax.');
+    process.exit(1);
+  }
 
   // Check if already initialized
   if (deployment.genesis?.txHash) {
@@ -185,6 +213,10 @@ async function main() {
   const address = wallet.getChangeAddress();
   log.info(`Wallet: ${address}`);
 
+  // Get current slot (CRITICAL: use slot numbers, not milliseconds)
+  const currentSlot = await getCurrentSlot(provider);
+  log.info(`Current slot: ${currentSlot}`);
+
   // Check balance
   const utxos = await provider.fetchAddressUTxOs(address);
   const balance = utxos.reduce((sum, u) => {
@@ -203,9 +235,9 @@ async function main() {
   log.step(1, 'Building genesis datums...');
 
   const genesisDatum = buildGenesisDatum();
-  const treasuryDatum = buildTreasuryDatum();
-  const bioregionDatum = buildBioregionDatum();
-  const ubiPoolDatum = buildUbiPoolDatum();
+  const treasuryDatum = buildTreasuryDatum(currentSlot);
+  const bioregionDatum = buildBioregionDatum(currentSlot);
+  const ubiPoolDatum = buildUbiPoolDatum(currentSlot);
 
   log.info('Genesis datum: Protocol parameters');
   log.info('Treasury datum: Initial treasury state');
