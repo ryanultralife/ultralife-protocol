@@ -7,8 +7,8 @@
 //
 // =============================================================================
 
-use aiken/crypto.{VerificationKeyHash, Blake2b_256, Hash}
-use cardano/assets.{PolicyId, AssetName}
+use aiken/crypto.{VerificationKeyHash}
+use cardano/assets.{AssetName}
 
 // =============================================================================
 // IDENTITY TYPES
@@ -945,14 +945,14 @@ pub fn can_propose(level: VerificationLevel) -> Bool {
 /// Encode transaction type to integer
 pub fn tx_type_code(tx_type: TransactionType) -> Int {
   when tx_type is {
-    Labor { work_code, hours } -> 1
-    Goods { product_code, quantity, unit_code } -> 2
-    Services { service_code } -> 3
+    Labor { .. } -> 1
+    Goods { .. } -> 2
+    Services { .. } -> 3
     Gift -> 4
-    Investment { terms_hash } -> 5
-    Remediation { bond_id } -> 6
-    UBI { cycle } -> 7
-    GovernanceReward { proposal_id } -> 8
+    Investment { .. } -> 5
+    Remediation { .. } -> 6
+    UBI { .. } -> 7
+    GovernanceReward { .. } -> 8
     Internal -> 9
     _ -> 10
   }

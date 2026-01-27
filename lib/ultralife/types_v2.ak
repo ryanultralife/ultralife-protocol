@@ -12,8 +12,8 @@
 // =============================================================================
 
 use aiken/collection/list
-use aiken/crypto.{VerificationKeyHash, Blake2b_256, Hash}
-use cardano/assets.{PolicyId, AssetName}
+use aiken/crypto.{VerificationKeyHash}
+use cardano/assets.{AssetName}
 
 // =============================================================================
 // PHYSICAL REALITY — IMPACT COMPOUNDS
