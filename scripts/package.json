@@ -1,12 +1,47 @@
 {
-  "name": "ultralife-scripts",
+  "name": "@ultralife/scripts",
   "version": "1.0.0",
+  "description": "UltraLife Protocol deployment and transaction scripts",
   "type": "module",
   "scripts": {
-    "deploy": "node deploy.mjs"
+    "deploy": "node src/deploy.mjs",
+    "deploy:preview": "NETWORK=preview node src/deploy.mjs",
+    "deploy:preprod": "NETWORK=preprod node src/deploy.mjs",
+    "deploy:reference": "node src/deploy-reference-scripts.mjs",
+    "genesis:init": "node src/genesis-init.mjs",
+    "genesis:mint": "node src/genesis-mint.mjs",
+    "pnft:mint": "node src/pnft-mint.mjs",
+    "ubi:init": "node src/ubi-init.mjs",
+    "ubi:claim": "node src/ubi-claim.mjs",
+    "transfer": "node src/transfer.mjs",
+    "status": "node src/status.mjs",
+    "test:deploy": "node src/test/deploy-test.mjs",
+    "test:transactions": "node src/test/transaction-test.mjs"
   },
   "dependencies": {
     "@blockfrost/blockfrost-js": "^5.5.0",
-    "@meshsdk/core": "^1.6.0"
-  }
+    "@lucid-evolution/lucid": "^0.3.0",
+    "@lucid-evolution/utils": "^0.1.0",
+    "bip39": "^3.1.0",
+    "cbor": "^9.0.0",
+    "chalk": "^5.3.0",
+    "commander": "^12.0.0",
+    "dotenv": "^16.4.0",
+    "multiformats": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "cardano",
+    "aiken",
+    "ultralife",
+    "deployment",
+    "transactions"
+  ],
+  "author": "UltraLife Protocol",
+  "license": "Apache-2.0"
 }

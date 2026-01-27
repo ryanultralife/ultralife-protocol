@@ -8,10 +8,13 @@ scripts/node_modules/
 
 # Deployment records
 deployment-*.json
+scripts/deployments/
 
 # Environment
 .env
-.env.*
+.env.local
+.env.*.local
+!.env.example
 
 # IDE
 .vscode/
