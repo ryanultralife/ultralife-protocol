@@ -19,6 +19,7 @@ import {
 
 import { UltraLifeIndexer } from '../indexer/index.js';
 import { UltraLifeTxBuilder } from '../builder/index.js';
+import { UbiOperations } from '../sdk/ubi.js';
 import type { UltraLifeConfig, CategoryRef, WhatOffered, LocationScope, Terms, CompoundFlow } from '../types/index.js';
 
 // =============================================================================
@@ -472,6 +473,81 @@ const TOOLS: Tool[] = [
       required: ['buyer_address', 'ada_amount'],
     },
   },
+
+  // === UBI TOOLS ===
+  {
+    name: 'get_ubi_pool',
+    description: 'Get UBI pool information for a bioregion including fees collected, eligible count, and estimated per-person distribution',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        bioregion: { type: 'string', description: 'The bioregion ID' },
+      },
+      required: ['bioregion'],
+    },
+  },
+  {
+    name: 'list_ubi_pools',
+    description: 'List all active UBI pools across bioregions',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'check_ubi_eligibility',
+    description: 'Check if a pNFT is eligible to claim UBI and get estimated amount',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pnft_id: { type: 'string', description: 'The pNFT ID to check' },
+      },
+      required: ['pnft_id'],
+    },
+  },
+  {
+    name: 'get_ubi_period_stats',
+    description: 'Get current UBI period statistics including distribution totals, fee shares, and adjustment history',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'estimate_next_ubi',
+    description: 'Estimate next cycle UBI distribution for a bioregion based on current data',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        bioregion: { type: 'string', description: 'The bioregion ID' },
+      },
+      required: ['bioregion'],
+    },
+  },
+  {
+    name: 'build_claim_ubi',
+    description: 'Build a transaction to claim UBI for a pNFT. Returns unsigned transaction for wallet signing.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pnft_id: { type: 'string', description: 'The pNFT ID claiming UBI' },
+      },
+      required: ['pnft_id'],
+    },
+  },
+  {
+    name: 'build_initialize_ubi_pool',
+    description: 'Build a transaction to initialize a UBI pool for a bioregion (admin only). Returns unsigned transaction for wallet signing.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        bioregion: { type: 'string', description: 'The bioregion ID' },
+        initial_fees: { type: 'number', description: 'Initial fee pool amount' },
+        admin_pnft: { type: 'string', description: 'Admin pNFT ID' },
+      },
+      required: ['bioregion', 'initial_fees', 'admin_pnft'],
+    },
+  },
 ];
 
 // =============================================================================
@@ -482,12 +558,14 @@ export class UltraLifeMcpServer {
   private server: Server;
   private indexer: UltraLifeIndexer;
   private builder: UltraLifeTxBuilder;
+  private ubi: UbiOperations;
   private config: UltraLifeConfig;
 
   constructor(config: UltraLifeConfig) {
     this.config = config;
     this.indexer = new UltraLifeIndexer(config);
     this.builder = new UltraLifeTxBuilder(config, this.indexer);
+    this.ubi = new UbiOperations(config, this.indexer, this.builder);
     
     this.server = new Server(
       {
@@ -637,6 +715,28 @@ export class UltraLifeMcpServer {
       
       case 'build_purchase_from_pool':
         return this.buildPurchaseFromPool(args);
+
+      // === UBI ===
+      case 'get_ubi_pool':
+        return this.ubi.getPoolInfo(args.bioregion as string);
+
+      case 'list_ubi_pools':
+        return this.ubi.listPools();
+
+      case 'check_ubi_eligibility':
+        return this.ubi.checkEligibility(args.pnft_id as string);
+
+      case 'get_ubi_period_stats':
+        return this.ubi.getPeriodStats();
+
+      case 'estimate_next_ubi':
+        return this.ubi.estimateNextCycleUbi(args.bioregion as string);
+
+      case 'build_claim_ubi':
+        return this.buildClaimUbi(args);
+
+      case 'build_initialize_ubi_pool':
+        return this.buildInitializeUbiPool(args);
 
       default:
         throw new Error(`Unknown tool: ${name}`);
@@ -989,6 +1089,44 @@ export class UltraLifeMcpServer {
   }
 
   // ===========================================================================
+  // UBI BUILDERS
+  // ===========================================================================
+
+  private async buildClaimUbi(args: Record<string, unknown>): Promise<object> {
+    const result = await this.ubi.buildClaimUbi({
+      pnftId: args.pnft_id as string,
+    });
+
+    return {
+      action: 'Claim UBI',
+      transaction: {
+        unsigned_cbor: result.tx.toString(),
+        tx_hash: result.tx.toHash(),
+      },
+      summary: result.summary,
+      next_step: 'Sign this transaction with your wallet to claim your UBI',
+    };
+  }
+
+  private async buildInitializeUbiPool(args: Record<string, unknown>): Promise<object> {
+    const result = await this.ubi.buildInitializePool({
+      bioregion: args.bioregion as string,
+      initialFees: BigInt((args.initial_fees as number) * 1_000_000),
+      adminPnft: args.admin_pnft as string,
+    });
+
+    return {
+      action: 'Initialize UBI Pool',
+      transaction: {
+        unsigned_cbor: result.tx.toString(),
+        tx_hash: result.tx.toHash(),
+      },
+      summary: result.summary,
+      next_step: 'Sign this transaction with your wallet to create the UBI pool',
+    };
+  }
+
+  // ===========================================================================
   // HELPERS
   // ===========================================================================
 
@@ -1008,12 +1146,15 @@ export class UltraLifeMcpServer {
   // ===========================================================================
 
   async start(): Promise<void> {
-    await this.indexer.initialize();
-    await this.builder.initialize();
-    
+    await Promise.all([
+      this.indexer.initialize(),
+      this.builder.initialize(),
+      this.ubi.initialize(),
+    ]);
+
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    
+
     console.error('UltraLife MCP Server running on stdio');
   }
 }
