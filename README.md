@@ -19,8 +19,12 @@ Built on Cardano | 27 Aiken Validators | Plutus V3 | LLM Interface
 | Validator Implementation (27) | ✅ Complete |
 | Type System & Libraries | ✅ Complete |
 | MCP Service (31 tools) | ✅ Complete |
-| Documentation (33 files) | ✅ Complete |
+| Documentation (34 files) | ✅ Complete |
+| Automated Testing (130+ tests) | ✅ Complete |
+| CI/CD Pipeline | ✅ Active |
 | Testnet Deployment | 🔄 In Progress |
+| Community Testing | ⏳ Pending |
+| Security Audit | ⏳ Pending |
 | Mainnet Launch | ⏳ Pending |
 
 **Next Steps:**
@@ -28,6 +32,7 @@ Built on Cardano | 27 Aiken Validators | Plutus V3 | LLM Interface
 2. Configure policy IDs and script addresses
 3. Seed initial bioregions and genesis pNFTs
 4. Community testing and feedback
+5. Security audit
 
 ---
 
@@ -122,7 +127,38 @@ cd service && npm install && npm start
 | [Fraud Analysis](docs/FRAUD_ANALYSIS.md) | Attack vectors, mitigations, residual risks |
 | [Oracle Specification](docs/ORACLE_SPECIFICATION.md) | Real-world data feeds |
 | [Deployment](docs/DEPLOYMENT.md) | Testnet and mainnet deployment |
+| [Testing](docs/TESTING.md) | Automated testing and CI/CD |
 | [SPO Quick Brief](docs/SPO_QUICK_BRIEF.md) | For technical testers |
+
+---
+
+## Testing
+
+The protocol includes comprehensive automated testing:
+
+| Category | Tests | Framework |
+|----------|-------|-----------|
+| Smart Contract Unit Tests | 130+ | Aiken |
+| Integration Scenarios | 25+ | Aiken |
+| Service Layer Tests | — | Vitest |
+| CI/CD Pipeline | Active | GitHub Actions |
+
+```bash
+# Run all contract tests
+cd contracts && aiken check
+
+# Run service tests
+cd service && npm test
+```
+
+**Test Coverage:**
+- UBI formula validation (30+ tests)
+- Type system verification (18 tests)
+- 8 transparent economy rules (20+ tests)
+- Protocol timing/37-day cycles (30+ tests)
+- 10 user journey scenarios (25+ tests)
+
+See [Testing Guide](docs/TESTING.md) for details.
 
 ---
 

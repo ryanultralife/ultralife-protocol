@@ -10,7 +10,9 @@
 | Contract Development | ✅ Complete (27 validators) |
 | Type System & Libraries | ✅ Complete |
 | MCP Service | ✅ Complete (31 tools) |
-| Documentation | ✅ Complete (33 files) |
+| Documentation | ✅ Complete (34 files) |
+| Automated Testing | ✅ Complete (130+ tests) |
+| CI/CD Pipeline | ✅ Active |
 | **Testnet Deployment** | 🔄 **Current Phase** |
 | Testnet Verification | ⏳ Pending |
 | Security Audit | ⏳ Pending |
@@ -79,8 +81,37 @@ Create `testnet-config.json`:
 }
 ```
 
+### Pre-Deployment Testing
+
+Before deploying to testnet, verify all automated tests pass:
+
+```bash
+# Run all smart contract tests (130+ tests)
+cd contracts && aiken check
+
+# Expected output:
+#   Summary: 130 tests, 0 failures
+
+# Build and compile validators
+cd contracts && aiken build
+
+# Run service tests
+cd service && npm test
+```
+
+**Test Categories:**
+- UBI calculation tests (30+ tests)
+- Type system tests (18 tests)
+- Token rules tests (20+ tests)
+- Protocol timing tests (30+ tests)
+- Integration scenarios (25+ tests)
+
+See [Testing Guide](TESTING.md) for complete documentation.
+
 ### Testnet Deployment Checklist
 
+- [ ] All automated tests passing (130+)
+- [ ] CI/CD pipeline green
 - [ ] Obtain Preview testnet ADA from faucet
 - [ ] Build and verify all 27 validators compile
 - [ ] Deploy reference scripts to Preview
