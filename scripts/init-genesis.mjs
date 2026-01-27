@@ -22,6 +22,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import 'dotenv/config';
 
+import { atomicWriteSync } from './utils.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // =============================================================================
@@ -272,7 +274,7 @@ async function main() {
     },
   };
 
-  fs.writeFileSync(CONFIG.deploymentPath, JSON.stringify(deployment, null, 2));
+  atomicWriteSync(CONFIG.deploymentPath, deployment);
 
   log.success('Genesis preparation complete!');
 

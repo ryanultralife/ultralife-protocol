@@ -27,6 +27,8 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import 'dotenv/config';
 
+import { atomicWriteSync } from './utils.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // =============================================================================
@@ -277,7 +279,7 @@ async function main() {
   };
 
   deployment.pnfts.push(pnftRecord);
-  fs.writeFileSync(CONFIG.deploymentPath, JSON.stringify(deployment, null, 2));
+  atomicWriteSync(CONFIG.deploymentPath, deployment);
 
   log.success('pNFT prepared!');
 

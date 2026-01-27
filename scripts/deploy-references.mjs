@@ -25,6 +25,16 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import 'dotenv/config';
 
+import {
+  atomicWriteSync,
+  safeReadJson,
+  selectUtxos,
+  validateUtxoSelection,
+  estimateFee,
+  calculateRequiredBalance,
+  formatAda,
+} from './utils.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // =============================================================================
@@ -113,18 +123,32 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
       verbose: false,
     });
 
-    // Select UTxOs for input
-    let inputValue = 0n;
-    const selectedUtxos = [];
-    for (const utxo of utxos) {
-      const lovelace = utxo.output.amount.find(a => a.unit === 'lovelace');
-      inputValue += BigInt(lovelace?.quantity || 0);
-      selectedUtxos.push(utxo);
-      if (inputValue > MIN_REFERENCE_LOVELACE + 5_000_000n) break;
+    // Calculate script size for fee estimation
+    const scriptSize = validator.compiledCode.length / 2; // hex to bytes
+    const estimatedFee = estimateFee('referenceScript', { scriptSize });
+
+    // Select UTxOs with proper validation
+    const targetAmount = MIN_REFERENCE_LOVELACE + estimatedFee;
+    const selection = selectUtxos(utxos, targetAmount);
+
+    if (!selection.sufficient) {
+      throw new Error(
+        `Insufficient UTxOs: need ${formatAda(targetAmount)}, ` +
+        `have ${formatAda(selection.total)}, shortfall ${formatAda(selection.shortfall)}`
+      );
+    }
+
+    // Validate selection before building transaction
+    const validation = validateUtxoSelection(selection.selected, MIN_REFERENCE_LOVELACE, estimatedFee);
+    if (!validation.valid) {
+      throw new Error(`UTxO validation failed: ${validation.errors.join(', ')}`);
+    }
+    for (const warning of validation.warnings) {
+      log.warn(warning);
     }
 
     // Add inputs
-    for (const utxo of selectedUtxos) {
+    for (const utxo of selection.selected) {
       txBuilder.txIn(
         utxo.input.txHash,
         utxo.input.outputIndex
@@ -196,13 +220,14 @@ async function main() {
     log.error(`plutus.json not found at ${CONFIG.plutusPath}`);
     process.exit(1);
   }
-  const plutus = JSON.parse(fs.readFileSync(CONFIG.plutusPath, 'utf8'));
-
-  // Load or create deployment record
-  let deployment = {};
-  if (fs.existsSync(CONFIG.deploymentPath)) {
-    deployment = JSON.parse(fs.readFileSync(CONFIG.deploymentPath, 'utf8'));
+  const plutus = safeReadJson(CONFIG.plutusPath);
+  if (!plutus) {
+    log.error('Failed to parse plutus.json');
+    process.exit(1);
   }
+
+  // Load or create deployment record (safe read with default)
+  let deployment = safeReadJson(CONFIG.deploymentPath, {});
   deployment.references = deployment.references || {};
 
   // Initialize provider and wallet
@@ -260,8 +285,8 @@ async function main() {
         skipped++;
       }
 
-      // Save after each deployment
-      fs.writeFileSync(CONFIG.deploymentPath, JSON.stringify(deployment, null, 2));
+      // Save after each deployment (atomic write prevents corruption)
+      atomicWriteSync(CONFIG.deploymentPath, deployment);
 
     } catch (error) {
       failed++;

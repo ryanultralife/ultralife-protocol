@@ -29,6 +29,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import 'dotenv/config';
 
+import {
+  atomicWriteSync,
+  safeReadJson,
+  calculateRequiredBalance,
+  formatAda,
+} from './utils.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // =============================================================================
@@ -196,10 +203,24 @@ async function checkPrerequisites() {
 
   log.info(`Wallet balance: ${formatAda(totalLovelace)}`);
 
-  // Need at least 100 ADA for deployment
-  const minRequired = 100_000_000n; // 100 ADA
-  if (totalLovelace < minRequired) {
-    log.error(`Insufficient funds. Need at least ${formatAda(minRequired)}`);
+  // Calculate required balance based on deployment complexity
+  const numValidators = DEPLOY_ORDER.length;
+  const required = calculateRequiredBalance({
+    numValidators,
+    treasuryAmount: CONFIG.initialUbiPool,
+    avgScriptSize: 5000,
+  });
+
+  log.info(`Deploying ${numValidators} validators`);
+  log.info(`Required: ${formatAda(required.total)}`);
+  log.info(`  - Reference scripts: ${formatAda(required.breakdown.referenceScripts)}`);
+  log.info(`  - Transaction fees: ${formatAda(required.breakdown.transactionFees)}`);
+  log.info(`  - Treasury/UBI: ${formatAda(required.breakdown.treasury + required.breakdown.ubiPool)}`);
+  log.info(`  - Min UTxOs: ${formatAda(required.breakdown.minUtxos)}`);
+
+  if (totalLovelace < required.total) {
+    log.error(`Insufficient funds. Need ${formatAda(required.total)}, have ${formatAda(totalLovelace)}`);
+    log.info(`Shortfall: ${formatAda(required.total - totalLovelace)}`);
     log.info(`Get test ADA from: https://docs.cardano.org/cardano-testnets/tools/faucet/`);
     process.exit(1);
   }
@@ -216,7 +237,12 @@ async function checkPrerequisites() {
 async function deployReferenceScripts(provider, wallet) {
   log.header('STEP 2: Deploying Reference Scripts');
 
-  const plutus = JSON.parse(fs.readFileSync(CONFIG.plutusPath, 'utf8'));
+  const plutus = safeReadJson(CONFIG.plutusPath);
+  if (!plutus) {
+    log.error('Failed to load plutus.json');
+    process.exit(1);
+  }
+
   const deployment = {
     network: CONFIG.network,
     timestamp: new Date().toISOString(),
@@ -224,12 +250,11 @@ async function deployReferenceScripts(provider, wallet) {
     references: {},
   };
 
-  // Load existing deployment if present
-  if (fs.existsSync(CONFIG.deploymentPath)) {
-    const existing = JSON.parse(fs.readFileSync(CONFIG.deploymentPath, 'utf8'));
-    if (existing.network === CONFIG.network) {
-      log.info('Found existing deployment, will skip already deployed scripts');
-      Object.assign(deployment.validators, existing.validators || {});
+  // Load existing deployment if present (using safe read)
+  const existing = safeReadJson(CONFIG.deploymentPath);
+  if (existing && existing.network === CONFIG.network) {
+    log.info('Found existing deployment, will skip already deployed scripts');
+    Object.assign(deployment.validators, existing.validators || {});
       Object.assign(deployment.references, existing.references || {});
     }
   }
@@ -305,7 +330,7 @@ async function deployReferenceScripts(provider, wallet) {
   }
 
   // Save deployment record
-  fs.writeFileSync(CONFIG.deploymentPath, JSON.stringify(deployment, null, 2));
+  atomicWriteSync(CONFIG.deploymentPath, deployment);
 
   log.success(`Deployment record saved to ${CONFIG.deploymentPath}`);
   log.info(`Deployed: ${deployed}, Skipped: ${skipped}`);
@@ -360,7 +385,7 @@ async function initializeProtocol(provider, wallet, deployment) {
     status: 'pending',
   }];
 
-  fs.writeFileSync(CONFIG.deploymentPath, JSON.stringify(deployment, null, 2));
+  atomicWriteSync(CONFIG.deploymentPath, deployment);
 
   log.success('Protocol initialization recorded');
   log.warn('Note: Actual on-chain initialization requires funded transactions');
@@ -399,7 +424,7 @@ async function mintTestPnft(provider, wallet, deployment) {
     timestamp: new Date().toISOString(),
   };
 
-  fs.writeFileSync(CONFIG.deploymentPath, JSON.stringify(deployment, null, 2));
+  atomicWriteSync(CONFIG.deploymentPath, deployment);
 
   log.success(`Test pNFT recorded: ${pnftId}`);
 
