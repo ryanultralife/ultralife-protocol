@@ -1065,3 +1065,111 @@ fn list_concat(a: List<t>, b: List<t>) -> List<t> {
 fn abs(x: Int) -> Int {
   if x < 0 { -x } else { x }
 }
+
+// =============================================================================
+// TESTS
+// =============================================================================
+
+test voting_weight_basic_is_0() {
+  voting_weight(Basic) == 0
+}
+
+test voting_weight_standard_is_1() {
+  voting_weight(Standard) == 1
+}
+
+test voting_weight_verified_is_2() {
+  voting_weight(Verified) == 2
+}
+
+test voting_weight_steward_is_3() {
+  voting_weight(Steward) == 3
+}
+
+test basic_cannot_transact() {
+  !can_transact(Basic)
+}
+
+test standard_can_transact() {
+  can_transact(Standard)
+}
+
+test verified_can_transact() {
+  can_transact(Verified)
+}
+
+test steward_can_transact() {
+  can_transact(Steward)
+}
+
+test basic_cannot_propose() {
+  !can_propose(Basic)
+}
+
+test standard_cannot_propose() {
+  !can_propose(Standard)
+}
+
+test verified_can_propose() {
+  can_propose(Verified)
+}
+
+test steward_can_propose() {
+  can_propose(Steward)
+}
+
+test tx_type_code_labor_is_1() {
+  tx_type_code(Labor { work_code: "", hours: None }) == 1
+}
+
+test tx_type_code_goods_is_2() {
+  tx_type_code(Goods { product_code: "", quantity: 1, unit_code: "" }) == 2
+}
+
+test tx_type_code_services_is_3() {
+  tx_type_code(Services { service_code: "" }) == 3
+}
+
+test tx_type_code_gift_is_4() {
+  tx_type_code(Gift) == 4
+}
+
+test tx_type_code_ubi_is_7() {
+  tx_type_code(UBI { cycle: 0 }) == 7
+}
+
+test tx_type_code_internal_is_9() {
+  tx_type_code(Internal) == 9
+}
+
+test impact_sign_positive_is_1() {
+  impact_sign(Positive { impact_code: "", magnitude: 100, unit_code: None }) == 1
+}
+
+test impact_sign_negative_is_minus_1() {
+  impact_sign(Negative {
+    impact_code: "",
+    magnitude: 100,
+    unit_code: None,
+    remediation: Immediate { output_index: 0 }
+  }) == -1
+}
+
+test impact_magnitude_positive() {
+  impact_magnitude(Positive { impact_code: "", magnitude: 500, unit_code: None }) == 500
+}
+
+test impact_magnitude_negative() {
+  impact_magnitude(Negative {
+    impact_code: "",
+    magnitude: 750,
+    unit_code: None,
+    remediation: Immediate { output_index: 0 }
+  }) == 750
+}
+
+test verification_levels_ordered() {
+  voting_weight(Basic) < voting_weight(Standard) &&
+  voting_weight(Standard) < voting_weight(Verified) &&
+  voting_weight(Verified) < voting_weight(Steward)
+}

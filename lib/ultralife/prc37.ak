@@ -194,3 +194,39 @@ pub fn majority_reached(votes_for: Int, votes_against: Int) -> Bool {
 // - Resonance Threshold: 37 interpretations for emergence
 //
 // =============================================================================
+
+// =============================================================================
+// TESTS
+// =============================================================================
+
+test current_cycle_starts_at_0() {
+  current_cycle(0) == 0
+}
+
+test current_cycle_before_first_complete() {
+  current_cycle(cycle_slots - 1) == 0
+}
+
+test current_cycle_after_first_complete() {
+  current_cycle(cycle_slots) == 1
+}
+
+test cycle_start_at_cycle_0() {
+  cycle_start(0) == 0
+}
+
+test cycle_start_at_cycle_1() {
+  cycle_start(1) == cycle_slots
+}
+
+test in_ubi_window_at_start() {
+  in_ubi_window(0)
+}
+
+test in_ubi_window_before_end() {
+  in_ubi_window(ubi_window - 1)
+}
+
+test not_in_ubi_window_after_end() {
+  !in_ubi_window(ubi_window)
+}

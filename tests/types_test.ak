@@ -5,7 +5,7 @@
 use ultralife/types.{
   VerificationLevel, Basic, Standard, Verified, Steward,
   TransactionType, Labor, Goods, Services, Gift, Investment, Remediation, UBI, GovernanceReward, Internal,
-  ImpactClass, Positive, Neutral, Negative,
+  ImpactClass, Positive, Negative,
   RemediationType, Immediate,
   voting_weight, can_transact, can_propose, tx_type_code, impact_sign, impact_magnitude,
 }
@@ -118,14 +118,10 @@ test impact_sign_positive_is_1() {
   impact_sign(Positive { impact_code: "", magnitude: 100, unit_code: None }) == 1
 }
 
-test impact_sign_neutral_is_0() {
-  impact_sign(Neutral) == 0
-}
-
 test impact_sign_negative_is_minus_1() {
-  impact_sign(Negative { 
-    impact_code: "", 
-    magnitude: 100, 
+  impact_sign(Negative {
+    impact_code: "",
+    magnitude: 100,
     unit_code: None,
     remediation: Immediate { output_index: 0 }
   }) == -1
@@ -139,14 +135,10 @@ test impact_magnitude_positive() {
   impact_magnitude(Positive { impact_code: "", magnitude: 500, unit_code: None }) == 500
 }
 
-test impact_magnitude_neutral() {
-  impact_magnitude(Neutral) == 0
-}
-
 test impact_magnitude_negative() {
-  impact_magnitude(Negative { 
-    impact_code: "", 
-    magnitude: 750, 
+  impact_magnitude(Negative {
+    impact_code: "",
+    magnitude: 750,
     unit_code: None,
     remediation: Immediate { output_index: 0 }
   }) == 750
