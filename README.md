@@ -8,6 +8,29 @@ Built on Cardano | 27 Aiken Validators | Plutus V3 | LLM Interface
 
 ---
 
+## Status: Testnet Deployment Phase
+
+> **Development Complete** — All 27 validators, 33 documentation files, and MCP service fully implemented.
+> Now deploying to Cardano Preview Testnet.
+
+| Milestone | Status |
+|-----------|--------|
+| Protocol Design | ✅ Complete |
+| Validator Implementation (27) | ✅ Complete |
+| Type System & Libraries | ✅ Complete |
+| MCP Service (31 tools) | ✅ Complete |
+| Documentation (33 files) | ✅ Complete |
+| Testnet Deployment | 🔄 In Progress |
+| Mainnet Launch | ⏳ Pending |
+
+**Next Steps:**
+1. Deploy reference scripts to Preview Testnet
+2. Configure policy IDs and script addresses
+3. Seed initial bioregions and genesis pNFTs
+4. Community testing and feedback
+
+---
+
 ## Overview
 
 UltraLife Protocol is a regenerative economics system where:

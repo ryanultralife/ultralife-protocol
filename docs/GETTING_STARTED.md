@@ -2,6 +2,20 @@
 
 This guide will help you set up your development environment and start building with the UltraLife Protocol.
 
+## Status: Development Complete, Testnet Ready
+
+> **All 27 validators, 33 documentation files, and MCP service are complete.**
+> The protocol is now deploying to Cardano Preview Testnet.
+
+| What's Ready | Count |
+|--------------|-------|
+| Aiken Validators | 27 |
+| MCP Tools | 31 |
+| Documentation Files | 33 |
+| Library Modules | 6 |
+
+---
+
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
@@ -10,9 +24,10 @@ This guide will help you set up your development environment and start building 
 4. [Building Contracts](#building-contracts)
 5. [Running Tests](#running-tests)
 6. [MCP Service Setup](#mcp-service-setup)
-7. [Local Development](#local-development)
-8. [Common Tasks](#common-tasks)
-9. [Troubleshooting](#troubleshooting)
+7. [Connecting to Testnet](#connecting-to-testnet)
+8. [Local Development](#local-development)
+9. [Common Tasks](#common-tasks)
+10. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -215,6 +230,57 @@ Add to your Claude Desktop MCP configuration:
   }
 }
 ```
+
+---
+
+## Connecting to Testnet
+
+The protocol is currently deployed to Cardano Preview Testnet.
+
+### Get Testnet ADA
+
+1. Generate a testnet wallet address
+2. Request tADA from the faucet: https://docs.cardano.org/cardano-testnet/tools/faucet
+
+### Configure for Testnet
+
+Update your `.env` file:
+
+```bash
+# Testnet configuration
+NETWORK=preview
+BLOCKFROST_PROJECT_ID=previewXXXXXXXXXXXXXXXXXXXXXXXX
+
+# Contract addresses (updated after deployment)
+# See service/src/index.ts for all addresses
+```
+
+### Verify Connection
+
+```bash
+# Start MCP service
+cd service && npm start
+
+# The service should connect to Preview testnet
+# Look for: "Connected to preview network"
+```
+
+### Testnet Validators
+
+All 27 validators are deployed as reference scripts on Preview testnet. The MCP service automatically uses these reference scripts to minimize transaction costs.
+
+| Layer | Validators |
+|-------|------------|
+| Identity | pnft, recovery |
+| Geography | bioregion, land_rights, commons |
+| Economy | token, treasury, grants |
+| Marketplace | marketplace, work_auction, records |
+| Governance | governance, ubi, genesis |
+| Impact | impact, impact_market, asset_impact, remediation |
+| Conservation | preservation, stake_pool |
+| Organizations | collective, care |
+| Registry | registry, memory |
+| Infrastructure | energy, spending_bucket, ultralife_validator |
 
 ---
 

@@ -1,8 +1,117 @@
 # Deployment Guide
 
+## Status: Testnet Deployment Phase
+
+> **Development Complete** — All validators, documentation, and MCP service fully implemented.
+> Currently deploying to Cardano Preview Testnet.
+
+| Phase | Status |
+|-------|--------|
+| Contract Development | ✅ Complete (27 validators) |
+| Type System & Libraries | ✅ Complete |
+| MCP Service | ✅ Complete (31 tools) |
+| Documentation | ✅ Complete (33 files) |
+| **Testnet Deployment** | 🔄 **Current Phase** |
+| Testnet Verification | ⏳ Pending |
+| Security Audit | ⏳ Pending |
+| Mainnet Launch | ⏳ Pending |
+
+---
+
 ## Overview
 
-This guide covers deploying UltraLife Protocol to Cardano mainnet. Deployment requires multi-sig approval from initial stewards.
+This guide covers deploying UltraLife Protocol to Cardano networks. The protocol supports both testnet (Preview/Preprod) and mainnet deployments.
+
+**Current Target:** Preview Testnet
+
+---
+
+## Testnet Deployment (Current)
+
+### Quick Start for Testnet
+
+```bash
+# 1. Build contracts
+cd contracts && aiken build
+
+# 2. Generate testnet addresses
+./scripts/generate-addresses.sh --network preview
+
+# 3. Deploy reference scripts (requires testnet ADA)
+./scripts/deploy-all.sh --network preview
+
+# 4. Configure MCP service
+cp service/.env.example service/.env
+# Edit .env with deployed addresses
+
+# 5. Start service
+cd service && npm start
+```
+
+### Testnet Configuration
+
+Create `testnet-config.json`:
+
+```json
+{
+  "network": "preview",
+  "blockfrost_project_id": "your_preview_project_id",
+  "protocol_version": "1.0.0-testnet",
+  "total_token_supply": 400000000000,
+  "bootstrap_grant": 50,
+  "cycle_length_slots": 3196800,
+  "initial_stewards": [
+    {
+      "name": "Testnet Steward 1",
+      "pubkey_hash": "...",
+      "bioregion": "test_bioregion_1"
+    }
+  ],
+  "multi_sig_threshold": 1,
+  "initial_bioregions": [
+    {
+      "id": "test_bioregion_1",
+      "bounds_hash": "...",
+      "carrying_capacity": 1000,
+      "health_index": 100
+    }
+  ]
+}
+```
+
+### Testnet Deployment Checklist
+
+- [ ] Obtain Preview testnet ADA from faucet
+- [ ] Build and verify all 27 validators compile
+- [ ] Deploy reference scripts to Preview
+- [ ] Record all policy IDs and script addresses
+- [ ] Update `service/src/index.ts` with addresses
+- [ ] Deploy MCP service
+- [ ] Test pNFT minting flow
+- [ ] Test token transfer flow
+- [ ] Test marketplace listing
+- [ ] Test governance proposal
+- [ ] Document any issues found
+
+### Getting Testnet ADA
+
+```bash
+# Preview Testnet Faucet
+# https://docs.cardano.org/cardano-testnet/tools/faucet
+
+# Request ADA to your testnet address
+curl -X POST "https://faucet.preview.world.dev.cardano.org/send-money" \
+  -H "Content-Type: application/json" \
+  -d '{"address": "addr_test1..."}'
+```
+
+---
+
+## Mainnet Deployment (Future)
+
+> **Note:** Mainnet deployment will follow successful testnet verification and security audit.
+
+Mainnet deployment requires multi-sig approval from initial stewards.
 
 ## Prerequisites
 
