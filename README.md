@@ -4,11 +4,53 @@
 
 *"The bar for participation is: can you talk?"*
 
-Built on Cardano • 27 Aiken Validators • LLM Interface
+Built on Cardano | 27 Aiken Validators | Plutus V3 | LLM Interface
 
 ---
 
-## Start Here
+## Overview
+
+UltraLife Protocol is a regenerative economics system where:
+- Every person has a permanent, DNA-verified identity (pNFT)
+- Every transaction measures environmental impact in chemical compounds
+- Every consumer accrues the full impact of their consumption
+- Every bioregion operates with local governance and UBI
+- Every interaction flows through conversation, not applications
+
+**Key Stats:**
+- 27 Smart Contracts (Aiken validators)
+- 400 billion token single pool
+- 37-day governance cycles
+- Compound-based impact tracking (Carbon, Nitrogen, Sulfur, Water, Phosphorus, Particulates, Metals)
+
+---
+
+## Quick Start
+
+```bash
+# Build contracts
+cd contracts && aiken build
+
+# Run tests
+aiken check
+
+# Run MCP service
+cd service && npm install && npm start
+
+# Connect your LLM
+# Add MCP server to Claude Desktop or similar
+```
+
+**Developer Guides:**
+- [Getting Started](docs/GETTING_STARTED.md) - Developer onboarding
+- [Architecture](docs/ARCHITECTURE.md) - System design overview
+- [API Reference](docs/API.md) - Transaction formats and endpoints
+
+---
+
+## Documentation
+
+### Start Here
 
 | # | Document | What You'll Learn |
 |---|----------|-------------------|
@@ -18,9 +60,7 @@ Built on Cardano • 27 Aiken Validators • LLM Interface
 | 4 | [Shopping Experience](docs/SHOPPING_EXPERIENCE.md) | Buy local through conversation |
 | 5 | [Comparative Value](docs/COMPARATIVE_VALUE.md) | How transparent pricing works |
 
----
-
-## Core Concepts
+### Core Concepts
 
 | Document | Description |
 |----------|-------------|
@@ -34,66 +74,117 @@ Built on Cardano • 27 Aiken Validators • LLM Interface
 | [Fortune 500 Disruption](docs/FORTUNE_500_DISRUPTION.md) | $6T market cap made obsolete |
 | [Transparency Replaces Certification](docs/TRANSPARENCY_CERTIFICATION.md) | $50B/year in verification eliminated |
 
----
-
-## Economics
+### Economics
 
 | Document | Description |
 |----------|-------------|
-| [Token Distribution](docs/TOKEN_DISTRIBUTION.md) | Bonding curve ($1/400B→$1), epoch settlement, founder ($10k/month) |
+| [Token Distribution](docs/TOKEN_DISTRIBUTION.md) | Bonding curve ($1/400B to $1), epoch settlement |
 | [Fee Structure](docs/FEE_STRUCTURE.md) | L1/L2 fees, validator rewards |
 | [External Value Flow](docs/EXTERNAL_VALUE_FLOW.md) | ADA/BTC treasury, founder compensation |
 | [Economic Model](docs/ECONOMIC_MODEL.md) | 400B single pool, UBI, impact markets |
 | [Validator Network](docs/VALIDATOR_NETWORK.md) | ULTRA staking, bioregion validation |
 
----
-
-## Technical
+### Technical
 
 | Document | Description |
 |----------|-------------|
+| [Architecture](docs/ARCHITECTURE.md) | System design and validator interactions |
+| [API Reference](docs/API.md) | Transaction formats and endpoints |
+| [Getting Started](docs/GETTING_STARTED.md) | Developer onboarding guide |
 | [System Alignment](docs/SYSTEM_ALIGNMENT.md) | All 27 validators mapped |
 | [Implementation Spec](docs/IMPLEMENTATION_SPEC.md) | Architecture details |
 | [Cardano Scaling](docs/CARDANO_SCALING_INTEGRATION.md) | Hydra, Leios, Starstream |
 | [L2 Scaling Menu](docs/L2_SCALING_MENU.md) | Pluggable L2s (Hydra, Hydrozoa, future) |
 | [L2 Security: pNFT Termination](docs/L2_SECURITY_PNFT.md) | Every L2 tx must end at verified pNFT |
 | [Fraud Analysis](docs/FRAUD_ANALYSIS.md) | Attack vectors, mitigations, residual risks |
-| [Philosophical Comparison](docs/PHILOSOPHICAL_COMPARISON.md) | UltraLife vs. Haldeman & Technocracy |
-| [LLM Security Model](docs/LLM_SECURITY_MODEL.md) | Why conversation interface is secure |
 | [Oracle Specification](docs/ORACLE_SPECIFICATION.md) | Real-world data feeds |
 | [Deployment](docs/DEPLOYMENT.md) | How to deploy to mainnet |
 | [SPO Quick Brief](docs/SPO_QUICK_BRIEF.md) | For technical testers |
 
 ---
 
-## The System
+## The 27 Validators
 
-### 27 Smart Contracts
+### Identity Layer
 
-| Category | Validators |
-|----------|------------|
-| **Identity** | pnft, recovery |
-| **Token** | token, treasury |
-| **Marketplace** | marketplace, work_auction |
-| **Records** | records, registry, memory |
-| **Bioregion** | bioregion, land_rights, commons |
-| **Staking** | stake_pool, governance, ubi |
-| **Impact** | impact, impact_market, asset_impact, remediation, preservation |
-| **Collectives** | collective, care |
-| **Infrastructure** | energy, grants, genesis |
-| **Hydra** | spending_bucket, ultralife_validator, fee_pool |
+| Validator | File | Purpose |
+|-----------|------|---------|
+| **pNFT** | `pnft.ak` | One-per-human DNA-verified identity. Cannot be transferred. Foundation for all participation. Supports 5 verification levels: Basic, Ward, Standard, Verified, Steward. |
+| **Recovery** | `recovery.ak` | 3-layer identity recovery: Social (guardians), DNA (lab workers), Bioregion Stewards. Human-vouches-for-human model. |
 
-### MCP Service
+### Geographic Layer
 
-| Component | Purpose |
-|-----------|---------|
-| Indexer | Read chain state via Blockfrost |
-| Builder | Construct unsigned transactions |
-| MCP Server | 31 tools for LLM interaction |
+| Validator | File | Purpose |
+|-----------|------|---------|
+| **Bioregion** | `bioregion.ak` | Ecological boundaries (not political). Tracks resident count, health index (0-100%), treasury, creation slot. Creates bioregion beacons for proof of residency. |
+| **Land Rights** | `land_rights.ak` | Separates land rights: surface, subsurface, water, air, cellulose, carbon. No ownership—only stewardship. Revenue sharing: 70% steward, 20% bioregion, 10% right holder. |
+| **Commons** | `commons.ak` | Public goods: infrastructure, emergency services, public spaces, utilities, healthcare, education. Funded by bioregion treasury, operated by collectives. |
+
+### Economy Core
+
+| Validator | File | Purpose |
+|-----------|------|---------|
+| **Token** | `token.ak` | Every transaction requires: valid pNFT, bioregion assignment, transaction type, impact declaration, valid recipient, evidence hash. No anonymous transfers. |
+| **Treasury** | `treasury.ak` | External value bridge (ADA/BTC to UltraLife). Quadratic bonding curve: price = n/400B USD. Asymmetric pricing: buy at market, sell at 90%. |
+| **Grants** | `grants.ak` | Bootstrap grants: 50 tokens per DNA-verified user from main 400B pool. Immediate settlement. Prevents double claims. |
+
+### Marketplace & Work
+
+| Validator | File | Purpose |
+|-----------|------|---------|
+| **Marketplace** | `marketplace.ak` | Listings for products (with impact disclosure), services, work capacity, asset sales/rentals. All listings require pNFT verification. |
+| **Work Auction** | `work_auction.ak` | Work request auctions. Requesters specify work, budget, expected impacts. Workers bid with price, compound flows, timeline, certifications. Escrow system. |
+| **Records** | `records.ak` | Accumulates transaction records into cycle aggregations: AvatarCycleStats (per-person) and BioregionCycleStats (per-bioregion). Drives UBI calculations. |
+
+### Governance & Distribution
+
+| Validator | File | Purpose |
+|-----------|------|---------|
+| **Governance** | `governance.ak` | Bioregional democracy with 37-day voting cycles. Proposal types: Budget, Policy, Emergency, Constitutional. Thresholds: 37% quorum, 50% majority, 63% supermajority. |
+| **UBI** | `ubi.ak` | 100% funded from transaction fees. No accrual, no separate pool. Pool divided by engagement weight each epoch. Dynamic fee adjustment (30-70%) maintains target. Survival floor: 20 tokens. |
+| **Genesis** | `genesis.ak` | Solves bootstrap problem. Founding founders have temporary powers during genesis for DNA verification, steward endorsement, bioregion bootstrap. |
+
+### Impact & Remediation
+
+| Validator | File | Purpose |
+|-----------|------|---------|
+| **Impact** | `impact.ak` | Verified environmental action tokens. Categories: Carbon, Water, Biodiversity, Soil, Air, Waste, Energy, Land Use. Compound-based measurement. |
+| **Impact Market** | `impact_market.ak` | True market for planetary consequence. Regenerators SELL verified positive impacts. Extractors BUY offsets or fund remediation. Market-determined pricing. |
+| **Remediation** | `remediation.ak` | Bonds for negative impact commitments. Poster provides bond amount, deadline, remediation magnitude. Bonds can be released, slashed, or completed. |
+| **Asset Impact** | `asset_impact.ak` | Compounds flow to assets through lifecycle. Worker performs work and compounds recorded to asset. Consumer purchases asset and all accumulated compounds transfer to consumer. |
+
+### Conservation & Stewardship
+
+| Validator | File | Purpose |
+|-----------|------|---------|
+| **Preservation** | `preservation.ak` | Ecosystem stewardship. Certified surveyors document ecosystem health. Land stewards receive preservation grants for maintaining/restoring. Multiple surveyor cross-verification. |
+| **Stake Pool** | `stake_pool.ak` | Bioregional economic infrastructure. Validators register pools with specific bioregions. Accept ULTRA delegations. Economic indicator per bioregion. |
+
+### Organizations & Communities
+
+| Validator | File | Purpose |
+|-----------|------|---------|
+| **Collective** | `collective.ak` | Business as pNFT configuration. Multiple pNFTs coordinate around shared resources. Governance weight configurable. Solo spending limits. No separate corporate entity. |
+| **Care** | `care.ak` | Recognizes invisible labor: childcare, elder care, household management, community service. Boosts UBI calculations. Community-based verification. |
+
+### Registry & Memory
+
+| Validator | File | Purpose |
+|-----------|------|---------|
+| **Registry** | `registry.ak` | Hierarchical classification system. Root to Categories to Subcategories. Taxonomy emerges organically from specialist use. Community-governed. |
+| **Memory** | `memory.ak` | Collective understanding registry. Interpretations marked with resonance score. When 37+ interpretations resonate, emergence occurs. Vitality decreases without resonance. |
+
+### Infrastructure & Special Purpose
+
+| Validator | File | Purpose |
+|-----------|------|---------|
+| **Energy** | `energy.ak` | Tracks energy from source to sink. Sources: Solar, Wind, Hydro, Geothermal, Biomass, Natural Gas (penalized), Coal (heavily penalized), Nuclear, Battery. |
+| **Spending Bucket** | `spending_bucket.ak` | Personal finance layer. Pre-allocated funds by purpose (daily, monthly, emergency). Operates inside Hydra heads. Settles to L1 in batches. |
+| **UltraLife Validator** | `ultralife_validator.ak` | Framework for validators to operate in UltraLife tokens. Options: Fee Subsidy Pool, Hydra UltraLife Heads, Partner Chain. |
 
 ---
 
-## How It Works
+## System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -133,34 +224,78 @@ Built on Cardano • 27 Aiken Validators • LLM Interface
 
 ---
 
-## Quick Start
+## The Core Mechanism: Consumer Accrual
 
-```bash
-# Build contracts
-cd contracts && aiken build
+```
+Worker performs work → compounds recorded to ASSET
+                    ↓
+        Consumer purchases ASSET
+                    ↓
+    ALL accumulated compounds transfer to CONSUMER
+                    ↓
+        Consumer is now ACCOUNTABLE
+```
 
-# Run MCP service
-cd service && npm install && npm start
+This makes **consumer demand drive accountability**—the inverse of traditional supply chains where workers carry all environmental cost.
 
-# Connect your LLM
-# Add MCP server to Claude Desktop or similar
+---
+
+## Why 37?
+
+The number 37 appears throughout the protocol:
+- **37-day cycles** — Cannot be gamed by calendar alignment (prime number)
+- **37% quorum** — Minimum participation for valid governance
+- **37 interpretations** — Threshold for emergence in memory
+- **37 smoothing samples** — Statistical averaging
+
+---
+
+## Project Structure
+
+```
+ultralife-protocol/
+├── contracts/
+│   ├── validators/         # 27 Aiken smart contracts
+│   ├── lib/ultralife/      # Shared types and helpers
+│   │   ├── types.ak        # Core type definitions
+│   │   ├── helpers.ak      # Common utilities
+│   │   └── prc37.ak        # 37-day cycle functions
+│   ├── tests/              # Test suites
+│   └── aiken.toml          # Aiken configuration
+├── docs/                   # 30+ documentation files
+├── service/                # MCP service for LLM integration
+│   ├── indexer/            # Read chain state via Blockfrost
+│   ├── builder/            # Construct unsigned transactions
+│   └── mcp/                # 31 tools for LLM interaction
+├── scripts/                # Deployment/utility scripts
+└── README.md               # This file
 ```
 
 ---
 
-## The Vision
+## MCP Service
 
-A parallel economy where:
+| Component | Purpose |
+|-----------|---------|
+| Indexer | Read chain state via Blockfrost |
+| Builder | Construct unsigned transactions |
+| MCP Server | 31 tools for LLM interaction |
 
-- ✓ Every person has permanent identity
-- ✓ Every action has measured impact  
-- ✓ Every impact is accountable
-- ✓ Every negative impact is remediated
-- ✓ Every positive impact is rewarded
-- ✓ Every bioregion has infrastructure
-- ✓ Every resident receives UBI
+---
 
-**Carbon-based life in abundance, with full accountability and dignity.**
+## Economic Parameters
+
+| Parameter | Value |
+|-----------|-------|
+| Total Supply | 400 billion tokens |
+| Cycle Duration | 37 days (3,196,800 slots) |
+| Grant per User | 50 tokens |
+| Quorum | 37% |
+| Majority | 50% |
+| Supermajority | 63% |
+| Resonance Threshold | 37 interpretations |
+| Base UBI | 100 tokens per cycle |
+| Sell Discount | 90% of buy price |
 
 ---
 
