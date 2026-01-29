@@ -17,7 +17,10 @@
     "test:onchain": "node test-onchain.mjs --test",
     "test:onchain:all": "node test-onchain.mjs --test all",
     "test:transfer": "node test-onchain.mjs --test simple-transfer",
-    "test:datum": "node test-onchain.mjs --test datum-output"
+    "test:datum": "node test-onchain.mjs --test datum-output",
+    "test:e2e": "node e2e-test.mjs",
+    "test:e2e:quick": "node e2e-test.mjs --quick",
+    "test:e2e:skip-deploy": "node e2e-test.mjs --skip-deploy"
   },
   "dependencies": {
     "@blockfrost/blockfrost-js": "^5.5.0",
