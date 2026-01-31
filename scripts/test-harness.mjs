@@ -35,7 +35,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // =============================================================================
 
 const CONFIG = {
-  network: process.env.NETWORK || 'preview',
+  network: process.env.NETWORK || 'preprod',
   blockfrostKey: process.env.BLOCKFROST_API_KEY,
   walletMnemonic: process.env.WALLET_SEED_PHRASE,
   plutusPath: path.join(__dirname, '..', 'plutus.json'),
@@ -205,7 +205,7 @@ const phase1Tests = (harness) => ({
 const phase2Tests = (harness) => ({
   'Can build Basic pNFT datum': async () => {
     // Use estimated slot for test datum (not Date.now() milliseconds!)
-    const currentSlot = estimateCurrentSlot('preview');
+    const currentSlot = estimateCurrentSlot(CONFIG.network);
 
     const datum = {
       constructor: 0,
@@ -230,7 +230,7 @@ const phase2Tests = (harness) => ({
   },
 
   'Can build Ward pNFT datum': async () => {
-    const currentSlot = estimateCurrentSlot('preview');
+    const currentSlot = estimateCurrentSlot(CONFIG.network);
     const guardianId = 'guardian_pnft_001';
 
     const datum = {
@@ -253,7 +253,7 @@ const phase2Tests = (harness) => ({
   },
 
   'Can build Steward pNFT datum': async () => {
-    const currentSlot = estimateCurrentSlot('preview');
+    const currentSlot = estimateCurrentSlot(CONFIG.network);
     const oneDayInSlots = 86400; // 1 day = 86400 slots (1 slot per second)
 
     const datum = {
@@ -290,7 +290,7 @@ const phase2Tests = (harness) => ({
 
 const phase3Tests = (harness) => ({
   'Can build Treasury datum': async () => {
-    const currentSlot = estimateCurrentSlot('preview');
+    const currentSlot = estimateCurrentSlot(CONFIG.network);
 
     const datum = {
       constructor: 0,
@@ -337,7 +337,7 @@ const phase3Tests = (harness) => ({
 
 const phase4Tests = (harness) => ({
   'Can build Bioregion datum': async () => {
-    const currentSlot = estimateCurrentSlot('preview');
+    const currentSlot = estimateCurrentSlot(CONFIG.network);
 
     const datum = {
       constructor: 0,
@@ -359,7 +359,7 @@ const phase4Tests = (harness) => ({
   },
 
   'Can build UBI Pool datum': async () => {
-    const currentSlot = estimateCurrentSlot('preview');
+    const currentSlot = estimateCurrentSlot(CONFIG.network);
 
     const datum = {
       constructor: 0,

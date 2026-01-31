@@ -19,7 +19,7 @@ import { BlockfrostProvider } from '@meshsdk/core';
 import fs from 'fs';
 
 const BLOCKFROST_KEY = process.env.BLOCKFROST_KEY;
-const NETWORK = process.env.NETWORK || 'preview';
+const NETWORK = process.env.NETWORK || 'preprod';
 
 if (!BLOCKFROST_KEY) {
   console.error('Error: BLOCKFROST_KEY environment variable required');

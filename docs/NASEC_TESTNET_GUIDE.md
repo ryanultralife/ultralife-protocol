@@ -15,18 +15,18 @@ You'll use your LLM (Claude, GPT, local) to create pNFTs, collectives, and offer
 **Blockfrost API Key** (free):
 ```
 https://blockfrost.io
-→ Sign up → Create Project → Select "Cardano preview" → Copy API key
+→ Sign up → Create Project → Select "Cardano preprod" → Copy API key
 ```
 
 **Testnet Wallet**:
 - Use any Cardano wallet (Eternl, Nami, Lace)
-- Switch to Preview testnet
+- Switch to Preprod testnet
 - Copy your address
 
 **Test ADA**:
 ```
 https://docs.cardano.org/cardano-testnets/tools/faucet/
-→ Select "Preview" → Paste address → Get tADA
+→ Select "Preprod" → Paste address → Get tADA
 ```
 
 ### 2. Clone & Setup
@@ -55,8 +55,8 @@ cp .env.example .env
       "command": "node",
       "args": ["/path/to/ultralife-protocol/service/dist/index.js"],
       "env": {
-        "BLOCKFROST_API_KEY": "previewXXX...",
-        "NETWORK": "preview"
+        "BLOCKFROST_API_KEY": "preprodXXX...",
+        "NETWORK": "preprod"
       }
     }
   }
@@ -164,7 +164,7 @@ I charge 2% margin, pool ticker is NASEC."
                             │ Signed TX
                             ▼
 ┌──────────────────────────────────────────────────────────┐
-│  Cardano Preview Testnet                                 │
+│  Cardano Preprod Testnet                                 │
 │  - 33 UltraLife validators (reference scripts)          │
 │  - Enforces all protocol rules                          │
 │  - Immutable on-chain logic                             │
