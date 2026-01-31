@@ -28,9 +28,13 @@ import crypto from 'crypto';
  * @param {object} options - Options (pretty: bool for JSON formatting)
  */
 export function atomicWriteSync(filePath, data, options = {}) {
+  // BigInt replacer for JSON.stringify
+  const replacer = (key, value) =>
+    typeof value === 'bigint' ? value.toString() : value;
+
   const content = typeof data === 'string'
     ? data
-    : JSON.stringify(data, null, options.pretty !== false ? 2 : 0);
+    : JSON.stringify(data, replacer, options.pretty !== false ? 2 : 0);
 
   // Create temp file in same directory (ensures same filesystem for rename)
   const dir = path.dirname(filePath);
