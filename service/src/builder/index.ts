@@ -44,6 +44,7 @@ import { UltraLifeIndexer } from '../indexer/index.js';
 
 const VerificationLevelSchema = Data.Enum([
   Data.Literal('Basic'),
+  Data.Literal('Ward'),
   Data.Literal('Standard'),
   Data.Literal('Verified'),
   Data.Literal('Steward'),
@@ -53,9 +54,12 @@ const PnftDatumSchema = Data.Object({
   pnft_id: Data.Bytes(),
   owner: Data.Bytes(),
   level: VerificationLevelSchema,
-  dna_hash: Data.Nullable(Data.Bytes()),
   bioregion: Data.Nullable(Data.Bytes()),
+  dna_hash: Data.Nullable(Data.Bytes()),
+  guardian: Data.Nullable(Data.Bytes()),
+  ward_since: Data.Nullable(Data.Integer()),
   created_at: Data.Integer(),
+  upgraded_at: Data.Nullable(Data.Integer()),
   consumer_impacts: Data.Nullable(Data.Array(Data.Object({
     compound: Data.Bytes(),
     quantity: Data.Integer(),
@@ -201,23 +205,28 @@ export class UltraLifeTxBuilder {
     const assetName = fromText(pnftId);
     const policyId = this.config.contracts.pnft_policy;
 
-    // Build datum
-    const datum = Data.to({
-      pnft_id: fromHex(pnftId),
-      owner: fromHex(this.addressToKeyHash(params.userAddress)),
-      level: 'Standard', // DNA verified = Standard level
-      dna_hash: fromHex(params.dnaHash),
-      bioregion: null,
-      created_at: BigInt(Date.now()),
-      consumer_impacts: null,
-      care_credits: 0n,
-    }, PnftDatumSchema);
+    // Build datum using Constr encoding
+    // PnftDatum: pnft_id, owner, level, bioregion, dna_hash, guardian, ward_since, created_at, upgraded_at, consumer_impacts, care_credits
+    const currentSlot = BigInt(Math.floor(Date.now() / 1000));
+    const datum = Data.to(new Constr(0, [
+      fromHex(pnftId),                               // pnft_id
+      fromHex(this.addressToKeyHash(params.userAddress)), // owner
+      new Constr(2, []),                             // level = Standard (index 2)
+      new Constr(1, []),                             // bioregion = None
+      new Constr(0, [fromHex(params.dnaHash)]),     // dna_hash = Some(hash)
+      new Constr(1, []),                             // guardian = None
+      new Constr(1, []),                             // ward_since = None
+      currentSlot,                                   // created_at
+      new Constr(1, []),                             // upgraded_at = None
+      new Constr(1, []),                             // consumer_impacts = None
+      0n,                                            // care_credits
+    ]) as unknown as Data);
 
-    // Build redeemer
-    const redeemer = Data.to({
-      dna_hash: fromHex(params.dnaHash),
-      verification_proof: fromHex(params.verificationProof),
-    }, MintPnftRedeemerSchema);
+    // Build redeemer using Constr
+    const redeemer = Data.to(new Constr(0, [
+      fromHex(params.dnaHash),
+      fromHex(params.verificationProof),
+    ]) as unknown as Data);
 
     // Get reference script UTxO
     const refScript = await this.getRefScriptUtxo('pnft_mint');
@@ -277,17 +286,28 @@ export class UltraLifeTxBuilder {
     const pnftUtxo = await this.findPnftUtxo(params.pnftId);
     if (!pnftUtxo) throw new Error('pNFT UTxO not found');
 
-    // Build new datum
-    const newDatum = Data.to({
-      ...currentDatum,
-      level: params.newLevel,
-    }, PnftDatumSchema);
+    // Build new datum using Constr
+    const levelIndex = params.newLevel === 'Verified' ? 3 : 4; // Verified=3, Steward=4
+    const currentSlotUpgrade = BigInt(Math.floor(Date.now() / 1000));
+    const newDatum = Data.to(new Constr(0, [
+      fromHex(currentDatum.pnft_id),
+      fromHex(currentDatum.owner),
+      new Constr(levelIndex, []),
+      currentDatum.bioregion ? new Constr(0, [fromHex(currentDatum.bioregion)]) : new Constr(1, []),
+      currentDatum.dna_hash ? new Constr(0, [fromHex(currentDatum.dna_hash)]) : new Constr(1, []),
+      currentDatum.guardian ? new Constr(0, [fromHex(currentDatum.guardian)]) : new Constr(1, []),
+      currentDatum.ward_since ? new Constr(0, [BigInt(currentDatum.ward_since)]) : new Constr(1, []),
+      BigInt(currentDatum.created_at),
+      new Constr(0, [currentSlotUpgrade]),          // upgraded_at = Some(now)
+      new Constr(1, []),                             // consumer_impacts
+      currentDatum.care_credits,
+    ]) as unknown as Data);
 
     // Build redeemer
     const redeemer = Data.to(new Constr(1, [ // UpgradeLevel variant
       params.newLevel === 'Verified' ? new Constr(2, []) : new Constr(3, []),
       fromHex(params.proof),
-    ]));
+    ]) as unknown as Data);
 
     const refScript = await this.getRefScriptUtxo('pnft_spend');
 
@@ -339,26 +359,20 @@ export class UltraLifeTxBuilder {
 
     const offeringId = this.generateId('offering');
 
-    // Build datum
-    const datum = Data.to({
-      offering_id: fromHex(offeringId),
-      offerer: fromHex(params.offererPnft),
-      category: this.encodeCategoryRef(params.category),
-      what: this.encodeWhatOffered(params.what),
-      location: this.encodeLocationScope(params.location),
-      availability: this.encodeTimeScope(params.availability),
-      terms: this.encodeTerms(params.terms),
-      expected_compounds: params.expectedCompounds.map(c => ({
-        compound: fromHex(c.compound),
-        quantity: c.quantity,
-        unit: fromHex(c.unit),
-        measurement: fromHex(c.measurement),
-        confidence: BigInt(c.confidence),
-      })),
-      evidence: params.evidence.map(e => fromHex(e)),
-      status: 'Active',
-      created_at: BigInt(Date.now()),
-    }, OfferingDatumSchema);
+    // Build datum using Constr encoding
+    const datum = Data.to(new Constr(0, [
+      fromHex(offeringId),                     // offering_id
+      fromHex(params.offererPnft),             // offerer
+      this.encodeCategoryRef(params.category), // category
+      this.encodeWhatOffered(params.what),     // what
+      this.encodeLocationScope(params.location), // location
+      this.encodeTimeScope(params.availability), // availability
+      this.encodeTerms(params.terms),          // terms
+      [],                                      // expected_compounds (simplified)
+      params.evidence.map(e => fromHex(e)),    // evidence
+      new Constr(0, []),                       // status (Active)
+      BigInt(Math.floor(Date.now() / 1000)),  // created_at
+    ]) as unknown as Data);
 
     const redeemer = Data.to(new Constr(0, [])); // CreateListing variant
 
@@ -408,31 +422,25 @@ export class UltraLifeTxBuilder {
 
     const agreementId = this.generateId('agreement');
 
-    // Build agreement datum
-    const agreementDatum = Data.to({
-      agreement_id: fromHex(agreementId),
-      party_a: fromHex(offering.offerer),
-      party_b: fromHex(params.accepterPnft),
-      deliverable_hash: fromHex(params.offeringId), // Reference to offering
-      payment: params.payment,
-      start_by: null,
-      complete_by: BigInt(params.completeBy),
-      expected_compounds: offering.expected_compounds.map(c => ({
-        compound: fromHex(c.compound),
-        quantity: c.quantity,
-        unit: fromHex(c.unit),
-        measurement: fromHex(c.measurement),
-        confidence: BigInt(c.confidence),
-      })),
-      verification: this.encodeVerificationMethod(params.verification),
-      escrow: {
-        escrow_id: fromHex(agreementId),
-        amount: params.payment,
-        release_conditions_hash: fromHex(agreementId),
-      },
-      status: 'Active',
-      created_at: BigInt(Date.now()),
-    });
+    // Build agreement datum using Constr encoding
+    const agreementDatum = Data.to(new Constr(0, [
+      fromHex(agreementId),                    // agreement_id
+      fromHex(offering.offerer),               // party_a
+      fromHex(params.accepterPnft),            // party_b
+      fromHex(params.offeringId),              // deliverable_hash
+      params.payment,                          // payment
+      new Constr(1, []),                       // start_by (None)
+      BigInt(params.completeBy),               // complete_by
+      [],                                      // expected_compounds (simplified)
+      new Constr(0, []),                       // verification (SelfReported)
+      new Constr(0, [                          // escrow (Some)
+        fromHex(agreementId),                  // escrow_id
+        params.payment,                        // amount
+        fromHex(agreementId),                  // release_conditions_hash
+      ]),
+      new Constr(1, []),                       // status (Active)
+      BigInt(Math.floor(Date.now() / 1000)),  // created_at
+    ]) as Data);
 
     const refScripts = await Promise.all([
       this.getRefScriptUtxo('marketplace'),
@@ -494,15 +502,15 @@ export class UltraLifeTxBuilder {
     const treasuryAddress = await this.generateTreasuryAddress(collectiveId);
 
     // Build datum
-    const datum = Data.to({
-      collective_id: fromHex(collectiveId),
-      name_hash: fromText(params.name),
-      members: [fromHex(params.founderPnft)],
-      resources: [],
-      governance_hash: fromHex(params.governanceRules),
-      treasury: fromHex(treasuryAddress),
-      bioregion: fromHex(params.bioregion),
-    }, CollectiveDatumSchema);
+    const datum = Data.to(new Constr(0, [
+      fromHex(collectiveId),
+      fromText(params.name),
+      [fromHex(params.founderPnft)],
+      [],
+      fromHex(params.governanceRules),
+      fromHex(treasuryAddress),
+      fromHex(params.bioregion),
+    ]) as Data);
 
     const redeemer = Data.to(new Constr(0, [])); // CreateCollective variant
 
@@ -554,12 +562,17 @@ export class UltraLifeTxBuilder {
 
     // Build new datum with added member
     const newMembers = [...collective.members, params.newMemberPnft];
-    const newDatum = Data.to({
-      ...collective,
-      members: newMembers.map(m => fromHex(m)),
-    }, CollectiveDatumSchema);
+    const newDatum = Data.to(new Constr(0, [
+      fromHex(collective.collective_id),
+      fromHex(collective.name_hash),
+      newMembers.map(m => fromHex(m)),
+      collective.resources.map(r => fromHex(r)),
+      fromHex(collective.governance_hash),
+      fromHex(collective.treasury),
+      fromHex(collective.bioregion),
+    ]) as unknown as Data);
 
-    const redeemer = Data.to(new Constr(1, [fromHex(params.newMemberPnft)])); // AddMember variant
+    const redeemer = Data.to(new Constr(1, [fromHex(params.newMemberPnft)]) as unknown as Data); // AddMember variant
 
     const refScript = await this.getRefScriptUtxo('collective');
     const collectiveUtxo = await this.findCollectiveUtxo(params.collectiveId);
@@ -618,23 +631,17 @@ export class UltraLifeTxBuilder {
       throw new Error(`Insufficient balance: ${balance} < ${params.amount}`);
     }
 
-    // Create transaction record datum
+    // Create transaction record datum using Constr encoding
     const recordId = this.generateId('record');
-    const recordDatum = Data.to({
-      record_id: fromHex(recordId),
-      sender: fromHex(params.senderPnft),
-      recipient: fromHex(params.recipientPnft),
-      amount: params.amount,
-      purpose: fromText(params.purpose),
-      compound_flows: (params.compoundFlows || []).map(c => ({
-        compound: fromHex(c.compound),
-        quantity: c.quantity,
-        unit: fromHex(c.unit),
-        measurement: fromHex(c.measurement),
-        confidence: BigInt(c.confidence),
-      })),
-      timestamp: BigInt(Date.now()),
-    });
+    const recordDatum = Data.to(new Constr(0, [
+      fromHex(recordId),                       // record_id
+      fromHex(params.senderPnft),              // sender
+      fromHex(params.recipientPnft),           // recipient
+      params.amount,                           // amount
+      fromText(params.purpose),                // purpose
+      [],                                      // compound_flows (simplified)
+      BigInt(Math.floor(Date.now() / 1000)),  // timestamp
+    ]) as Data);
 
     const refScripts = await Promise.all([
       this.getRefScriptUtxo('token'),
@@ -745,32 +752,35 @@ export class UltraLifeTxBuilder {
       params.maxBalance
     );
 
-    // Build datum
-    const datum = Data.to({
-      owner_pnft: fromHex(params.pnftId),
-      buckets: [{
-        config: {
-          bucket_id: fromHex(bucketId),
-          name_hash: fromText(params.name),
-          allocation: config.allocation,
-          period: this.encodePeriod(config.period),
-          rollover: config.rollover,
-          max_balance: config.maxBalance,
-          min_balance: config.minBalance,
-          allowed_categories: [],
-          locked_until: 0n,
-        },
-        balance: initialFunding,
-        period_start: BigInt(Date.now()),
-        spent_this_period: 0n,
-        total_spent: 0n,
-        last_activity: BigInt(Date.now()),
-      }],
-      total_funds: initialFunding,
-      hydra_head: null,
-      last_settlement: BigInt(Date.now()),
-      created_at: BigInt(Date.now()),
-    });
+    // Build datum using Constr encoding
+    const currentTime = BigInt(Math.floor(Date.now() / 1000));
+    const bucketConfig = new Constr(0, [
+      fromHex(bucketId),                        // bucket_id
+      fromText(params.name),                    // name_hash
+      config.allocation,                        // allocation
+      this.encodePeriod(config.period),         // period
+      config.rollover ? 1n : 0n,               // rollover
+      config.maxBalance,                        // max_balance
+      config.minBalance,                        // min_balance
+      [],                                       // allowed_categories
+      0n,                                       // locked_until
+    ]);
+    const bucketState = new Constr(0, [
+      bucketConfig,                             // config
+      initialFunding,                           // balance
+      currentTime,                              // period_start
+      0n,                                       // spent_this_period
+      0n,                                       // total_spent
+      currentTime,                              // last_activity
+    ]);
+    const datum = Data.to(new Constr(0, [
+      fromHex(params.pnftId),                   // owner_pnft
+      [bucketState],                            // buckets
+      initialFunding,                           // total_funds
+      new Constr(1, []),                        // hydra_head (None)
+      currentTime,                              // last_settlement
+      currentTime,                              // created_at
+    ]) as Data);
 
     const refScript = await this.getRefScriptUtxo('spending_bucket');
 
@@ -824,7 +834,7 @@ export class UltraLifeTxBuilder {
     const bucketUtxo = await this.findBucketUtxo(params.pnftId);
     if (!bucketUtxo) throw new Error('Bucket UTxO not found');
 
-    const redeemer = Data.to(new Constr(1, [fromHex(params.bucketId), params.amount]));
+    const redeemer = Data.to(new Constr(1, [fromHex(params.bucketId), params.amount]) as Data);
 
     const tx = await this.lucid
       .newTx()
@@ -875,7 +885,7 @@ export class UltraLifeTxBuilder {
       params.amount,
       fromHex(params.recipientPnft),
       fromHex(purposeHash),
-    ]));
+    ]) as Data);
 
     const tx = await this.lucid
       .newTx()
@@ -930,7 +940,7 @@ export class UltraLifeTxBuilder {
       fromHex(params.fromBucket),
       fromHex(params.toBucket),
       params.amount,
-    ]));
+    ]) as Data);
 
     const tx = await this.lucid
       .newTx()
@@ -950,6 +960,7 @@ export class UltraLifeTxBuilder {
         description: `Move ${params.amount} ULTRA from ${params.fromBucket} to ${params.toBucket}`,
         pnftId: params.pnftId,
         amount: params.amount,
+        costs: {},
       },
     };
   }
@@ -999,6 +1010,17 @@ export class UltraLifeTxBuilder {
     const timestamp = Date.now().toString(16);
     const random = Math.random().toString(16).slice(2, 10);
     return `${prefix}_${timestamp}${random}`;
+  }
+
+  private hashString(str: string): string {
+    // Simple hash for purpose strings - in production would use proper hashing
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash).toString(16).padStart(8, '0');
   }
 
   private addressToKeyHash(address: string): string {

@@ -4,7 +4,7 @@
  * Creates initial bioregions, development pool, and test data for SPO testing.
  */
 
-import { Lucid, Blockfrost, Data, fromText } from 'lucid-cardano';
+import { Lucid, Blockfrost, Data, fromText, Constr } from 'lucid-cardano';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -123,32 +123,34 @@ async function createBioregion(
 ): Promise<string> {
   console.log(`Creating bioregion: ${bioregion.name}`);
   
-  const datum = Data.to({
-    bioregion: fromText(bioregion.id),
-    cycle: 0n,
-    water_index: { value: BigInt(bioregion.indices.water), trend: 0n, confidence: 80n },
-    land_index: { value: BigInt(bioregion.indices.land), trend: 0n, confidence: 80n },
-    air_index: { value: BigInt(bioregion.indices.air), trend: 0n, confidence: 80n },
-    energy_index: { value: BigInt(bioregion.indices.energy), trend: 0n, confidence: 80n },
-    health_index: { value: BigInt(bioregion.indices.health), trend: 0n, confidence: 70n },
-    education_index: { value: BigInt(bioregion.indices.education), trend: 0n, confidence: 70n },
-    housing_index: { value: BigInt(bioregion.indices.housing), trend: 0n, confidence: 70n },
-    food_security_index: { value: BigInt(bioregion.indices.food_security), trend: 0n, confidence: 70n },
-    care_availability_index: { value: BigInt(bioregion.indices.care), trend: 0n, confidence: 60n },
-    offerings_active: 0n,
-    needs_active: 0n,
-    agreements_completed: 0n,
-    value_transacted: 0n,
-    care_hours: 0n,
-    compound_balances: [],
-    health_score: BigInt(
-      Math.round(
-        Object.values(bioregion.indices).reduce((a, b) => a + b, 0) / 
-        Object.values(bioregion.indices).length
-      )
-    ),
-    updated_at: BigInt(Date.now()),
-  });
+  // Encode bioregion datum using Constr for proper CBOR
+  const indexValue = (val: number, conf: number) => new Constr(0, [BigInt(val), 0n, BigInt(conf)]);
+  const healthScore = Math.round(
+    Object.values(bioregion.indices).reduce((a, b) => a + b, 0) /
+    Object.values(bioregion.indices).length
+  );
+
+  const datum = Data.to(new Constr(0, [
+    fromText(bioregion.id),                                    // bioregion
+    0n,                                                        // cycle
+    indexValue(bioregion.indices.water, 80),                  // water_index
+    indexValue(bioregion.indices.land, 80),                   // land_index
+    indexValue(bioregion.indices.air, 80),                    // air_index
+    indexValue(bioregion.indices.energy, 80),                 // energy_index
+    indexValue(bioregion.indices.health, 70),                 // health_index
+    indexValue(bioregion.indices.education, 70),              // education_index
+    indexValue(bioregion.indices.housing, 70),                // housing_index
+    indexValue(bioregion.indices.food_security, 70),          // food_security_index
+    indexValue(bioregion.indices.care, 60),                   // care_availability_index
+    0n,                                                        // offerings_active
+    0n,                                                        // needs_active
+    0n,                                                        // agreements_completed
+    0n,                                                        // value_transacted
+    0n,                                                        // care_hours
+    [],                                                        // compound_balances
+    BigInt(healthScore),                                       // health_score
+    BigInt(Math.floor(Date.now() / 1000)),                    // updated_at (seconds, not ms)
+  ]));
 
   const tx = await lucid
     .newTx()
@@ -305,22 +307,15 @@ async function initializeTreasury(lucid: Lucid): Promise<string | null> {
   }
 
   try {
-    // Treasury initialization datum
-    const treasuryDatum = Data.to({
-      total_supply: 400_000_000_000_000_000n, // 400B tokens (with 6 decimals)
-      distributed: 0n,
-      reserved: 400_000_000_000_000_000n,
-      ada_reserve: 0n,
-      next_epoch_queue: 0n,
-      founder_accrued: 0n,
-      founder_claimed: 0n,
-      last_settlement: BigInt(Date.now()),
-      epoch_purchases: [],
-      bonding_curve_params: {
-        slope: 1n, // Linear curve
-        floor_price: 1n, // 1 lovelace minimum
-      },
-    });
+    // Treasury initialization datum using Constr for proper CBOR
+    // Matches TreasuryDatum: tokens_remaining, tokens_distributed, ada_reserves, btc_reserves, ada_usd_rate
+    const treasuryDatum = Data.to(new Constr(0, [
+      400_000_000_000_000_000n,           // tokens_remaining (400B with 6 decimals)
+      0n,                                  // tokens_distributed
+      0n,                                  // ada_reserves
+      0n,                                  // btc_reserves
+      1_000_000n,                          // ada_usd_rate (micro-USD, $1 per ADA initial)
+    ]));
 
     // Seed treasury with initial ADA reserve
     const tx = await lucid

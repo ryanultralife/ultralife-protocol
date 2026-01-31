@@ -154,8 +154,8 @@ export class UltraLifeIndexer {
     }
     
     if (options?.minLevel !== undefined) {
-      const levelOrder = { 'Basic': 0, 'Standard': 1, 'Verified': 2, 'Steward': 3 };
-      results = results.filter(p => levelOrder[p.level] >= options.minLevel!);
+      const levelOrder: Record<string, number> = { 'Basic': 0, 'Ward': 0, 'Standard': 1, 'Verified': 2, 'Steward': 3 };
+      results = results.filter(p => (levelOrder[p.level] ?? 0) >= options.minLevel!);
     }
     
     if (options?.limit) {
@@ -905,18 +905,21 @@ export class UltraLifeIndexer {
 
   private decodePnftDatum(inlineDatum: string): PnftDatum {
     const decoded = cbor.decode(Buffer.from(inlineDatum, 'hex'));
-    
+
     // Map CBOR structure to TypeScript type
-    // This depends on how Aiken serializes the datum
+    // Matches Aiken PnftDatum: pnft_id, owner, level, bioregion, dna_hash, guardian, ward_since, created_at, upgraded_at, consumer_impacts, care_credits
     return {
       pnft_id: decoded[0]?.toString('hex') || '',
       owner: decoded[1]?.toString('hex') || '',
       level: this.decodeVerificationLevel(decoded[2]),
-      dna_hash: decoded[3]?.toString('hex') || null,
-      bioregion: decoded[4]?.toString('hex') || null,
-      created_at: Number(decoded[5]) || 0,
-      consumer_impacts: decoded[6] ? this.decodeCompoundBalances(decoded[6]) : null,
-      care_credits: BigInt(decoded[7] || 0),
+      bioregion: decoded[3]?.toString('hex') || null,
+      dna_hash: decoded[4]?.toString('hex') || null,
+      guardian: decoded[5]?.toString('hex') || null,
+      ward_since: decoded[6] ? Number(decoded[6]) : null,
+      created_at: Number(decoded[7]) || 0,
+      upgraded_at: decoded[8] ? Number(decoded[8]) : null,
+      consumer_impacts: decoded[9] ? this.decodeCompoundBalances(decoded[9]) : null,
+      care_credits: BigInt(decoded[10] || 0),
     };
   }
 
@@ -1013,7 +1016,7 @@ export class UltraLifeIndexer {
 
   // Helper decoders
   private decodeVerificationLevel(value: number): PnftDatum['level'] {
-    const levels: PnftDatum['level'][] = ['Basic', 'Standard', 'Verified', 'Steward'];
+    const levels: PnftDatum['level'][] = ['Basic', 'Ward', 'Standard', 'Verified', 'Steward'];
     return levels[value] || 'Basic';
   }
 
