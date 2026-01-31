@@ -63,10 +63,6 @@ const log = {
   error: (msg) => console.log(`❌ ${msg}`),
 };
 
-function formatAda(lovelace) {
-  return (Number(lovelace) / 1_000_000).toFixed(6) + ' ADA';
-}
-
 async function waitForConfirmation(provider, txHash, maxAttempts = 60) {
   log.info(`Waiting for confirmation: ${txHash}`);
 
