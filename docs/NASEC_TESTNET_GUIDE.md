@@ -35,14 +35,14 @@ https://docs.cardano.org/cardano-testnets/tools/faucet/
 git clone https://github.com/ryanultralife/ultralife-protocol
 cd ultralife-protocol/scripts
 npm install
+npm run setup
 ```
 
-Create `.env` file:
-```bash
-BLOCKFROST_API_KEY=preprodYOUR_KEY_HERE
-WALLET_SEED_PHRASE=your 24 word seed phrase here
-NETWORK=preprod
-```
+The setup wizard will:
+- Guide you through getting a Blockfrost API key
+- Generate a test wallet or use your existing seed phrase
+- Check your balance and show the faucet link
+- Ask what you'd like to do next
 
 ### 3. Mint Your pNFT
 

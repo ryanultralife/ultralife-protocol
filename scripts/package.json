@@ -21,7 +21,9 @@
     "test:e2e": "node e2e-test.mjs",
     "test:e2e:quick": "node e2e-test.mjs --quick",
     "test:e2e:skip-deploy": "node e2e-test.mjs --skip-deploy",
-    "show:address": "node show-wallet-address.mjs"
+    "show:address": "node show-wallet-address.mjs",
+    "setup": "node setup-testnet.mjs",
+    "setup:generate": "node setup-testnet.mjs --generate-wallet"
   },
   "dependencies": {
     "@blockfrost/blockfrost-js": "^5.5.0",
