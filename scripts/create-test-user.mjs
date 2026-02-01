@@ -44,52 +44,6 @@ const CONFIG = {
   deploymentPath: path.join(__dirname, 'deployment.json'),
 };
 
-// BIP39 word list (simplified - first 256 words for demo)
-const BIP39_WORDS = [
-  'abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract',
-  'absurd', 'abuse', 'access', 'accident', 'account', 'accuse', 'achieve', 'acid',
-  'acoustic', 'acquire', 'across', 'act', 'action', 'actor', 'actress', 'actual',
-  'adapt', 'add', 'addict', 'address', 'adjust', 'admit', 'adult', 'advance',
-  'advice', 'aerobic', 'affair', 'afford', 'afraid', 'again', 'age', 'agent',
-  'agree', 'ahead', 'aim', 'air', 'airport', 'aisle', 'alarm', 'album',
-  'alcohol', 'alert', 'alien', 'all', 'alley', 'allow', 'almost', 'alone',
-  'alpha', 'already', 'also', 'alter', 'always', 'amateur', 'amazing', 'among',
-  'amount', 'amused', 'analyst', 'anchor', 'ancient', 'anger', 'angle', 'angry',
-  'animal', 'ankle', 'announce', 'annual', 'another', 'answer', 'antenna', 'antique',
-  'anxiety', 'any', 'apart', 'apology', 'appear', 'apple', 'approve', 'april',
-  'arch', 'arctic', 'area', 'arena', 'argue', 'arm', 'armed', 'armor',
-  'army', 'around', 'arrange', 'arrest', 'arrive', 'arrow', 'art', 'artefact',
-  'artist', 'artwork', 'ask', 'aspect', 'assault', 'asset', 'assist', 'assume',
-  'asthma', 'athlete', 'atom', 'attack', 'attend', 'attitude', 'attract', 'auction',
-  'audit', 'august', 'aunt', 'author', 'auto', 'autumn', 'average', 'avocado',
-  'avoid', 'awake', 'aware', 'away', 'awesome', 'awful', 'awkward', 'axis',
-  'baby', 'bachelor', 'bacon', 'badge', 'bag', 'balance', 'balcony', 'ball',
-  'bamboo', 'banana', 'banner', 'bar', 'barely', 'bargain', 'barrel', 'base',
-  'basic', 'basket', 'battle', 'beach', 'bean', 'beauty', 'because', 'become',
-  'beef', 'before', 'begin', 'behave', 'behind', 'believe', 'below', 'belt',
-  'bench', 'benefit', 'best', 'betray', 'better', 'between', 'beyond', 'bicycle',
-  'bid', 'bike', 'bind', 'biology', 'bird', 'birth', 'bitter', 'black',
-  'blade', 'blame', 'blanket', 'blast', 'bleak', 'bless', 'blind', 'blood',
-  'blossom', 'blouse', 'blue', 'blur', 'blush', 'board', 'boat', 'body',
-  'boil', 'bomb', 'bone', 'bonus', 'book', 'boost', 'border', 'boring',
-  'borrow', 'boss', 'bottom', 'bounce', 'box', 'boy', 'bracket', 'brain',
-  'brand', 'brass', 'brave', 'bread', 'breeze', 'brick', 'bridge', 'brief',
-  'bright', 'bring', 'brisk', 'broccoli', 'broken', 'bronze', 'broom', 'brother',
-  'brown', 'brush', 'bubble', 'buddy', 'budget', 'buffalo', 'build', 'bulb',
-  'bulk', 'bullet', 'bundle', 'bunker', 'burden', 'burger', 'burst', 'bus',
-  'business', 'busy', 'butter', 'buyer', 'buzz', 'cabbage', 'cabin', 'cable',
-];
-
-function generateMnemonic() {
-  // Generate 24 random words from BIP39 list
-  const words = [];
-  for (let i = 0; i < 24; i++) {
-    const randomIndex = crypto.randomInt(0, BIP39_WORDS.length);
-    words.push(BIP39_WORDS[randomIndex]);
-  }
-  return words.join(' ');
-}
-
 function generatePnftId() {
   const timestamp = Date.now().toString(36);
   const random = crypto.randomBytes(8).toString('hex');
@@ -137,11 +91,11 @@ async function main() {
   log.info(`Creating test user: ${userName}`);
   log.info(`Bioregion: ${bioregion}`);
 
-  // Generate new wallet
-  const mnemonic = generateMnemonic();
-  log.info('Generated new wallet');
+  // Generate new wallet using MeshWallet's built-in mnemonic generation
+  const mnemonic = MeshWallet.brew(true); // true = 24 words
+  log.info('Generated new wallet with valid BIP39 mnemonic');
 
-  // Initialize wallet
+  // Initialize wallet with generated mnemonic
   const provider = new BlockfrostProvider(CONFIG.blockfrostKey);
   const wallet = new MeshWallet({
     networkId: CONFIG.network === 'mainnet' ? 1 : 0,
@@ -149,7 +103,7 @@ async function main() {
     submitter: provider,
     key: {
       type: 'mnemonic',
-      words: mnemonic.split(' '),
+      words: mnemonic,
     },
   });
 
@@ -189,11 +143,12 @@ async function main() {
     testnetSimulated: true,
   });
 
-  // Store test user
+  // Store test user (mnemonic as array)
+  const mnemonicStr = Array.isArray(mnemonic) ? mnemonic.join(' ') : mnemonic;
   const testUser = {
     name: userName,
     address: address,
-    mnemonic: mnemonic, // Store for testing (wouldn't do this in production!)
+    mnemonic: mnemonicStr, // Store for testing (wouldn't do this in production!)
     pnftId: pnftId,
     bioregion: bioregion,
     createdAt: new Date().toISOString(),
@@ -211,22 +166,13 @@ async function main() {
 ║  pNFT:       ${pnftId.padEnd(48)}║
 ║  Bioregion:  ${bioregion.padEnd(48)}║
 ║  ULTRA:      ${(signupAmount + ' ULTRA (signup grant)').padEnd(48)}║
-╠═══════════════════════════════════════════════════════════════╣
-║                                                               ║
-║  Seed Phrase (TESTNET ONLY - save this!):                     ║
-╠═══════════════════════════════════════════════════════════════╣
-║  ${mnemonic.slice(0, 60).padEnd(60)}║
-║  ${mnemonic.slice(60, 120).padEnd(60)}║
-║  ${mnemonic.slice(120).padEnd(60)}║
-╠═══════════════════════════════════════════════════════════════╣
-║                                                               ║
-║  To send tADA to this user, use this address:                 ║
-║  ${address}
-║                                                               ║
-║  To make an impact transaction TO this user:                  ║
-║    npm run transfer -- --to ${userName} --amount 10           ║
-║                                                               ║
 ╚═══════════════════════════════════════════════════════════════╝
+
+To make an impact transaction TO this user:
+  npm run transfer -- --to ${userName} --amount 10 --type goods --impact food
+
+To list all test users:
+  npm run user:list
 `);
 }
 
