@@ -357,19 +357,51 @@ async function main() {
   });
 
   // Select a UTxO with enough ADA (need ~5 ADA for output + fees)
+  // IMPORTANT: Skip UTxOs that have reference scripts attached (they have scriptRef)
   const minRequired = 5_000_000n;
-  const inputUtxo = utxos.find(u => {
+  const cleanUtxos = utxos.filter(u => {
+    // Skip UTxOs with reference scripts or other assets
+    const hasRefScript = u.output.scriptRef || u.output.plutusData;
+    const hasOtherAssets = u.output.amount.some(a => a.unit !== 'lovelace');
+    return !hasRefScript && !hasOtherAssets;
+  });
+
+  log.info(`Found ${cleanUtxos.length} clean UTxOs (no scripts/assets) out of ${utxos.length} total`);
+
+  const inputUtxo = cleanUtxos.find(u => {
     const lovelace = u.output.amount.find(a => a.unit === 'lovelace');
     return BigInt(lovelace?.quantity || 0) >= minRequired;
   });
 
   if (!inputUtxo) {
-    log.error(`No UTxO found with at least ${Number(minRequired) / 1_000_000} ADA`);
-    process.exit(1);
+    // Fallback: try any UTxO with enough ADA
+    const anyUtxo = utxos.find(u => {
+      const lovelace = u.output.amount.find(a => a.unit === 'lovelace');
+      return BigInt(lovelace?.quantity || 0) >= minRequired;
+    });
+    if (!anyUtxo) {
+      log.error(`No UTxO found with at least ${Number(minRequired) / 1_000_000} ADA`);
+      log.info('UTxO breakdown:');
+      utxos.slice(0, 5).forEach(u => {
+        const lovelace = u.output.amount.find(a => a.unit === 'lovelace');
+        log.info(`  ${u.input.txHash.slice(0, 12)}...#${u.input.outputIndex}: ${formatAda(lovelace?.quantity || 0)}`);
+      });
+      process.exit(1);
+    }
+    log.warn('Using UTxO with attached data (may have issues)');
   }
 
-  log.info(`Using input UTxO: ${inputUtxo.input.txHash.slice(0, 16)}... (${formatAda(inputUtxo.output.amount.find(a => a.unit === 'lovelace')?.quantity || 0)})`);
-  txBuilder.txIn(inputUtxo.input.txHash, inputUtxo.input.outputIndex);
+  const selectedUtxo = inputUtxo || cleanUtxos[0] || utxos[0];
+  const inputLovelace = selectedUtxo.output.amount.find(a => a.unit === 'lovelace')?.quantity || '0';
+  log.info(`Using input UTxO: ${selectedUtxo.input.txHash.slice(0, 16)}...#${selectedUtxo.input.outputIndex} (${formatAda(inputLovelace)})`);
+
+  // Provide full UTxO details to txIn for proper handling
+  txBuilder.txIn(
+    selectedUtxo.input.txHash,
+    selectedUtxo.input.outputIndex,
+    selectedUtxo.output.amount,
+    selectedUtxo.output.address
+  );
 
   // Add the mint operation with reference script
   txBuilder.mintPlutusScriptV3();
@@ -388,14 +420,17 @@ async function main() {
   txBuilder.changeAddress(address);
 
   // Set collateral (required for Plutus scripts)
-  const collateralUtxo = utxos.find(u => {
+  // Use a different UTxO than the input, preferring clean UTxOs
+  const collateralUtxo = cleanUtxos.find(u => {
+    if (u.input.txHash === selectedUtxo.input.txHash &&
+        u.input.outputIndex === selectedUtxo.input.outputIndex) {
+      return false; // Don't use same UTxO as input
+    }
     const lovelace = u.output.amount.find(a => a.unit === 'lovelace');
     return BigInt(lovelace?.quantity || 0) >= 5_000_000n;
-  });
-  if (!collateralUtxo) {
-    log.error('No suitable collateral UTxO found (need >= 5 ADA)');
-    process.exit(1);
-  }
+  }) || selectedUtxo; // Fall back to same UTxO if no other option
+
+  log.info(`Using collateral: ${collateralUtxo.input.txHash.slice(0, 16)}...#${collateralUtxo.input.outputIndex}`);
   txBuilder.txInCollateral(
     collateralUtxo.input.txHash,
     collateralUtxo.input.outputIndex,
