@@ -18,8 +18,12 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Load .env file from scripts directory
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 // Simple logger that doesn't require external deps
 const log = {
@@ -273,7 +277,6 @@ async function main() {
   }
 
   // Dynamic imports for heavy dependencies (only load when needed)
-  await import('dotenv/config');
   const { atomicWriteSync, safeReadJson, formatAda } = await import('./utils.mjs');
   const { BlockfrostProvider, MeshWallet, deserializeAddress, stringToHex } = await import('@meshsdk/core');
 
