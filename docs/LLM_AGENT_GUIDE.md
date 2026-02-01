@@ -87,6 +87,22 @@ Your pNFT is your on-chain identity - one per person, permanent, and the basis f
 "What offerings do I have listed?"
 ```
 
+### For Stake Pool Operators
+
+```
+"Register my stake pool for the Sierra Nevada bioregion"
+"List available bioregions"
+"What's my pool's delegation status?"
+```
+
+### Delegate to a Bioregion Pool
+
+```
+"Delegate 1000 ULTRA to the NASEC pool"
+"Show me pools in Sierra Nevada"
+"How much am I earning from delegation?"
+```
+
 ---
 
 ## Example Conversations

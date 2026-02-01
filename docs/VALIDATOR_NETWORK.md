@@ -266,3 +266,160 @@ A: Yes. They delegate ULTRA to your validator, share in fees proportionally.
 | ADA required everywhere | ADA abstracted away |
 
 **The protocol absorbs ADA complexity. Validators operate in ULTRA.**
+
+---
+
+## Bioregion Economic Infrastructure
+
+### SPOs as "Central Banks"
+
+In UltraLife, stake pools aren't just validators—they're the economic infrastructure for their bioregion:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    SIERRA NEVADA BIOREGION                      │
+│                                                                 │
+│  Community Members          Stake Pools            Treasury     │
+│  ┌─────────┐               ┌─────────────┐       ┌───────────┐ │
+│  │ Farmers │──delegate──▶  │   NASEC     │──5%──▶│ Bioregion │ │
+│  │ Makers  │     ULTRA     │   TAHOE     │       │ Treasury  │ │
+│  │ Artists │◀──rewards───  │   YOSEMITE  │       │           │ │
+│  └─────────┘               └──────┬──────┘       └─────┬─────┘ │
+│                                   │                    │       │
+│                            Track Metrics         Fund Projects │
+│                                   │                    │       │
+│                            ┌──────▼──────┐      ┌──────▼─────┐ │
+│                            │ Health Index │      │ Restoration│ │
+│                            │ Economics    │      │ UBI Boost  │ │
+│                            │ Impact Data  │      │ Grants     │ │
+│                            └─────────────┘      └────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### What SPOs Track
+
+**For Their Pool:**
+- Total ULTRA delegated
+- Number of delegators
+- Renewable energy status
+- Carbon footprint (kg CO2e/epoch)
+- Uptime and performance
+
+**For The Bioregion (Aggregated):**
+- Combined stake = Economic confidence indicator
+- Health indices (air, water, biodiversity, carbon, soil)
+- Transaction volume = Economic activity
+- Treasury balance = Project funding capacity
+
+### Delegation Flow
+
+Anyone with a pNFT can delegate ULTRA to a bioregion pool:
+
+```bash
+# Tell your LLM agent:
+"Delegate 1000 ULTRA to the NASEC pool in Sierra Nevada"
+"Lock my delegation for 12 epochs for bonus rewards"
+"Enable auto-compound on my delegation"
+```
+
+**Why delegate?**
+1. Earn ULTRA rewards (share of pool epoch earnings)
+2. Support your bioregion (stake = economic confidence signal)
+3. Participate in governance (delegators can vote)
+4. Impact alignment (pools with better environmental scores earn more)
+
+### Reward Distribution
+
+Each epoch, pools distribute rewards:
+
+```
+Total Epoch Rewards: 10,000 ULTRA
+│
+├── Operator Share (2%):      200 ULTRA → Pool operator
+├── Treasury Share (5%):      500 ULTRA → Bioregion treasury
+├── Local Reinvestment (10%): 1,000 ULTRA → Local projects
+└── Delegator Share (83%):    8,300 ULTRA → Pro-rata to delegators
+```
+
+### Impact Modifier
+
+Pools with better environmental performance earn bonus rewards:
+
+| Carbon Footprint | Reward Modifier |
+|------------------|-----------------|
+| 0 kg (fully renewable) | +15% bonus |
+| < 50 kg | +10% bonus |
+| < 100 kg | +5% bonus |
+| < 200 kg | 0% (baseline) |
+| > 200 kg | -5% penalty |
+
+### Economic Signal
+
+A bioregion's total delegated stake is a **real-time economic health indicator**:
+
+```
+High stake = Community confidence
+  → More treasury funding
+  → More local projects funded
+  → Better health indices
+  → Attracts more delegation (positive feedback)
+
+Low stake = Economic concern
+  → Limited treasury funds
+  → Fewer projects possible
+  → Signal to address issues
+  → Call to action for community
+```
+
+This creates a **decentralized economic indicator** that:
+- Cannot be manipulated by central authorities
+- Reflects genuine community confidence
+- Incentivizes environmental stewardship
+- Automatically funds local action
+
+### SPO Registration for Bioregion
+
+```bash
+# List available bioregions
+npm run list:bioregions
+
+# Register your pool for Sierra Nevada
+npm run register:pool:sierra
+
+# Or with custom parameters
+node register-bioregion-pool.mjs \
+  --bioregion "Sierra Nevada" \
+  --pool-id pool1abc... \
+  --ticker NASEC \
+  --margin 2 \
+  --renewable \
+  --carbon-footprint 25
+```
+
+### Requirements to Register
+
+1. **Verified pNFT** — At least Basic level identity
+2. **Steward endorsements** — 3 Stewards from the bioregion
+3. **Minimum stake** — Lock 10,000 ULTRA
+4. **Impact commitment** — Declare energy source and carbon footprint
+
+---
+
+## Multi-Pool Bioregions
+
+Large bioregions can have multiple pools competing:
+
+| Pool | Total Stake | Renewable | Carbon | Delegators |
+|------|-------------|-----------|--------|------------|
+| NASEC | 1.25M ULTRA | Yes | 15 kg | 47 |
+| TAHOE | 890K ULTRA | Yes | 0 kg | 31 |
+| YOSEMITE | 2.1M ULTRA | Partial | 85 kg | 89 |
+
+**Total Sierra Nevada stake: 4.24M ULTRA**
+
+Pools compete on:
+- Lower carbon footprint
+- Higher renewable percentage
+- Better uptime
+- Lower operator margin
+- Community engagement and trust
