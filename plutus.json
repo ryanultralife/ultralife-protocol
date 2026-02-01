@@ -1060,6 +1060,31 @@
       "hash": "594549810ba795415e922f789b44f12c312b6a7f0cd0b1beb281f814"
     },
     {
+      "title": "test_simple.test_simple.spend",
+      "datum": {
+        "title": "_datum",
+        "schema": {
+          "$ref": "#/definitions/Data"
+        }
+      },
+      "redeemer": {
+        "title": "_redeemer",
+        "schema": {
+          "$ref": "#/definitions/Data"
+        }
+      },
+      "compiledCode": "585c01010029800aba2aba1aab9eaab9dab9a4888896600264653001300600198031803800cc0180092225980099b8748008c01cdd500144c8cc892898050009805180580098041baa0028b200c180300098019baa0068a4d13656400401",
+      "hash": "d27ccc13fab5b782984a3d1f99353197ca1a81be069941ffc003ee75"
+    },
+    {
+      "title": "test_simple.test_simple.else",
+      "redeemer": {
+        "schema": {}
+      },
+      "compiledCode": "585c01010029800aba2aba1aab9eaab9dab9a4888896600264653001300600198031803800cc0180092225980099b8748008c01cdd500144c8cc892898050009805180580098041baa0028b200c180300098019baa0068a4d13656400401",
+      "hash": "d27ccc13fab5b782984a3d1f99353197ca1a81be069941ffc003ee75"
+    },
+    {
       "title": "token.token.spend",
       "datum": {
         "title": "datum",
