@@ -9,6 +9,7 @@ scripts/node_modules/
 
 # Deployment records
 deployment-*.json
+scripts/deployment.json
 
 # Environment
 .env
