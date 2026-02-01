@@ -25,6 +25,28 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load .env file from scripts directory
 dotenv.config({ path: path.join(__dirname, '.env') });
 
+// =============================================================================
+// FIX: libsodium ESM module issue (MeshSDK dependency)
+// The libsodium-wrappers-sumo package expects libsodium-sumo.mjs in its own
+// dist folder, but npm doesn't copy it there. We fix this automatically.
+// =============================================================================
+function fixLibsodiumESM() {
+  const nodeModules = path.join(__dirname, 'node_modules');
+  const targetDir = path.join(nodeModules, 'libsodium-wrappers-sumo', 'dist', 'modules-sumo-esm');
+  const targetFile = path.join(targetDir, 'libsodium-sumo.mjs');
+  const sourceFile = path.join(nodeModules, 'libsodium-sumo', 'dist', 'modules-sumo-esm', 'libsodium-sumo.mjs');
+
+  if (!fs.existsSync(targetFile) && fs.existsSync(sourceFile)) {
+    try {
+      fs.copyFileSync(sourceFile, targetFile);
+      console.log('ℹ️  Fixed libsodium ESM module path');
+    } catch (err) {
+      // Ignore - will fail later with better error
+    }
+  }
+}
+fixLibsodiumESM();
+
 // Simple logger that doesn't require external deps
 const log = {
   info: (msg) => console.log(`ℹ️  ${msg}`),
@@ -100,6 +122,11 @@ const BIOREGIONS = {
 // =============================================================================
 // UTILITY FUNCTIONS
 // =============================================================================
+
+// Convert string to hex (used for on-chain data)
+function stringToHex(str) {
+  return Buffer.from(str, 'utf8').toString('hex');
+}
 
 function getBioregionById(idOrName) {
   // Try by ID first
