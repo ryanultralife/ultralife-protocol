@@ -18,7 +18,7 @@ import {
   BlockfrostProvider,
   MeshWallet,
   MeshTxBuilder,
-  serializePlutusScript,
+  resolveScriptHash,
 } from '@meshsdk/core';
 import fs from 'fs';
 import path from 'path';
@@ -106,12 +106,6 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
       throw new Error('No UTxOs available. Fund the wallet first.');
     }
 
-    // Build reference script output
-    const script = {
-      code: validator.compiledCode,
-      version: 'V3',
-    };
-
     // Build transaction
     const txBuilder = new MeshTxBuilder({
       fetcher: provider,
@@ -152,13 +146,14 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
     }
 
     // Add reference script output
-    // Store at a script address derived from the script itself
-    const serialized = serializePlutusScript(script);
-
+    // Store at the wallet address with the script attached
     txBuilder.txOut(address, [
       { unit: 'lovelace', quantity: MIN_REFERENCE_LOVELACE.toString() }
     ]);
-    txBuilder.txOutReferenceScript(serialized.code, 'V3');
+    txBuilder.txOutReferenceScript(validator.compiledCode, 'V3');
+
+    // Calculate script hash for reference
+    const scriptHash = resolveScriptHash(validator.compiledCode, 'V3');
 
     // Add change output
     txBuilder.changeAddress(address);
@@ -177,7 +172,7 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
     return {
       txHash,
       outputIndex: 0,
-      scriptHash: serialized.address,
+      scriptHash,
     };
 
   } catch (error) {
