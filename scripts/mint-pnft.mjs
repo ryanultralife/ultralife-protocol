@@ -20,7 +20,6 @@ import {
   MeshWallet,
   MeshTxBuilder,
   deserializeAddress,
-  applyCborEncoding,
   resolveScriptHash,
   stringToHex,
 } from '@meshsdk/core';
@@ -31,6 +30,13 @@ import { fileURLToPath } from 'url';
 import 'dotenv/config';
 
 import { atomicWriteSync, safeReadJson } from './utils.mjs';
+
+// Centralized config - single source of truth for all validator parameters
+import {
+  applyValidatorParams,
+  findValidator,
+  getAdminPkh,
+} from './testnet-config.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -295,20 +301,39 @@ async function main() {
 
   log.info(`Using pNFT policy ref: ${pnftPolicyRef.txHash}#${pnftPolicyRef.outputIndex}`);
 
-  // Load the pNFT policy script from plutus.json to get the script hash
+  // Load the pNFT policy script from plutus.json
   const plutusPath = path.join(__dirname, '..', 'plutus.json');
   const plutus = safeReadJson(plutusPath);
-  const pnftPolicyValidator = plutus?.validators?.find(v => v.title === 'pnft.pnft_policy.mint');
+  const pnftPolicyValidator = findValidator(plutus?.validators || [], 'pnft_policy.mint');
 
   if (!pnftPolicyValidator) {
     log.error('pNFT policy validator not found in plutus.json');
     process.exit(1);
   }
 
-  // Apply CBOR encoding to get correct script hash
-  const encodedScript = applyCborEncoding(pnftPolicyValidator.compiledCode);
-  const policyId = resolveScriptHash(encodedScript, 'V3');
+  // Apply parameters using the SAME centralized config as deployment
+  // This ensures policy ID consistency across the protocol
+  const adminPkh = getAdminPkh(address);
+  const applied = applyValidatorParams(pnftPolicyValidator, adminPkh);
+
+  if (!applied) {
+    log.error('Could not apply params to pnft policy');
+    process.exit(1);
+  }
+
+  const { encodedScript, scriptHash: policyId, config } = applied;
+
+  // Verify consistency with deployed reference
+  if (pnftPolicyRef.scriptHash && pnftPolicyRef.scriptHash !== policyId) {
+    log.warn(`Policy ID mismatch!`);
+    log.warn(`  Deployment: ${pnftPolicyRef.scriptHash}`);
+    log.warn(`  Computed:   ${policyId}`);
+    log.error('Configuration inconsistency detected. Ensure same wallet is used for all operations.');
+    process.exit(1);
+  }
+
   log.info(`Policy ID: ${policyId}`);
+  log.info(`Config type: ${applied.configTypeName || 'none'}`);
 
   // Asset name is the pNFT ID in hex
   const assetNameHex = stringToHex(pnftId);

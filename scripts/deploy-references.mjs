@@ -18,10 +18,7 @@ import {
   BlockfrostProvider,
   MeshWallet,
   MeshTxBuilder,
-  resolveScriptHash,
-  applyParamsToScript,
   resolvePaymentKeyHash,
-  applyCborEncoding,
 } from '@meshsdk/core';
 import fs from 'fs';
 import path from 'path';
@@ -34,9 +31,14 @@ import {
   selectUtxos,
   validateUtxoSelection,
   estimateFee,
-  calculateRequiredBalance,
   formatAda,
 } from './utils.mjs';
+
+// Centralized config - single source of truth for all validator parameters
+import {
+  applyValidatorParams,
+  getUniqueValidators,
+} from './testnet-config.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -67,109 +69,6 @@ function calculateMinLovelace(scriptHex) {
   return minUtxo;
 }
 
-// Apply parameters to parameterized validators
-// For testnet, we use placeholder values based on the wallet address
-function applyValidatorParams(validator, walletPkh, plutusDefinitions) {
-  // If validator has no parameters, return as-is
-  if (!validator.parameters || validator.parameters.length === 0) {
-    return validator.compiledCode;
-  }
-
-  // Get the config schema reference
-  const configRef = validator.parameters[0]?.schema?.['$ref'];
-  if (!configRef) {
-    log.warn(`No config schema for ${validator.title}`);
-    return validator.compiledCode;
-  }
-
-  // Extract config type name (e.g., "pnft/PnftConfig" -> "PnftConfig")
-  const configTypeName = configRef.replace('#/definitions/', '').split('/').pop();
-
-  // Placeholder values for testnet
-  const placeholderHash = '00'.repeat(28);  // 28-byte hash
-  const adminList = [{ bytes: walletPkh }]; // Wallet as admin
-
-  // Build config based on validator type
-  // Each config is a constructor with index 0
-  let configFields;
-
-  switch (configTypeName) {
-    case 'PnftConfig':
-      // bioregion_registry (ByteArray), dna_oracle (List<PKH>), oracle_threshold (Int)
-      configFields = [
-        { bytes: placeholderHash },
-        { list: adminList },
-        { int: 1 },
-      ];
-      break;
-
-    case 'GenesisConfig':
-      // genesis_end_slot, founding_oracles, founding_stewards, genesis_oracle_threshold, steward_threshold
-      configFields = [
-        { int: 999999999 },  // Far future slot
-        { list: adminList },
-        { list: adminList },
-        { int: 1 },
-        { int: 1 },
-      ];
-      break;
-
-    case 'BioregionConfig':
-    case 'RegistryConfig':
-      // Most have: some_hash, admin_list, threshold pattern
-      configFields = [
-        { bytes: placeholderHash },
-        { list: adminList },
-        { int: 1 },
-      ];
-      break;
-
-    case 'GovernanceConfig':
-    case 'TreasuryConfig':
-    case 'UbiConfig':
-      // proposal_threshold, quorum, etc.
-      configFields = [
-        { bytes: placeholderHash },
-        { list: adminList },
-        { int: 1 },
-        { int: 1 },
-      ];
-      break;
-
-    default:
-      // Generic fallback: try common 3-field pattern
-      configFields = [
-        { bytes: placeholderHash },
-        { list: adminList },
-        { int: 1 },
-      ];
-  }
-
-  const config = {
-    constructor: 0,  // First constructor variant
-    fields: configFields,
-  };
-
-  try {
-    const appliedScript = applyParamsToScript(validator.compiledCode, [config], 'JSON');
-    return appliedScript;
-  } catch (e) {
-    // Try with fewer fields
-    for (let numFields = configFields.length - 1; numFields >= 1; numFields--) {
-      try {
-        const reducedConfig = {
-          constructor: 0,
-          fields: configFields.slice(0, numFields),
-        };
-        return applyParamsToScript(validator.compiledCode, [reducedConfig], 'JSON');
-      } catch {
-        continue;
-      }
-    }
-    log.warn(`Could not apply params to ${validator.title} (${configTypeName}): ${e.message}`);
-    return null; // Return null to skip this validator
-  }
-}
 
 // =============================================================================
 // UTILITIES
@@ -223,20 +122,20 @@ async function deployReferenceScript(provider, wallet, validator, deployment, wa
       throw new Error('No UTxOs available. Fund the wallet first.');
     }
 
-    // Apply parameters to get the final script
-    const finalScript = applyValidatorParams(validator, walletPkh);
+    // Apply parameters using centralized config
+    const applied = applyValidatorParams(validator, walletPkh);
 
     // Skip if params couldn't be applied
-    if (!finalScript) {
+    if (!applied) {
       throw new Error('Could not apply validator parameters');
     }
 
-    // Calculate minimum lovelace based on final script size
-    const scriptSizeBytes = Math.ceil(finalScript.length / 2);
-    const minLovelace = calculateMinLovelace(finalScript);
-    log.info(`Deploying: ${validator.title} (${(scriptSizeBytes / 1024).toFixed(1)} KB, min ${formatAda(minLovelace)})`);
+    const { script, encodedScript, scriptHash, config, configTypeName } = applied;
 
-    const scriptSize = scriptSizeBytes;
+    // Calculate minimum lovelace based on final script size
+    const scriptSizeBytes = Math.ceil(script.length / 2);
+    const minLovelace = calculateMinLovelace(script);
+    log.info(`Deploying: ${validator.title} (${(scriptSizeBytes / 1024).toFixed(1)} KB, min ${formatAda(minLovelace)})`);
 
     // Build transaction
     const txBuilder = new MeshTxBuilder({
@@ -246,7 +145,7 @@ async function deployReferenceScript(provider, wallet, validator, deployment, wa
     });
 
     // Calculate fee estimation
-    const estimatedFee = estimateFee('referenceScript', { scriptSize });
+    const estimatedFee = estimateFee('referenceScript', { scriptSize: scriptSizeBytes });
 
     // Select UTxOs with proper validation
     const targetAmount = minLovelace + estimatedFee;
@@ -276,19 +175,11 @@ async function deployReferenceScript(provider, wallet, validator, deployment, wa
       );
     }
 
-    // Apply CBOR encoding required for reference scripts
-    // This adds the proper wrapper that Cardano expects
-    const encodedScript = applyCborEncoding(finalScript);
-
-    // Add reference script output
-    // Store at the wallet address with the script attached
+    // Add reference script output with CBOR-encoded script
     txBuilder.txOut(address, [
       { unit: 'lovelace', quantity: minLovelace.toString() }
     ]);
     txBuilder.txOutReferenceScript(encodedScript, 'V3');
-
-    // Calculate script hash for reference (using encoded script for correct hash)
-    const scriptHash = resolveScriptHash(encodedScript, 'V3');
 
     // Add change output
     txBuilder.changeAddress(address);
@@ -304,10 +195,15 @@ async function deployReferenceScript(provider, wallet, validator, deployment, wa
     // Wait for confirmation
     await waitForConfirmation(provider, txHash);
 
+    // Return deployment record with all details needed for future use
     return {
       txHash,
       outputIndex: 0,
       scriptHash,
+      configTypeName,
+      config,  // Store config for verification
+      scriptSize: scriptSizeBytes,
+      deployedAt: new Date().toISOString(),
     };
 
   } catch (error) {
@@ -380,11 +276,8 @@ async function main() {
   }, 0n);
   log.info(`Balance: ${formatAda(balance)}`);
 
-  // Filter validators to deploy
-  let validators = plutus.validators;
-
-  // Skip .else validators (duplicates of .spend/.mint with same hash)
-  validators = validators.filter(v => !v.title.endsWith('.else'));
+  // Filter validators to deploy (skip .else duplicates)
+  let validators = getUniqueValidators(plutus.validators);
   log.info(`Filtered to ${validators.length} unique validators (skipping .else duplicates)`);
 
   if (specificValidator) {
