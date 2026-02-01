@@ -65,6 +65,7 @@ async function main() {
 
   const { atomicWriteSync, safeReadJson } = await import('./utils.mjs');
   const { MeshWallet, BlockfrostProvider } = await import('@meshsdk/core');
+  const bip39 = await import('bip39');
 
   // Load deployment
   const deployment = safeReadJson(CONFIG.deploymentPath, {});
@@ -91,9 +92,10 @@ async function main() {
   log.info(`Creating test user: ${userName}`);
   log.info(`Bioregion: ${bioregion}`);
 
-  // Generate new wallet using MeshWallet's built-in mnemonic generation
-  const mnemonic = MeshWallet.brew(true); // true = 24 words
-  log.info('Generated new wallet with valid BIP39 mnemonic');
+  // Generate new wallet using bip39 directly (more reliable than MeshWallet.brew)
+  const mnemonic = bip39.generateMnemonic(256); // 256 bits = 24 words
+  const mnemonicWords = mnemonic.split(' ');
+  log.info(`Generated 24-word BIP39 mnemonic (${mnemonicWords.length} words)`);
 
   // Initialize wallet with generated mnemonic
   const provider = new BlockfrostProvider(CONFIG.blockfrostKey);
@@ -103,7 +105,7 @@ async function main() {
     submitter: provider,
     key: {
       type: 'mnemonic',
-      words: mnemonic,
+      words: mnemonicWords,
     },
   });
 
@@ -143,8 +145,8 @@ async function main() {
     testnetSimulated: true,
   });
 
-  // Store test user (mnemonic as array)
-  const mnemonicStr = Array.isArray(mnemonic) ? mnemonic.join(' ') : mnemonic;
+  // Store test user (mnemonic as string for storage)
+  const mnemonicStr = mnemonicWords.join(' ');
   const testUser = {
     name: userName,
     address: address,

@@ -40,7 +40,10 @@
     "user:create": "node create-test-user.mjs",
     "user:list": "node create-test-user.mjs --list",
     "transfer": "node transfer-ultra.mjs",
-    "transfer:impacts": "node transfer-ultra.mjs --list-impacts"
+    "transfer:impacts": "node transfer-ultra.mjs --list-impacts",
+    "land:mint": "node mint-land.mjs",
+    "land:list": "node mint-land.mjs --list",
+    "land:types": "node mint-land.mjs --list-types"
   },
   "dependencies": {
     "@blockfrost/blockfrost-js": "^5.5.0",
