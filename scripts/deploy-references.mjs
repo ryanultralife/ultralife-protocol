@@ -21,6 +21,7 @@ import {
   resolveScriptHash,
   applyParamsToScript,
   resolvePaymentKeyHash,
+  applyCborEncoding,
 } from '@meshsdk/core';
 import fs from 'fs';
 import path from 'path';
@@ -275,15 +276,19 @@ async function deployReferenceScript(provider, wallet, validator, deployment, wa
       );
     }
 
+    // Apply CBOR encoding required for reference scripts
+    // This adds the proper wrapper that Cardano expects
+    const encodedScript = applyCborEncoding(finalScript);
+
     // Add reference script output
     // Store at the wallet address with the script attached
     txBuilder.txOut(address, [
       { unit: 'lovelace', quantity: minLovelace.toString() }
     ]);
-    txBuilder.txOutReferenceScript(finalScript, 'V3');
+    txBuilder.txOutReferenceScript(encodedScript, 'V3');
 
-    // Calculate script hash for reference
-    const scriptHash = resolveScriptHash(finalScript, 'V3');
+    // Calculate script hash for reference (using encoded script for correct hash)
+    const scriptHash = resolveScriptHash(encodedScript, 'V3');
 
     // Add change output
     txBuilder.changeAddress(address);
