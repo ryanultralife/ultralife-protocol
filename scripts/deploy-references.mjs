@@ -377,6 +377,11 @@ async function main() {
 
   // Filter validators to deploy
   let validators = plutus.validators;
+
+  // Skip .else validators (duplicates of .spend/.mint with same hash)
+  validators = validators.filter(v => !v.title.endsWith('.else'));
+  log.info(`Filtered to ${validators.length} unique validators (skipping .else duplicates)`);
+
   if (specificValidator) {
     validators = validators.filter(v =>
       v.title.toLowerCase().includes(specificValidator.toLowerCase())
