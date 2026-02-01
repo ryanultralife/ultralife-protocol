@@ -271,9 +271,14 @@ A: Yes. They delegate ULTRA to your validator, share in fees proportionally.
 
 ## Bioregion Economic Infrastructure
 
-### SPOs as "Central Banks"
+### SPOs as Bioregion Economic Infrastructure
 
-In UltraLife, stake pools aren't just validators—they're the economic infrastructure for their bioregion:
+In UltraLife, stake pools are the **data and credit infrastructure** for their bioregion:
+
+1. **Underwrite credit** - Pool stake backs bioregion projects
+2. **Collate data** - All transactions flow through with bioregion markers
+3. **Track economy** - Sector breakdown, trade flows, economic health
+4. **Aggregate health** - Environmental and economic indices
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -298,17 +303,36 @@ In UltraLife, stake pools aren't just validators—they're the economic infrastr
 
 ### What SPOs Track
 
-**For Their Pool:**
-- Total ULTRA delegated
-- Number of delegators
-- Underwriting capacity (50% of stake)
-- Active projects backed
+SPOs are the **data infrastructure** for their bioregion. All transactions flow through with bioregion markers, enabling complete economic tracking.
 
-**For The Bioregion (Aggregated):**
-- Combined stake = Credit capacity
-- Health indices (air, water, biodiversity, carbon, soil)
-- Transaction volume = Economic activity
-- Treasury balance = Project funding capacity
+**Credit Underwriting:**
+- Total ULTRA delegated = Underwriting capacity
+- Active projects backed
+- Credit utilization rate
+
+**Economic Data Collation:**
+- All transactions tagged by bioregion
+- Sector breakdown (agriculture, services, goods, energy)
+- Transaction volume and velocity
+- Trade flows between bioregions
+
+**Health Metrics:**
+- Environmental indices (air, water, biodiversity, carbon, soil)
+- Resident count and growth
+- Economic participation rate
+
+**Liquid Staking Flow:**
+```
+Person → pNFT (bioregion tagged)
+    │
+    └─→ All transactions carry bioregion marker
+            │
+            └─→ Flows through bioregion pools
+                    │
+                    └─→ SPOs collate and aggregate
+                            │
+                            └─→ Bioregion economic picture
+```
 
 ### Delegation Flow
 
