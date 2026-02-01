@@ -98,9 +98,9 @@ Your pNFT is your on-chain identity - one per person, permanent, and the basis f
 ### Delegate to a Bioregion Pool
 
 ```
-"Delegate 1000 ULTRA to the NASEC pool"
+"Delegate 1000 ULTRA to Sierra Nevada Pool A"
 "Show me pools in Sierra Nevada"
-"How much am I earning from delegation?"
+"What's the credit capacity of my bioregion?"
 ```
 
 ---

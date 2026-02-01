@@ -301,12 +301,11 @@ In UltraLife, stake pools aren't just validators—they're the economic infrastr
 **For Their Pool:**
 - Total ULTRA delegated
 - Number of delegators
-- Renewable energy status
-- Carbon footprint (kg CO2e/epoch)
-- Uptime and performance
+- Underwriting capacity (50% of stake)
+- Active projects backed
 
 **For The Bioregion (Aggregated):**
-- Combined stake = Economic confidence indicator
+- Combined stake = Credit capacity
 - Health indices (air, water, biodiversity, carbon, soil)
 - Transaction volume = Economic activity
 - Treasury balance = Project funding capacity
@@ -317,16 +316,16 @@ Anyone with a pNFT can delegate ULTRA to a bioregion pool:
 
 ```bash
 # Tell your LLM agent:
-"Delegate 1000 ULTRA to the NASEC pool in Sierra Nevada"
-"Lock my delegation for 12 epochs for bonus rewards"
-"Enable auto-compound on my delegation"
+"Delegate 1000 ULTRA to Sierra Nevada Pool A"
+"Show me the pools in my bioregion"
+"What's the credit capacity of Sierra Nevada?"
 ```
 
 **Why delegate?**
-1. Earn ULTRA rewards (share of pool epoch earnings)
-2. Support your bioregion (stake = economic confidence signal)
-3. Participate in governance (delegators can vote)
-4. Impact alignment (pools with better environmental scores earn more)
+1. Increase your bioregion's credit capacity
+2. Earn ULTRA rewards (share of pool epoch earnings)
+3. Support local projects (your stake backs real work)
+4. Participate in governance (delegators can vote)
 
 ### Reward Distribution
 
@@ -341,17 +340,14 @@ Total Epoch Rewards: 10,000 ULTRA
 └── Delegator Share (83%):    8,300 ULTRA → Pro-rata to delegators
 ```
 
-### Impact Modifier
+### Impact Tracking
 
-Pools with better environmental performance earn bonus rewards:
+Pools track their impact the same as any transaction—no special treatment:
 
-| Carbon Footprint | Reward Modifier |
-|------------------|-----------------|
-| 0 kg (fully renewable) | +15% bonus |
-| < 50 kg | +10% bonus |
-| < 100 kg | +5% bonus |
-| < 200 kg | 0% (baseline) |
-| > 200 kg | -5% penalty |
+- Pool operations generate impact (energy, hardware, etc.)
+- Impact is measured and recorded on-chain
+- Consumer of pool services accrues the impact
+- No bonuses or penalties—just transparent tracking
 
 ### Economic Signal
 
@@ -384,24 +380,20 @@ This creates a **decentralized economic indicator** that:
 npm run list:bioregions
 
 # Register your pool for Sierra Nevada
-npm run register:pool:sierra
+npm run register:pool:sierra-a
 
 # Or with custom parameters
 node register-bioregion-pool.mjs \
   --bioregion "Sierra Nevada" \
   --pool-id pool1abc... \
-  --ticker NASEC \
-  --margin 2 \
-  --renewable \
-  --carbon-footprint 25
+  --ticker SNA
 ```
 
 ### Requirements to Register
 
-1. **Verified pNFT** — At least Basic level identity
-2. **Steward endorsements** — 3 Stewards from the bioregion
-3. **Minimum stake** — Lock 10,000 ULTRA
-4. **Impact commitment** — Declare energy source and carbon footprint
+1. **pNFT** — On-chain identity
+2. **Bioregion selection** — Which bioregion to serve
+3. **Commitment** — Ready to underwrite the bioregion's credit needs
 
 ---
 
