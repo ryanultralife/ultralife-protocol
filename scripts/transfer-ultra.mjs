@@ -301,6 +301,43 @@ async function main() {
     bioData.byCompound[compound.compound] += compound.quantity;
   }
 
+  // =========================================================================
+  // IMPACT TOKEN MINTING (for positive net impact)
+  // =========================================================================
+
+  let impactTokensMinted = null;
+  if (netImpact > 0) {
+    // Positive impact = mint impact tokens that can be traded
+    const impactTokenId = 'impact_' + crypto.randomBytes(8).toString('hex');
+    const impactTokenAmount = Math.floor(netImpact); // 1 token per weighted unit
+
+    impactTokensMinted = {
+      tokenId: impactTokenId,
+      amount: impactTokenAmount,
+      category: impactArg,
+      compounds: impactPreset.compounds.filter(c => c.quantity > 0),
+      mintedAt: new Date().toISOString(),
+      mintedBy: senderPnft.id,
+      bioregion: senderBio,
+      txHash: txHash,
+    };
+
+    // Store impact tokens
+    deployment.impactTokens = deployment.impactTokens || [];
+    deployment.impactTokens.push(impactTokensMinted);
+
+    // Add to user's impact token balance
+    deployment.impactTokenBalances = deployment.impactTokenBalances || {};
+    deployment.impactTokenBalances[senderAddress] = deployment.impactTokenBalances[senderAddress] || [];
+    deployment.impactTokenBalances[senderAddress].push({
+      tokenId: impactTokenId,
+      amount: impactTokenAmount,
+      category: impactArg,
+    });
+
+    log.success(`Minted ${impactTokenAmount} impact tokens for positive activity!`);
+  }
+
   atomicWriteSync(CONFIG.deploymentPath, deployment);
 
   console.log(`
@@ -319,8 +356,26 @@ async function main() {
     console.log(`║    ${compound.compound.padEnd(6)} ${(sign + compound.quantity + compound.unit).padEnd(12)} (${compound.confidence}% confidence)${' '.repeat(18)}║`);
   }
 
-  console.log(`║  Net:      ${(impactSign + netImpact.toFixed(1) + ' weighted units').padEnd(48)}║
-╠═══════════════════════════════════════════════════════════════╣
+  console.log(`║  Net:      ${(impactSign + netImpact.toFixed(1) + ' weighted units').padEnd(48)}║`);
+
+  // Show impact tokens minted (for positive impact)
+  if (impactTokensMinted) {
+    console.log(`╠═══════════════════════════════════════════════════════════════╣
+║  🌱 IMPACT TOKENS MINTED:                                     ║
+║    Amount:   ${(impactTokensMinted.amount + ' tokens').padEnd(47)}║
+║    Category: ${impactTokensMinted.category.padEnd(47)}║
+║    These can be traded on the impact market!                  ║`);
+  }
+
+  // Show remediation required (for negative impact)
+  if (netImpact < 0) {
+    console.log(`╠═══════════════════════════════════════════════════════════════╣
+║  ⚠️  REMEDIATION REQUIRED:                                    ║
+║    Offset needed: ${(Math.abs(netImpact).toFixed(0) + ' impact tokens').padEnd(42)}║
+║    Buy tokens or fund remediation projects                    ║`);
+  }
+
+  console.log(`╠═══════════════════════════════════════════════════════════════╣
 ║  Tx Hash:  ${txHash.slice(0, 50).padEnd(50)}║
 ╠═══════════════════════════════════════════════════════════════╣
 ║  NEW BALANCES:                                                ║
