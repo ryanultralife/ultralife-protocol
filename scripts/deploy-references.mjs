@@ -68,50 +68,105 @@ function calculateMinLovelace(scriptHex) {
 
 // Apply parameters to parameterized validators
 // For testnet, we use placeholder values based on the wallet address
-function applyValidatorParams(validator, walletPkh) {
+function applyValidatorParams(validator, walletPkh, plutusDefinitions) {
   // If validator has no parameters, return as-is
   if (!validator.parameters || validator.parameters.length === 0) {
     return validator.compiledCode;
   }
 
-  // Create placeholder config based on validator type
-  // All UltraLife validators use a "config" parameter with similar structure
-  // For testnet, we use placeholder values
+  // Get the config schema reference
+  const configRef = validator.parameters[0]?.schema?.['$ref'];
+  if (!configRef) {
+    log.warn(`No config schema for ${validator.title}`);
+    return validator.compiledCode;
+  }
 
-  // Placeholder 28-byte hash (all zeros for testnet)
-  const placeholderHash = '00'.repeat(28);
+  // Extract config type name (e.g., "pnft/PnftConfig" -> "PnftConfig")
+  const configTypeName = configRef.replace('#/definitions/', '').split('/').pop();
 
-  // Build a generic config that works for most validators:
-  // { field1: ByteArray, field2: [PubKeyHash], field3: Int, ... }
-  // Most configs have: some_registry (bytes), oracles/admins (list of pkh), threshold (int)
+  // Placeholder values for testnet
+  const placeholderHash = '00'.repeat(28);  // 28-byte hash
+  const adminList = [{ bytes: walletPkh }]; // Wallet as admin
+
+  // Build config based on validator type
+  // Each config is a constructor with index 0
+  let configFields;
+
+  switch (configTypeName) {
+    case 'PnftConfig':
+      // bioregion_registry (ByteArray), dna_oracle (List<PKH>), oracle_threshold (Int)
+      configFields = [
+        { bytes: placeholderHash },
+        { list: adminList },
+        { int: 1 },
+      ];
+      break;
+
+    case 'GenesisConfig':
+      // genesis_end_slot, founding_oracles, founding_stewards, genesis_oracle_threshold, steward_threshold
+      configFields = [
+        { int: 999999999 },  // Far future slot
+        { list: adminList },
+        { list: adminList },
+        { int: 1 },
+        { int: 1 },
+      ];
+      break;
+
+    case 'BioregionConfig':
+    case 'RegistryConfig':
+      // Most have: some_hash, admin_list, threshold pattern
+      configFields = [
+        { bytes: placeholderHash },
+        { list: adminList },
+        { int: 1 },
+      ];
+      break;
+
+    case 'GovernanceConfig':
+    case 'TreasuryConfig':
+    case 'UbiConfig':
+      // proposal_threshold, quorum, etc.
+      configFields = [
+        { bytes: placeholderHash },
+        { list: adminList },
+        { int: 1 },
+        { int: 1 },
+      ];
+      break;
+
+    default:
+      // Generic fallback: try common 3-field pattern
+      configFields = [
+        { bytes: placeholderHash },
+        { list: adminList },
+        { int: 1 },
+      ];
+  }
 
   const config = {
-    alternative: 0,  // Constructor index
-    fields: [
-      { bytes: placeholderHash },     // Registry/reference script hash
-      { list: [{ bytes: walletPkh }] }, // Admin/oracle list with wallet as admin
-      { int: 1 },                      // Threshold = 1
-    ],
+    constructor: 0,  // First constructor variant
+    fields: configFields,
   };
 
   try {
     const appliedScript = applyParamsToScript(validator.compiledCode, [config], 'JSON');
     return appliedScript;
   } catch (e) {
-    // If params don't match, try with simpler structure
-    const simpleConfig = {
-      alternative: 0,
-      fields: [
-        { bytes: placeholderHash },
-      ],
-    };
-    try {
-      return applyParamsToScript(validator.compiledCode, [simpleConfig], 'JSON');
-    } catch {
-      // Return original if we can't apply params (will fail on-chain)
-      log.warn(`Could not apply params to ${validator.title}: ${e.message}`);
-      return validator.compiledCode;
+    // Try with fewer fields
+    for (let numFields = configFields.length - 1; numFields >= 1; numFields--) {
+      try {
+        const reducedConfig = {
+          constructor: 0,
+          fields: configFields.slice(0, numFields),
+        };
+        return applyParamsToScript(validator.compiledCode, [reducedConfig], 'JSON');
+      } catch {
+        continue;
+      }
     }
+    log.warn(`Could not apply params to ${validator.title} (${configTypeName}): ${e.message}`);
+    return null; // Return null to skip this validator
   }
 }
 
@@ -169,6 +224,11 @@ async function deployReferenceScript(provider, wallet, validator, deployment, wa
 
     // Apply parameters to get the final script
     const finalScript = applyValidatorParams(validator, walletPkh);
+
+    // Skip if params couldn't be applied
+    if (!finalScript) {
+      throw new Error('Could not apply validator parameters');
+    }
 
     // Calculate minimum lovelace based on final script size
     const scriptSizeBytes = Math.ceil(finalScript.length / 2);
