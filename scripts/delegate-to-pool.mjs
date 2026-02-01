@@ -147,11 +147,25 @@ async function main() {
   });
 
   const address = wallet.getChangeAddress();
-  const rewardAddresses = wallet.getRewardAddresses();
-  const stakeAddress = rewardAddresses[0];
+
+  // Get reward/stake address - try multiple methods
+  let stakeAddress;
+  try {
+    const rewardAddresses = wallet.getRewardAddresses();
+    stakeAddress = rewardAddresses?.[0];
+  } catch (err) {
+    // Fallback: derive from address
+  }
+
+  // If no stake address, we can still track delegation locally for testnet
+  if (!stakeAddress) {
+    log.warn('Could not get stake address from wallet');
+    log.info('Using local delegation tracking for testnet');
+  } else {
+    log.info(`Stake address: ${stakeAddress}`);
+  }
 
   log.info(`Wallet: ${address.slice(0, 40)}...`);
-  log.info(`Stake address: ${stakeAddress}`);
 
   // Check balance
   const utxos = await provider.fetchAddressUTxOs(address);
@@ -166,69 +180,102 @@ async function main() {
     process.exit(1);
   }
 
-  // Check current delegation status
-  let isRegistered = false;
-  let currentDelegation = null;
-
-  try {
-    const accountInfo = await provider.fetchAccountInfo(stakeAddress);
-    if (accountInfo) {
-      isRegistered = accountInfo.active;
-      currentDelegation = accountInfo.poolId;
-
-      if (currentDelegation) {
-        log.info(`Currently delegated to: ${currentDelegation.slice(0, 20)}...`);
-      }
-    }
-  } catch (err) {
-    // Account not found = not registered
-    log.info('Stake address not yet registered');
+  // Check for existing local delegation
+  const existingDelegation = deployment.delegations?.find(d => d.walletAddress === address);
+  if (existingDelegation) {
+    log.info(`Currently delegated to: ${existingDelegation.poolTicker} (${existingDelegation.bioregion})`);
   }
 
-  // Build delegation transaction
-  log.info('');
-  log.info('Building delegation transaction...');
+  // =========================================================================
+  // TESTNET: Local delegation tracking (demo pool IDs aren't real Cardano pools)
+  // MAINNET: Would use real Cardano stake delegation
+  // =========================================================================
 
-  try {
-    const tx = new Transaction({ initiator: wallet });
+  const isTestnetDemoPool = !targetPool.poolId.startsWith('pool1');
 
-    // Register stake address if needed (costs 2 ADA deposit, refunded on deregistration)
-    if (!isRegistered) {
-      log.info('Registering stake address (2 ADA deposit, refundable)...');
-      tx.registerStake(stakeAddress);
-    }
+  if (isTestnetDemoPool) {
+    log.info('');
+    log.info('Testnet mode: Recording delegation locally');
+    log.info('(Demo pool ID - not a real Cardano stake pool)');
 
-    // Delegate to pool
-    // Note: For demo pools, we use the generated pool ID
-    // In production, this would be a real Cardano pool ID (bech32 format: pool1...)
-    tx.delegateStake(stakeAddress, targetPool.poolId);
-
-    // Build and sign
-    const unsignedTx = await tx.build();
-    const signedTx = await wallet.signTx(unsignedTx);
-
-    // Submit
-    log.info('Submitting delegation transaction...');
-    const txHash = await wallet.submitTx(signedTx);
-
-    log.success(`Delegation submitted!`);
-    log.success(`Transaction: ${txHash}`);
-
-    // Update deployment record
+    // Record delegation locally
     deployment.delegations = deployment.delegations || [];
+
+    // Remove existing delegation for this wallet
+    deployment.delegations = deployment.delegations.filter(d => d.walletAddress !== address);
+
+    const txHash = 'testnet_delegation_' + Date.now().toString(16);
+
     deployment.delegations.push({
-      stakeAddress: stakeAddress,
+      stakeAddress: stakeAddress || 'derived_from_' + address.slice(0, 20),
       poolId: targetPool.poolId,
       poolTicker: targetPool.ticker,
       bioregion: targetPool.bioregion,
       delegatedAt: new Date().toISOString(),
       txHash: txHash,
       walletAddress: address,
+      testnetSimulated: true,
     });
 
     atomicWriteSync(CONFIG.deploymentPath, deployment);
 
     console.log(`
+╔═══════════════════════════════════════════════════════════════╗
+║              🌲 DELEGATION RECORDED! 🌲                       ║
+╠═══════════════════════════════════════════════════════════════╣
+║  Pool:        ${targetPool.ticker.padEnd(47)}║
+║  Bioregion:   ${targetPool.bioregion.padEnd(47)}║
+║  Balance:     ${(formatAda(balance) + ' (still liquid!)').padEnd(47)}║
+╠═══════════════════════════════════════════════════════════════╣
+║                                                               ║
+║  Your ADA remains fully spendable while delegated.            ║
+║                                                               ║
+║  As a delegator to ${targetPool.ticker}, you're now:${' '.repeat(Math.max(0, 26 - targetPool.ticker.length))}║
+║  • Supporting ${targetPool.bioregion} bioregion health${' '.repeat(Math.max(0, 26 - targetPool.bioregion.length))}║
+║  • Contributing to local treasury (${targetPool.commitment?.treasuryContribution / 100 || 5}%)${' '.repeat(23)}║
+║  • Enabling credit underwriting for local projects            ║
+║                                                               ║
+║  Note: Testnet uses simulated delegation.                     ║
+║  Mainnet would use real Cardano stake delegation.             ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+`);
+
+  } else {
+    // Real Cardano delegation (mainnet or real preprod pool)
+    log.info('');
+    log.info('Building on-chain delegation transaction...');
+
+    try {
+      const tx = new Transaction({ initiator: wallet });
+
+      if (stakeAddress) {
+        tx.registerStake(stakeAddress);
+        tx.delegateStake(stakeAddress, targetPool.poolId);
+
+        const unsignedTx = await tx.build();
+        const signedTx = await wallet.signTx(unsignedTx);
+
+        log.info('Submitting delegation transaction...');
+        const txHash = await wallet.submitTx(signedTx);
+
+        log.success(`Delegation submitted!`);
+        log.success(`Transaction: ${txHash}`);
+
+        deployment.delegations = deployment.delegations || [];
+        deployment.delegations.push({
+          stakeAddress: stakeAddress,
+          poolId: targetPool.poolId,
+          poolTicker: targetPool.ticker,
+          bioregion: targetPool.bioregion,
+          delegatedAt: new Date().toISOString(),
+          txHash: txHash,
+          walletAddress: address,
+        });
+
+        atomicWriteSync(CONFIG.deploymentPath, deployment);
+
+        console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
 ║              🌲 DELEGATION SUCCESSFUL! 🌲                     ║
 ╠═══════════════════════════════════════════════════════════════╣
@@ -237,38 +284,20 @@ async function main() {
 ║  Balance:     ${(formatAda(balance) + ' (still liquid!)').padEnd(47)}║
 ╠═══════════════════════════════════════════════════════════════╣
 ║  Transaction: ${txHash.slice(0, 44)}...  ║
-╠═══════════════════════════════════════════════════════════════╣
-║                                                               ║
-║  Your ADA remains fully spendable while delegated.            ║
-║  Rewards will accrue to your stake address each epoch.        ║
-║                                                               ║
-║  As a delegator to ${targetPool.ticker}, you're now:${' '.repeat(Math.max(0, 26 - targetPool.ticker.length))}║
-║  • Supporting Sierra Nevada bioregion health                  ║
-║  • Contributing to local treasury (${targetPool.commitment?.treasuryContribution / 100 || 5}%)${' '.repeat(23)}║
-║  • Enabling credit underwriting for local projects            ║
-║                                                               ║
 ╚═══════════════════════════════════════════════════════════════╝
 
 View on Cardanoscan:
   https://${CONFIG.network === 'mainnet' ? '' : 'preprod.'}cardanoscan.io/transaction/${txHash}
 `);
-
-  } catch (error) {
-    log.error(`Delegation failed: ${error.message}`);
-
-    // Check if this is a demo pool ID issue
-    if (error.message.includes('pool') || error.message.includes('invalid')) {
-      log.warn('');
-      log.warn('Note: This pool uses a demo ID. For real delegation, you need:');
-      log.warn('1. A real Cardano stake pool registered on-chain');
-      log.warn('2. The pool ID in bech32 format (pool1...)');
-      log.warn('');
-      log.info('To delegate to a real pool:');
-      log.info('  node delegate-to-pool.mjs --pool-id pool1xxxxxxx...');
+      } else {
+        log.error('Could not determine stake address for on-chain delegation');
+        process.exit(1);
+      }
+    } catch (error) {
+      log.error(`Delegation failed: ${error.message}`);
+      console.error(error);
+      process.exit(1);
     }
-
-    console.error(error);
-    process.exit(1);
   }
 }
 
