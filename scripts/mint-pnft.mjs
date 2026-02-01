@@ -20,6 +20,9 @@ import {
   MeshWallet,
   MeshTxBuilder,
   deserializeAddress,
+  applyCborEncoding,
+  resolveScriptHash,
+  stringToHex,
 } from '@meshsdk/core';
 import fs from 'fs';
 import path from 'path';
@@ -27,7 +30,7 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import 'dotenv/config';
 
-import { atomicWriteSync } from './utils.mjs';
+import { atomicWriteSync, safeReadJson } from './utils.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -261,8 +264,6 @@ async function main() {
     currentSlot: currentSlot,
   });
 
-  log.info('pNFT datum constructed');
-
   // Record pNFT
   const pnftRecord = {
     id: pnftId,
@@ -278,30 +279,146 @@ async function main() {
     },
   };
 
+  log.info('pNFT datum constructed');
+
+  // =========================================================================
+  // ON-CHAIN MINTING
+  // =========================================================================
+
+  // Check for pNFT policy reference script
+  const pnftPolicyRef = deployment.references?.pnft_pnft_policy_mint;
+  if (!pnftPolicyRef?.txHash) {
+    log.error('pNFT policy reference script not deployed!');
+    log.info('Run: npm run deploy:references -- --validator pnft_policy');
+    process.exit(1);
+  }
+
+  log.info(`Using pNFT policy ref: ${pnftPolicyRef.txHash}#${pnftPolicyRef.outputIndex}`);
+
+  // Load the pNFT policy script from plutus.json to get the script hash
+  const plutusPath = path.join(__dirname, '..', 'plutus.json');
+  const plutus = safeReadJson(plutusPath);
+  const pnftPolicyValidator = plutus?.validators?.find(v => v.title === 'pnft.pnft_policy.mint');
+
+  if (!pnftPolicyValidator) {
+    log.error('pNFT policy validator not found in plutus.json');
+    process.exit(1);
+  }
+
+  // Apply CBOR encoding to get correct script hash
+  const encodedScript = applyCborEncoding(pnftPolicyValidator.compiledCode);
+  const policyId = resolveScriptHash(encodedScript, 'V3');
+  log.info(`Policy ID: ${policyId}`);
+
+  // Asset name is the pNFT ID in hex
+  const assetNameHex = stringToHex(pnftId);
+  log.info(`Asset name (hex): ${assetNameHex.slice(0, 32)}...`);
+
+  // Build minting redeemer (MintBasic { owner: VerificationKeyHash })
+  const mintRedeemer = {
+    constructor: 0,  // MintBasic variant
+    fields: [
+      { bytes: ownerHash },  // owner field
+    ],
+  };
+
+  // Build the minting transaction
+  log.info('Building minting transaction...');
+
+  const txBuilder = new MeshTxBuilder({
+    fetcher: provider,
+    submitter: provider,
+    verbose: false,
+  });
+
+  // Select UTxO for input
+  const inputUtxo = utxos[0];
+  txBuilder.txIn(inputUtxo.input.txHash, inputUtxo.input.outputIndex);
+
+  // Add the mint operation with reference script
+  txBuilder.mintPlutusScriptV3();
+  txBuilder.mint('1', policyId, assetNameHex);
+  txBuilder.mintTxInReference(pnftPolicyRef.txHash, pnftPolicyRef.outputIndex);
+  txBuilder.mintRedeemerValue(mintRedeemer, 'JSON');
+
+  // Output the minted pNFT to the owner's address with inline datum
+  txBuilder.txOut(address, [
+    { unit: 'lovelace', quantity: '2000000' },  // 2 ADA min
+    { unit: policyId + assetNameHex, quantity: '1' },
+  ]);
+  txBuilder.txOutInlineDatumValue(datum, 'JSON');
+
+  // Change output
+  txBuilder.changeAddress(address);
+
+  // Set collateral (required for Plutus scripts)
+  const collateralUtxo = utxos.find(u => {
+    const lovelace = u.output.amount.find(a => a.unit === 'lovelace');
+    return BigInt(lovelace?.quantity || 0) >= 5_000_000n;
+  });
+  if (!collateralUtxo) {
+    log.error('No suitable collateral UTxO found (need >= 5 ADA)');
+    process.exit(1);
+  }
+  txBuilder.txInCollateral(
+    collateralUtxo.input.txHash,
+    collateralUtxo.input.outputIndex,
+    collateralUtxo.output.amount,
+    collateralUtxo.output.address
+  );
+
+  // Complete, sign, and submit
+  log.info('Completing transaction...');
+  const unsignedTx = await txBuilder.complete();
+
+  log.info('Signing transaction...');
+  const signedTx = await wallet.signTx(unsignedTx);
+
+  log.info('Submitting transaction...');
+  const txHash = await provider.submitTx(signedTx);
+  log.success(`Transaction submitted: ${txHash}`);
+
+  // Wait for confirmation
+  log.info('Waiting for confirmation...');
+  for (let i = 0; i < 60; i++) {
+    try {
+      const tx = await provider.fetchTxInfo(txHash);
+      if (tx) {
+        log.success(`Transaction confirmed in block ${tx.block}`);
+        break;
+      }
+    } catch {
+      // Not found yet
+    }
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    process.stdout.write('.');
+  }
+
+  // Update record with on-chain info
+  pnftRecord.status = 'minted';
+  pnftRecord.txHash = txHash;
+  pnftRecord.policyId = policyId;
+  pnftRecord.assetName = assetNameHex;
+  pnftRecord.assetId = policyId + assetNameHex;
+
   deployment.pnfts.push(pnftRecord);
   atomicWriteSync(CONFIG.deploymentPath, deployment);
 
-  log.success('pNFT prepared!');
-
   console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
-║                      pNFT Summary                             ║
+║                   🎉 pNFT MINTED! 🎉                          ║
 ╠═══════════════════════════════════════════════════════════════╣
 ║  ID:        ${pnftId.padEnd(48)}║
 ║  Owner:     ${address.slice(0, 48).padEnd(48)}║
 ║  Level:     ${level.padEnd(48)}║
-║  DNA:       ${(dnaHash || 'Not provided').slice(0, 48).padEnd(48)}║
-║  Bioregion: ${(bioregion || 'Not assigned').slice(0, 48).padEnd(48)}║
-║  Guardian:  ${(guardian || 'None (not a ward)').slice(0, 48).padEnd(48)}║
-║  Status:    ${'Prepared (ready for on-chain mint)'.padEnd(48)}║
+║  Policy:    ${policyId.slice(0, 48).padEnd(48)}║
+║  Asset:     ${(policyId + assetNameHex).slice(0, 48).padEnd(48)}║
+║  Tx:        ${txHash.slice(0, 48).padEnd(48)}║
+║  Status:    ${'✅ On-chain!'.padEnd(48)}║
 ╚═══════════════════════════════════════════════════════════════╝
 
-pNFT saved to deployment.json
-
-To mint on-chain:
-  1. Ensure pnft policy reference script is deployed
-  2. Build minting transaction with datum
-  3. Submit and wait for confirmation
+🔗 View on Cardanoscan:
+   https://${CONFIG.network}.cardanoscan.io/transaction/${txHash}
 
 `);
 }
