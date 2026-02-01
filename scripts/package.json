@@ -23,7 +23,10 @@
     "test:e2e:skip-deploy": "node e2e-test.mjs --skip-deploy",
     "show:address": "node show-wallet-address.mjs",
     "setup": "node setup-testnet.mjs",
-    "setup:generate": "node setup-testnet.mjs --generate-wallet"
+    "setup:generate": "node setup-testnet.mjs --generate-wallet",
+    "register:bioregion": "node register-bioregion-pool.mjs",
+    "register:pool:sierra": "node register-bioregion-pool.mjs --bioregion 'Sierra Nevada' --ticker NASEC --renewable",
+    "list:bioregions": "node register-bioregion-pool.mjs --list"
   },
   "dependencies": {
     "@blockfrost/blockfrost-js": "^5.5.0",
