@@ -409,6 +409,9 @@ async function main() {
   txBuilder.mintTxInReference(pnftPolicyRef.txHash, pnftPolicyRef.outputIndex);
   txBuilder.mintRedeemerValue(mintRedeemer, 'JSON');
 
+  // CRITICAL: Add required signer - the script checks for owner's signature
+  txBuilder.requiredSignerHash(ownerHash);
+
   // Output the minted pNFT to the owner's address with inline datum
   txBuilder.txOut(address, [
     { unit: 'lovelace', quantity: '2000000' },  // 2 ADA min
