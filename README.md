@@ -4,7 +4,9 @@
 
 *"The bar for participation is: can you talk?"*
 
-Built on Cardano • 27 Aiken Validators • LLM Interface
+Built on Cardano • 34 Aiken Validators • LLM Interface
+
+**[Testnet Status: Live on Preprod](docs/TESTNET_STATUS.md)** | [Quick Start](docs/NASEC_TESTNET_GUIDE.md)
 
 ---
 
@@ -68,7 +70,7 @@ Built on Cardano • 27 Aiken Validators • LLM Interface
 
 ## The System
 
-### 27 Smart Contracts
+### 34 Smart Contracts (Deployed on Preprod)
 
 | Category | Validators |
 |----------|------------|

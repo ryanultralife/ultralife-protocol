@@ -1,14 +1,12 @@
 # UltraLife Protocol: NASEC Testnet Guide
 
-## Talk to the Protocol
+**Status:** Live on Preprod | 34 Validators | pNFT Minting Operational
 
-**No CLI commands. No Web UI. Just conversation.**
-
-You'll use your LLM (Claude, GPT, local) to create pNFTs, collectives, and offerings through natural language.
+See [TESTNET_STATUS.md](./TESTNET_STATUS.md) for full deployment details.
 
 ---
 
-## Quick Setup (~10 minutes)
+## Quick Start: Mint Your pNFT (~5 minutes)
 
 ### 1. Get Credentials
 
@@ -18,56 +16,52 @@ https://blockfrost.io
 → Sign up → Create Project → Select "Cardano preprod" → Copy API key
 ```
 
-**Testnet Wallet**:
-- Use any Cardano wallet (Eternl, Nami, Lace)
-- Switch to Preprod testnet
-- Copy your address
+**Testnet Wallet Seed**:
+- Create a new wallet in Eternl/Nami/Lace (Preprod network)
+- Copy the 24-word seed phrase (keep it safe!)
+- Copy your receive address
 
 **Test ADA**:
 ```
 https://docs.cardano.org/cardano-testnets/tools/faucet/
-→ Select "Preprod" → Paste address → Get tADA
+→ Select "Preprod" → Paste address → Get 10,000 tADA
 ```
 
 ### 2. Clone & Setup
 
 ```bash
 git clone https://github.com/ryanultralife/ultralife-protocol
-cd ultralife-protocol
-
-# Build contracts
-aiken build
-
-# Setup service
-cd service
+cd ultralife-protocol/scripts
 npm install
-cp .env.example .env
-# Edit .env with your Blockfrost key
 ```
 
-### 3. Connect Your LLM
-
-**Claude Desktop** — Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
-```json
-{
-  "mcpServers": {
-    "ultralife": {
-      "command": "node",
-      "args": ["/path/to/ultralife-protocol/service/dist/index.js"],
-      "env": {
-        "BLOCKFROST_API_KEY": "preprodXXX...",
-        "NETWORK": "preprod"
-      }
-    }
-  }
-}
-```
-
-**Other LLMs** — Run MCP server standalone:
+Create `.env` file:
 ```bash
-npm start
-# Server provides tool interface at stdio
+BLOCKFROST_API_KEY=preprodYOUR_KEY_HERE
+WALLET_SEED_PHRASE=your 24 word seed phrase here
+NETWORK=preprod
 ```
+
+### 3. Mint Your pNFT
+
+```bash
+# Mint a Basic level pNFT (wallet-only, no DNA verification)
+npm run mint:pnft:basic
+```
+
+Expected output:
+```
+╔═══════════════════════════════════════════════════════════════╗
+║                   🎉 pNFT MINTED! 🎉                          ║
+╠═══════════════════════════════════════════════════════════════╣
+║  ID:        pnft_ml361rj3_dcb6eb37787234c8                    ║
+║  Owner:     addr_test1qq7h5wjmrzndkgh72...                    ║
+║  Level:     Basic                                             ║
+║  Status:    ✅ On-chain!                                      ║
+╚═══════════════════════════════════════════════════════════════╝
+```
+
+View your pNFT: https://preprod.cardanoscan.io/transaction/YOUR_TX_HASH
 
 ---
 
