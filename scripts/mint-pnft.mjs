@@ -331,8 +331,19 @@ async function main() {
     verbose: false,
   });
 
-  // Select UTxO for input
-  const inputUtxo = utxos[0];
+  // Select a UTxO with enough ADA (need ~5 ADA for output + fees)
+  const minRequired = 5_000_000n;
+  const inputUtxo = utxos.find(u => {
+    const lovelace = u.output.amount.find(a => a.unit === 'lovelace');
+    return BigInt(lovelace?.quantity || 0) >= minRequired;
+  });
+
+  if (!inputUtxo) {
+    log.error(`No UTxO found with at least ${Number(minRequired) / 1_000_000} ADA`);
+    process.exit(1);
+  }
+
+  log.info(`Using input UTxO: ${inputUtxo.input.txHash.slice(0, 16)}... (${formatAda(inputUtxo.output.amount.find(a => a.unit === 'lovelace')?.quantity || 0)})`);
   txBuilder.txIn(inputUtxo.input.txHash, inputUtxo.input.outputIndex);
 
   // Add the mint operation with reference script
