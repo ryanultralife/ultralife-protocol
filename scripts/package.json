@@ -25,7 +25,7 @@
     "setup": "node setup-testnet.mjs",
     "setup:generate": "node setup-testnet.mjs --generate-wallet",
     "register:bioregion": "node register-bioregion-pool.mjs",
-    "register:pool:sierra": "node register-bioregion-pool.mjs --bioregion 'Sierra Nevada' --ticker NASEC --renewable",
+    "register:pool:sierra-a": "node register-bioregion-pool.mjs --bioregion 'Sierra Nevada' --ticker SNA --renewable",
     "list:bioregions": "node register-bioregion-pool.mjs --list"
   },
   "dependencies": {
