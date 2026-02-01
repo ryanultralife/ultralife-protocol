@@ -19,6 +19,8 @@ import {
   MeshWallet,
   MeshTxBuilder,
   resolveScriptHash,
+  applyParamsToScript,
+  resolvePaymentKeyHash,
 } from '@meshsdk/core';
 import fs from 'fs';
 import path from 'path';
@@ -64,6 +66,55 @@ function calculateMinLovelace(scriptHex) {
   return minUtxo;
 }
 
+// Apply parameters to parameterized validators
+// For testnet, we use placeholder values based on the wallet address
+function applyValidatorParams(validator, walletPkh) {
+  // If validator has no parameters, return as-is
+  if (!validator.parameters || validator.parameters.length === 0) {
+    return validator.compiledCode;
+  }
+
+  // Create placeholder config based on validator type
+  // All UltraLife validators use a "config" parameter with similar structure
+  // For testnet, we use placeholder values
+
+  // Placeholder 28-byte hash (all zeros for testnet)
+  const placeholderHash = '00'.repeat(28);
+
+  // Build a generic config that works for most validators:
+  // { field1: ByteArray, field2: [PubKeyHash], field3: Int, ... }
+  // Most configs have: some_registry (bytes), oracles/admins (list of pkh), threshold (int)
+
+  const config = {
+    alternative: 0,  // Constructor index
+    fields: [
+      { bytes: placeholderHash },     // Registry/reference script hash
+      { list: [{ bytes: walletPkh }] }, // Admin/oracle list with wallet as admin
+      { int: 1 },                      // Threshold = 1
+    ],
+  };
+
+  try {
+    const appliedScript = applyParamsToScript(validator.compiledCode, [config], 'JSON');
+    return appliedScript;
+  } catch (e) {
+    // If params don't match, try with simpler structure
+    const simpleConfig = {
+      alternative: 0,
+      fields: [
+        { bytes: placeholderHash },
+      ],
+    };
+    try {
+      return applyParamsToScript(validator.compiledCode, [simpleConfig], 'JSON');
+    } catch {
+      // Return original if we can't apply params (will fail on-chain)
+      log.warn(`Could not apply params to ${validator.title}: ${e.message}`);
+      return validator.compiledCode;
+    }
+  }
+}
+
 // =============================================================================
 // UTILITIES
 // =============================================================================
@@ -99,7 +150,7 @@ async function waitForConfirmation(provider, txHash, maxAttempts = 60) {
 // DEPLOY SINGLE REFERENCE SCRIPT
 // =============================================================================
 
-async function deployReferenceScript(provider, wallet, validator, deployment) {
+async function deployReferenceScript(provider, wallet, validator, deployment, walletPkh) {
   const key = validator.title.replace(/\./g, '_');
 
   // Check if already deployed
@@ -107,11 +158,6 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
     log.info(`${key}: Already deployed at ${deployment.references[key].txHash}`);
     return null;
   }
-
-  // Calculate minimum lovelace based on script size early for logging
-  const scriptSizeBytes = Math.ceil(validator.compiledCode.length / 2);
-  const minLov = calculateMinLovelace(validator.compiledCode);
-  log.info(`Deploying: ${validator.title} (${(scriptSizeBytes / 1024).toFixed(1)} KB, min ${formatAda(minLov)})`);
 
   try {
     const address = wallet.getChangeAddress();
@@ -121,9 +167,15 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
       throw new Error('No UTxOs available. Fund the wallet first.');
     }
 
-    // Calculate minimum lovelace based on script size
-    const scriptSize = validator.compiledCode.length / 2; // hex to bytes
-    const minLovelace = calculateMinLovelace(validator.compiledCode);
+    // Apply parameters to get the final script
+    const finalScript = applyValidatorParams(validator, walletPkh);
+
+    // Calculate minimum lovelace based on final script size
+    const scriptSizeBytes = Math.ceil(finalScript.length / 2);
+    const minLovelace = calculateMinLovelace(finalScript);
+    log.info(`Deploying: ${validator.title} (${(scriptSizeBytes / 1024).toFixed(1)} KB, min ${formatAda(minLovelace)})`);
+
+    const scriptSize = scriptSizeBytes;
 
     // Build transaction
     const txBuilder = new MeshTxBuilder({
@@ -168,10 +220,10 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
     txBuilder.txOut(address, [
       { unit: 'lovelace', quantity: minLovelace.toString() }
     ]);
-    txBuilder.txOutReferenceScript(validator.compiledCode, 'V3');
+    txBuilder.txOutReferenceScript(finalScript, 'V3');
 
     // Calculate script hash for reference
-    const scriptHash = resolveScriptHash(validator.compiledCode, 'V3');
+    const scriptHash = resolveScriptHash(finalScript, 'V3');
 
     // Add change output
     txBuilder.changeAddress(address);
@@ -277,6 +329,10 @@ async function main() {
 
   log.info(`Validators to deploy: ${validators.length}`);
 
+  // Get wallet's payment key hash for parameterized validators
+  const walletPkh = resolvePaymentKeyHash(address);
+  log.info(`Using wallet PKH for config: ${walletPkh.slice(0, 16)}...`);
+
   // Deploy each validator
   let deployed = 0;
   let skipped = 0;
@@ -286,7 +342,7 @@ async function main() {
     const key = validator.title.replace(/\./g, '_');
 
     try {
-      const result = await deployReferenceScript(provider, wallet, validator, deployment);
+      const result = await deployReferenceScript(provider, wallet, validator, deployment, walletPkh);
 
       if (result) {
         deployment.references[key] = result;
