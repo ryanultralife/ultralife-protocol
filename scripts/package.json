@@ -31,7 +31,12 @@
     "register:pool:great-lakes": "node register-bioregion-pool.mjs --bioregion great_lakes --ticker GLK",
     "register:pool:gulf-coast": "node register-bioregion-pool.mjs --bioregion gulf_coast --ticker GCT",
     "register:pool:sonoran": "node register-bioregion-pool.mjs --bioregion sonoran_desert --ticker SON",
-    "list:bioregions": "node register-bioregion-pool.mjs --list"
+    "list:bioregions": "node register-bioregion-pool.mjs --list",
+    "delegate": "node delegate-to-pool.mjs",
+    "delegate:sna": "node delegate-to-pool.mjs --pool SNA",
+    "delegate:list": "node delegate-to-pool.mjs --list",
+    "claim:signup": "node claim-signup-ultra.mjs",
+    "balance": "node show-balance.mjs"
   },
   "dependencies": {
     "@blockfrost/blockfrost-js": "^5.5.0",
