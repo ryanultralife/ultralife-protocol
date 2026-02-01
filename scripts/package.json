@@ -36,7 +36,11 @@
     "delegate:sna": "node delegate-to-pool.mjs --pool SNA",
     "delegate:list": "node delegate-to-pool.mjs --list",
     "claim:signup": "node claim-signup-ultra.mjs",
-    "balance": "node show-balance.mjs"
+    "balance": "node show-balance.mjs",
+    "user:create": "node create-test-user.mjs",
+    "user:list": "node create-test-user.mjs --list",
+    "transfer": "node transfer-ultra.mjs",
+    "transfer:impacts": "node transfer-ultra.mjs --list-impacts"
   },
   "dependencies": {
     "@blockfrost/blockfrost-js": "^5.5.0",
