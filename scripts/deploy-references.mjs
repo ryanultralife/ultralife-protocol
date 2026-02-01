@@ -49,8 +49,20 @@ const CONFIG = {
   deploymentPath: path.join(__dirname, 'deployment.json'),
 };
 
-// Minimum ADA to lock with reference script (protocol minimum)
-const MIN_REFERENCE_LOVELACE = 25_000_000n; // 25 ADA (safe minimum)
+// Minimum ADA to lock with reference script - calculated dynamically based on script size
+// Formula: coinsPerUTxOByte (4310) * (baseSize + scriptBytes)
+const COINS_PER_UTXO_BYTE = 4310n;
+const BASE_OUTPUT_SIZE = 160n; // Base UTXO overhead
+
+function calculateMinLovelace(scriptHex) {
+  // Script size in bytes (hex string / 2)
+  const scriptBytes = BigInt(Math.ceil(scriptHex.length / 2));
+  // Add overhead for script hash, address, etc.
+  const totalSize = BASE_OUTPUT_SIZE + scriptBytes + 50n; // 50 bytes overhead for reference script
+  // Calculate minimum with 20% safety margin
+  const minUtxo = (COINS_PER_UTXO_BYTE * totalSize * 120n) / 100n;
+  return minUtxo;
+}
 
 // =============================================================================
 // UTILITIES
@@ -96,7 +108,10 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
     return null;
   }
 
-  log.info(`Deploying: ${validator.title}`);
+  // Calculate minimum lovelace based on script size early for logging
+  const scriptSizeBytes = Math.ceil(validator.compiledCode.length / 2);
+  const minLov = calculateMinLovelace(validator.compiledCode);
+  log.info(`Deploying: ${validator.title} (${(scriptSizeBytes / 1024).toFixed(1)} KB, min ${formatAda(minLov)})`);
 
   try {
     const address = wallet.getChangeAddress();
@@ -106,6 +121,10 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
       throw new Error('No UTxOs available. Fund the wallet first.');
     }
 
+    // Calculate minimum lovelace based on script size
+    const scriptSize = validator.compiledCode.length / 2; // hex to bytes
+    const minLovelace = calculateMinLovelace(validator.compiledCode);
+
     // Build transaction
     const txBuilder = new MeshTxBuilder({
       fetcher: provider,
@@ -113,12 +132,11 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
       verbose: false,
     });
 
-    // Calculate script size for fee estimation
-    const scriptSize = validator.compiledCode.length / 2; // hex to bytes
+    // Calculate fee estimation
     const estimatedFee = estimateFee('referenceScript', { scriptSize });
 
     // Select UTxOs with proper validation
-    const targetAmount = MIN_REFERENCE_LOVELACE + estimatedFee;
+    const targetAmount = minLovelace + estimatedFee;
     const selection = selectUtxos(utxos, targetAmount);
 
     if (!selection.sufficient) {
@@ -129,7 +147,7 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
     }
 
     // Validate selection before building transaction
-    const validation = validateUtxoSelection(selection.selected, MIN_REFERENCE_LOVELACE, estimatedFee);
+    const validation = validateUtxoSelection(selection.selected, minLovelace, estimatedFee);
     if (!validation.valid) {
       throw new Error(`UTxO validation failed: ${validation.errors.join(', ')}`);
     }
@@ -148,7 +166,7 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
     // Add reference script output
     // Store at the wallet address with the script attached
     txBuilder.txOut(address, [
-      { unit: 'lovelace', quantity: MIN_REFERENCE_LOVELACE.toString() }
+      { unit: 'lovelace', quantity: minLovelace.toString() }
     ]);
     txBuilder.txOutReferenceScript(validator.compiledCode, 'V3');
 
@@ -176,8 +194,9 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
     };
 
   } catch (error) {
-    log.error(`Failed to deploy ${validator.title}: ${error.message}`);
-    throw error;
+    const errMsg = error?.message || error?.toString() || JSON.stringify(error) || 'Unknown error';
+    log.error(`Failed to deploy ${validator.title}: ${errMsg}`);
+    throw new Error(errMsg);
   }
 }
 
