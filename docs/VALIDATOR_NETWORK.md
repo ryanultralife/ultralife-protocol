@@ -281,16 +281,16 @@ In UltraLife, stake pools aren't just validators—they're the economic infrastr
 │                                                                 │
 │  Community Members          Stake Pools            Treasury     │
 │  ┌─────────┐               ┌─────────────┐       ┌───────────┐ │
-│  │ Farmers │──delegate──▶  │   NASEC     │──5%──▶│ Bioregion │ │
-│  │ Makers  │     ULTRA     │   TAHOE     │       │ Treasury  │ │
-│  │ Artists │◀──rewards───  │   YOSEMITE  │       │           │ │
+│  │ Farmers │──delegate──▶  │   Pool A    │──5%──▶│ Bioregion │ │
+│  │ Makers  │     ULTRA     │   Pool B    │       │ Treasury  │ │
+│  │ Artists │◀──rewards───  │   Pool C    │       │           │ │
 │  └─────────┘               └──────┬──────┘       └─────┬─────┘ │
 │                                   │                    │       │
-│                            Track Metrics         Fund Projects │
+│                       Track Metrics + Underwrite  Fund Projects │
 │                                   │                    │       │
 │                            ┌──────▼──────┐      ┌──────▼─────┐ │
 │                            │ Health Index │      │ Restoration│ │
-│                            │ Economics    │      │ UBI Boost  │ │
+│                            │ Credit Cap   │      │ UBI Boost  │ │
 │                            │ Impact Data  │      │ Grants     │ │
 │                            └─────────────┘      └────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
@@ -407,19 +407,82 @@ node register-bioregion-pool.mjs \
 
 ## Multi-Pool Bioregions
 
-Large bioregions can have multiple pools competing:
+Large bioregions can have multiple pools working together:
 
-| Pool | Total Stake | Renewable | Carbon | Delegators |
-|------|-------------|-----------|--------|------------|
-| NASEC | 1.25M ULTRA | Yes | 15 kg | 47 |
-| TAHOE | 890K ULTRA | Yes | 0 kg | 31 |
-| YOSEMITE | 2.1M ULTRA | Partial | 85 kg | 89 |
+| Pool | Stake | Underwriting Capacity | Focus Area |
+|------|-------|----------------------|------------|
+| Sierra Nevada A | 1.25M ULTRA | 625K credit | General infrastructure |
+| Sierra Nevada B | 890K ULTRA | 445K credit | Water/watershed projects |
+| Sierra Nevada C | 2.1M ULTRA | 1.05M credit | Conservation/restoration |
 
 **Total Sierra Nevada stake: 4.24M ULTRA**
+**Total Bioregion Credit Capacity: ~2.1M ULTRA**
 
-Pools compete on:
-- Lower carbon footprint
-- Higher renewable percentage
-- Better uptime
-- Lower operator margin
-- Community engagement and trust
+Pools don't compete—they **cooperate to support the bioregion**:
+- Combined stake = Total bioregion credit capacity
+- Each pool can underwrite projects up to 50% of their stake
+- Pools coordinate on large regional projects
+- Specialization by area (water, energy, agriculture, etc.)
+
+---
+
+## Credit Underwriting
+
+### Pools as Bioregion Credit Unions
+
+A stake pool's delegation determines how much credit it can extend to the bioregion:
+
+```
+Pool Stake: 1,000,000 ULTRA
+      │
+      ├── Underwriting Capacity: 500,000 ULTRA (50% of stake)
+      │
+      ├── Can back:
+      │     • Restoration projects
+      │     • Local business loans
+      │     • Emergency response
+      │     • Infrastructure improvements
+      │
+      └── Risk: Pool's stake backs the credit
+            If project fails, pool absorbs loss
+```
+
+### How Credit Works
+
+1. **Community proposes project** ("Restore 100 acres of watershed")
+2. **Pool evaluates and underwrites** (commits portion of stake as backing)
+3. **Treasury releases funds** against the pool's guarantee
+4. **Project executes** with on-chain milestones
+5. **Success:** Pool earns bonus, stake unlocked
+6. **Failure:** Pool stake partially slashed to cover losses
+
+### Underwriting Example
+
+```
+Project: Sierra Nevada Reforestation
+Cost: 200,000 ULTRA
+Duration: 24 epochs
+
+Underwriters:
+  Sierra Nevada A:  100,000 ULTRA (50%)
+  Sierra Nevada B:   60,000 ULTRA (30%)
+  Sierra Nevada C:   40,000 ULTRA (20%)
+
+On success: Pools earn 5% bonus on underwritten amount
+On failure: Pools lose up to 30% of underwritten amount
+```
+
+### Credit Capacity by Bioregion
+
+The total stake delegated to a bioregion = its credit capacity:
+
+| Bioregion | Total Stake | Credit Capacity | Active Projects |
+|-----------|-------------|-----------------|-----------------|
+| Sierra Nevada | 4.24M ULTRA | 2.12M ULTRA | 12 |
+| Pacific Northwest | 6.8M ULTRA | 3.4M ULTRA | 18 |
+| Great Lakes | 3.1M ULTRA | 1.55M ULTRA | 8 |
+| Gulf Coast | 2.5M ULTRA | 1.25M ULTRA | 6 |
+
+**Higher stake = more credit = more projects funded = healthier bioregion**
+
+This creates a direct link between community confidence (delegation) and the bioregion's ability to fund improvements.
