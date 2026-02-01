@@ -366,12 +366,26 @@ Total Epoch Rewards: 10,000 ULTRA
 
 ### Impact Tracking
 
-Pools track their impact the same as any transaction—no special treatment:
+Impact flows through the same data infrastructure—no special treatment for anyone:
 
-- Pool operations generate impact (energy, hardware, etc.)
-- Impact is measured and recorded on-chain
-- Consumer of pool services accrues the impact
-- No bonuses or penalties—just transparent tracking
+```
+Every transaction:
+  │
+  ├── Economic data → Bioregion economic tracking
+  │
+  └── Impact data → Bioregion impact tracking
+          │
+          ├── Measured in compounds (CO2, H2O, N, P, etc.)
+          ├── Consumer accrues full supply chain impact
+          └── Aggregated by bioregion for health indices
+```
+
+Pool operations generate impact like any other activity:
+- Energy consumption
+- Hardware lifecycle
+- Facility operations
+
+All tracked, all transparent, all aggregated into bioregion data. No bonuses, no penalties—just the truth.
 
 ### Economic Signal
 
