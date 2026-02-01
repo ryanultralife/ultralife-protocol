@@ -166,13 +166,15 @@ scripts/
 | Transaction Building | Working | `scripts/mint-pnft.mjs` operational |
 | Chain Indexer | Partial | Blockfrost integration ready |
 
-### Using Claude Now
+### Using Any LLM Coding Agent
 
-You're already doing it - conversational interaction with the protocol:
+See **[LLM_AGENT_GUIDE.md](./LLM_AGENT_GUIDE.md)** for full instructions.
+
+Works with Claude Code, Cursor, Windsurf, Copilot, or any agent with terminal access:
 
 ```
 You: "Mint me a pNFT"
-Claude: Runs npm run mint:pnft:basic
+Agent: Runs npm run mint:pnft:basic
 Result: On-chain pNFT
 ```
 

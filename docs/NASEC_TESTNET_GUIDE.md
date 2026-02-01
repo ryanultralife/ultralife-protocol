@@ -2,7 +2,9 @@
 
 **Status:** Live on Preprod | 34 Validators | pNFT Minting Operational
 
-See [TESTNET_STATUS.md](./TESTNET_STATUS.md) for full deployment details.
+See [TESTNET_STATUS.md](./TESTNET_STATUS.md) for deployment details.
+
+**Have an LLM coding agent?** See [LLM_AGENT_GUIDE.md](./LLM_AGENT_GUIDE.md) - just talk to your agent to mint pNFTs.
 
 ---
 

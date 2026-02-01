@@ -6,7 +6,7 @@
 
 Built on Cardano • 34 Aiken Validators • LLM Interface
 
-**[Testnet Status: Live on Preprod](docs/TESTNET_STATUS.md)** | [Quick Start](docs/NASEC_TESTNET_GUIDE.md)
+**[Testnet Status: Live on Preprod](docs/TESTNET_STATUS.md)** | [Quick Start](docs/NASEC_TESTNET_GUIDE.md) | [LLM Agent Guide](docs/LLM_AGENT_GUIDE.md)
 
 ---
 
