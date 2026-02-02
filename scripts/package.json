@@ -42,6 +42,10 @@
     "transfer": "node transfer-ultra.mjs",
     "transfer:help": "node transfer-ultra.mjs --help",
     "transfer:compounds": "node transfer-ultra.mjs --list-compounds",
+    "measure": "node measure-helper.mjs",
+    "measure:methods": "node measure-helper.mjs --list-methods",
+    "measure:factors": "node measure-helper.mjs --list-factors",
+    "measure:nutrition": "node measure-helper.mjs --list-nutrition",
     "land:mint": "node mint-land.mjs",
     "land:list": "node mint-land.mjs --list",
     "land:types": "node mint-land.mjs --list-types"
