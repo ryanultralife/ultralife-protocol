@@ -79,7 +79,9 @@ const TX_TYPES = {
 // =============================================================================
 
 // Known compound types (extensible as measurement science evolves)
+// Full lifecycle: Environment → Nutrition → Health → Care
 const COMPOUND_TYPES = {
+  // === ENVIRONMENTAL (extraction/emission) ===
   // Carbon cycle
   CO2: { name: 'Carbon Dioxide', unit: 'g', category: 'carbon' },
   CH4: { name: 'Methane', unit: 'g', category: 'carbon' },
@@ -104,6 +106,38 @@ const COMPOUND_TYPES = {
 
   // Energy (embodied)
   KWH: { name: 'Energy', unit: 'kWh', category: 'energy' },
+
+  // === NUTRITIONAL (what the product delivers) ===
+  PROT: { name: 'Protein', unit: 'g', category: 'nutrition' },
+  FAT: { name: 'Fat', unit: 'g', category: 'nutrition' },
+  CARB: { name: 'Carbohydrate', unit: 'g', category: 'nutrition' },
+  FIBER: { name: 'Fiber', unit: 'g', category: 'nutrition' },
+  B12: { name: 'Vitamin B12', unit: 'mcg', category: 'nutrition' },
+  IRON: { name: 'Iron', unit: 'mg', category: 'nutrition' },
+  ZINC: { name: 'Zinc', unit: 'mg', category: 'nutrition' },
+  OMEGA3: { name: 'Omega-3', unit: 'mg', category: 'nutrition' },
+  OMEGA6: { name: 'Omega-6', unit: 'mg', category: 'nutrition' },
+  VIT_D: { name: 'Vitamin D', unit: 'IU', category: 'nutrition' },
+  VIT_A: { name: 'Vitamin A', unit: 'IU', category: 'nutrition' },
+  CA: { name: 'Calcium', unit: 'mg', category: 'nutrition' },
+  MG: { name: 'Magnesium', unit: 'mg', category: 'nutrition' },
+  K: { name: 'Potassium', unit: 'mg', category: 'nutrition' },
+  NA: { name: 'Sodium', unit: 'mg', category: 'nutrition' },
+  KCAL: { name: 'Calories', unit: 'kcal', category: 'nutrition' },
+
+  // === HEALTH OUTCOMES (relative to individual need) ===
+  // Positive = met a deficiency, Negative = excess beyond need
+  NEED_PROT: { name: 'Protein Need Met', unit: '%', category: 'health' },
+  NEED_B12: { name: 'B12 Need Met', unit: '%', category: 'health' },
+  NEED_IRON: { name: 'Iron Need Met', unit: '%', category: 'health' },
+  NEED_ZINC: { name: 'Zinc Need Met', unit: '%', category: 'health' },
+  EXCESS: { name: 'Nutritional Excess', unit: '%', category: 'health' },
+
+  // === CARE ECONOMICS (downstream costs) ===
+  // Positive = care cost avoided, Negative = care cost incurred
+  SUPP_AVOID: { name: 'Supplement Cost Avoided', unit: 'USD', category: 'care' },
+  CARE_AVOID: { name: 'Healthcare Cost Avoided', unit: 'USD', category: 'care' },
+  CARE_INCUR: { name: 'Healthcare Cost Incurred', unit: 'USD', category: 'care' },
 };
 
 async function main() {
