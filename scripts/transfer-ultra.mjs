@@ -56,52 +56,64 @@ const TX_TYPES = {
 };
 
 // Impact categories (compound flows)
+// IMPORTANT: ALL economic activity has negative impact.
+// Some activities have LESS negative impact than alternatives.
+// ONLY LAND generates sequestration credits (positive capacity).
+// These presets represent the DEBT accumulated by the consumer.
 const IMPACT_PRESETS = {
   food: {
-    description: 'Food purchase - local organic',
+    description: 'Food purchase - local organic (less impact than conventional)',
     compounds: [
-      { compound: 'CO2', quantity: -200, unit: 'g', confidence: 70 },  // Carbon from transport
+      { compound: 'CO2', quantity: -200, unit: 'g', confidence: 70 },  // Transport, processing
       { compound: 'H2O', quantity: -50, unit: 'L', confidence: 60 },   // Water footprint
-      { compound: 'N', quantity: 5, unit: 'g', confidence: 50 },       // Nitrogen cycle benefit
+      { compound: 'N', quantity: -5, unit: 'g', confidence: 50 },      // Nitrogen runoff
     ],
   },
   digital: {
-    description: 'Digital service - low impact',
+    description: 'Digital service - lower impact (still has server/network cost)',
     compounds: [
       { compound: 'CO2', quantity: -10, unit: 'g', confidence: 80 },   // Server energy
     ],
   },
   transport: {
-    description: 'Transportation service',
+    description: 'Transportation - fossil fuel',
     compounds: [
       { compound: 'CO2', quantity: -500, unit: 'g', confidence: 85 },  // Fuel emissions
-      { compound: 'NOx', quantity: -5, unit: 'g', confidence: 70 },    // Exhaust
+      { compound: 'NOx', quantity: -5, unit: 'g', confidence: 70 },    // Exhaust pollutants
     ],
   },
   renewable: {
-    description: 'Renewable energy purchase',
+    description: 'Renewable energy - less impact than fossil (not zero)',
     compounds: [
-      { compound: 'CO2', quantity: 100, unit: 'g', confidence: 90 },   // Avoided emissions
+      { compound: 'CO2', quantity: -20, unit: 'g', confidence: 90 },   // Manufacturing, maintenance
     ],
   },
   craft: {
-    description: 'Handmade/artisan goods',
+    description: 'Handmade/artisan goods - lower industrial footprint',
     compounds: [
       { compound: 'CO2', quantity: -50, unit: 'g', confidence: 60 },
     ],
   },
   regenerative: {
-    description: 'Regenerative agriculture product',
+    description: 'Regenerative ag product - lower impact (land generates credits separately)',
     compounds: [
-      { compound: 'CO2', quantity: 500, unit: 'g', confidence: 75 },   // Carbon sequestered
-      { compound: 'H2O', quantity: 100, unit: 'L', confidence: 65 },   // Water retention
-      { compound: 'N', quantity: 20, unit: 'g', confidence: 70 },      // Soil nitrogen
+      { compound: 'CO2', quantity: -30, unit: 'g', confidence: 75 },   // Processing, transport
+      { compound: 'H2O', quantity: -10, unit: 'L', confidence: 65 },   // Reduced water use
+      { compound: 'N', quantity: -2, unit: 'g', confidence: 70 },      // Minimal runoff
+    ],
+  },
+  conventional: {
+    description: 'Conventional goods - standard industrial impact',
+    compounds: [
+      { compound: 'CO2', quantity: -400, unit: 'g', confidence: 70 },
+      { compound: 'H2O', quantity: -100, unit: 'L', confidence: 60 },
+      { compound: 'N', quantity: -15, unit: 'g', confidence: 50 },
     ],
   },
   neutral: {
-    description: 'Estimated neutral impact',
+    description: 'Minimal documented impact',
     compounds: [
-      { compound: 'CO2', quantity: 0, unit: 'g', confidence: 50 },
+      { compound: 'CO2', quantity: -5, unit: 'g', confidence: 50 },    // Even "neutral" has cost
     ],
   },
 };
@@ -237,12 +249,11 @@ async function main() {
   log.info(`Type: ${txType.name} - ${txType.description}`);
   log.info(`Impact: ${impactPreset.description}`);
 
-  // Calculate net impact
+  // Calculate net impact (always negative - represents debt)
   const netImpact = impactPreset.compounds.reduce((sum, c) => {
     return sum + (c.quantity * c.confidence / 100);
   }, 0);
-  const impactSign = netImpact >= 0 ? '+' : '';
-  log.info(`Net impact: ${impactSign}${netImpact.toFixed(1)} (weighted by confidence)`);
+  log.info(`Impact debt: ${Math.abs(netImpact).toFixed(1)} units (weighted by confidence)`);
 
   // Create transaction record
   const currentSlot = Math.floor(Date.now() / 1000) - 1654041600;
@@ -302,41 +313,19 @@ async function main() {
   }
 
   // =========================================================================
-  // IMPACT TOKEN MINTING (for positive net impact)
+  // IMPACT DEBT TRACKING
+  // =========================================================================
+  // All economic activity creates impact debt (negative).
+  // Some activities have LESS debt than alternatives (e.g., renewable vs fossil).
+  // ONLY LAND can generate sequestration credits to offset this debt.
+  // Consumer accumulates all impact debt from their purchases.
   // =========================================================================
 
-  let impactTokensMinted = null;
-  if (netImpact > 0) {
-    // Positive impact = mint impact tokens that can be traded
-    const impactTokenId = 'impact_' + crypto.randomBytes(8).toString('hex');
-    const impactTokenAmount = Math.floor(netImpact); // 1 token per weighted unit
+  // Track cumulative impact debt for the consumer (recipient)
+  deployment.impactDebt = deployment.impactDebt || {};
+  deployment.impactDebt[recipientAddress] = (deployment.impactDebt[recipientAddress] || 0) + Math.abs(netImpact);
 
-    impactTokensMinted = {
-      tokenId: impactTokenId,
-      amount: impactTokenAmount,
-      category: impactArg,
-      compounds: impactPreset.compounds.filter(c => c.quantity > 0),
-      mintedAt: new Date().toISOString(),
-      mintedBy: senderPnft.id,
-      bioregion: senderBio,
-      txHash: txHash,
-    };
-
-    // Store impact tokens
-    deployment.impactTokens = deployment.impactTokens || [];
-    deployment.impactTokens.push(impactTokensMinted);
-
-    // Add to user's impact token balance
-    deployment.impactTokenBalances = deployment.impactTokenBalances || {};
-    deployment.impactTokenBalances[senderAddress] = deployment.impactTokenBalances[senderAddress] || [];
-    deployment.impactTokenBalances[senderAddress].push({
-      tokenId: impactTokenId,
-      amount: impactTokenAmount,
-      category: impactArg,
-    });
-
-    log.success(`Minted ${impactTokenAmount} impact tokens for positive activity!`);
-  }
+  log.info(`Consumer impact debt: ${deployment.impactDebt[recipientAddress].toFixed(1)} units`);
 
   atomicWriteSync(CONFIG.deploymentPath, deployment);
 
@@ -356,24 +345,24 @@ async function main() {
     console.log(`║    ${compound.compound.padEnd(6)} ${(sign + compound.quantity + compound.unit).padEnd(12)} (${compound.confidence}% confidence)${' '.repeat(18)}║`);
   }
 
-  console.log(`║  Net:      ${(impactSign + netImpact.toFixed(1) + ' weighted units').padEnd(48)}║`);
+  console.log(`║  Net:      ${(netImpact.toFixed(1) + ' weighted units (debt)').padEnd(48)}║`);
 
-  // Show impact tokens minted (for positive impact)
-  if (impactTokensMinted) {
-    console.log(`╠═══════════════════════════════════════════════════════════════╣
-║  🌱 IMPACT TOKENS MINTED:                                     ║
-║    Amount:   ${(impactTokensMinted.amount + ' tokens').padEnd(47)}║
-║    Category: ${impactTokensMinted.category.padEnd(47)}║
-║    These can be traded on the impact market!                  ║`);
-  }
+  // All economic activity creates debt - show cumulative debt for consumer
+  const consumerDebt = deployment.impactDebt[recipientAddress] || Math.abs(netImpact);
+  console.log(`╠═══════════════════════════════════════════════════════════════╣
+║  📊 CONSUMER IMPACT DEBT:                                     ║
+║    This transaction:  ${(Math.abs(netImpact).toFixed(1) + ' units').padEnd(37)}║
+║    Cumulative debt:   ${(consumerDebt.toFixed(1) + ' units').padEnd(37)}║
+║                                                               ║
+║    All activity has impact. Some has LESS (renewable, local). ║
+║    Only LAND sequestration generates offset credits.          ║`);
 
-  // Show remediation required (for negative impact)
-  if (netImpact < 0) {
-    console.log(`╠═══════════════════════════════════════════════════════════════╣
-║  ⚠️  REMEDIATION REQUIRED:                                    ║
-║    Offset needed: ${(Math.abs(netImpact).toFixed(0) + ' impact tokens').padEnd(42)}║
-║    Buy tokens or fund remediation projects                    ║`);
-  }
+  // Show remediation info
+  console.log(`╠═══════════════════════════════════════════════════════════════╣
+║  🌲 TO OFFSET THIS DEBT:                                      ║
+║    Purchase sequestration credits from land stewards          ║
+║    Natural quota: ~4 tonnes CO2-eq per person/year            ║
+║    Credits are generated by registered land parcels           ║`);
 
   console.log(`╠═══════════════════════════════════════════════════════════════╣
 ║  Tx Hash:  ${txHash.slice(0, 50).padEnd(50)}║
