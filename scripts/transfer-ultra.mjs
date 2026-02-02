@@ -133,11 +133,27 @@ const COMPOUND_TYPES = {
   NEED_ZINC: { name: 'Zinc Need Met', unit: '%', category: 'health' },
   EXCESS: { name: 'Nutritional Excess', unit: '%', category: 'health' },
 
-  // === CARE ECONOMICS (downstream costs) ===
-  // Positive = care cost avoided, Negative = care cost incurred
-  SUPP_AVOID: { name: 'Supplement Cost Avoided', unit: 'USD', category: 'care' },
-  CARE_AVOID: { name: 'Healthcare Cost Avoided', unit: 'USD', category: 'care' },
-  CARE_INCUR: { name: 'Healthcare Cost Incurred', unit: 'USD', category: 'care' },
+  // === PHARMACEUTICAL/SUPPLEMENT IMPACT CHAIN ===
+  // When nature doesn't meet a need, industrial alternatives have their own impacts
+  // These must be measured and compared to natural provision
+  PHARMA_CO2: { name: 'Pharma Embodied Carbon', unit: 'g', category: 'pharma' },      // R&D, manufacturing, distribution
+  PHARMA_H2O: { name: 'Pharma Water Use', unit: 'L', category: 'pharma' },            // Manufacturing water
+  PHARMA_CHEM: { name: 'Pharma Chemical Waste', unit: 'g', category: 'pharma' },      // Production byproducts
+  PHARMA_PKG: { name: 'Pharma Packaging', unit: 'g', category: 'pharma' },            // Plastic, foil, cardboard
+  PHARMA_SIDE: { name: 'Side Effect Risk', unit: '%', category: 'pharma' },           // Known adverse reactions
+  PHARMA_DEP: { name: 'Dependency Risk', unit: '%', category: 'pharma' },             // Long-term dependency
+  PHARMA_INT: { name: 'Drug Interaction Risk', unit: '%', category: 'pharma' },       // Interactions with other meds
+
+  // === NATURE vs INDUSTRY COMPARISON ===
+  // Positive = nature met need (avoided industrial chain)
+  // Negative = required industrial intervention
+  NAT_PROV: { name: 'Nature Provided', unit: '%', category: 'source' },               // % of need met by natural source
+  IND_REQ: { name: 'Industrial Required', unit: '%', category: 'source' },            // % requiring pharma/supplement
+
+  // === CARE ECONOMICS (full chain comparison) ===
+  // Not just cost avoided - full impact chain avoided or incurred
+  CHAIN_AVOID: { name: 'Industrial Chain Avoided', unit: 'units', category: 'care' }, // Weighted pharma impacts avoided
+  CHAIN_INCUR: { name: 'Industrial Chain Incurred', unit: 'units', category: 'care' }, // Weighted pharma impacts required
 };
 
 async function main() {
