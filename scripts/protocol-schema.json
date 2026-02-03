@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UltraLife Protocol Transaction",
+  "description": "Schema for impact-tracked transactions on UltraLife Protocol",
+
+  "definitions": {
+    "compoundCode": {
+      "type": "string",
+      "enum": [
+        "CO2", "CH4", "H2O", "N", "NO3", "NH3", "NOx", "P", "BIO", "SOIL", "KWH",
+        "PROT", "FAT", "CARB", "FIBER", "B12", "IRON", "ZINC", "OMEGA3", "OMEGA6", "VIT_D", "VIT_A", "CA", "MG", "K", "NA", "KCAL",
+        "NEED_PROT", "NEED_B12", "NEED_IRON", "NEED_ZINC", "EXCESS",
+        "PHARMA_CO2", "PHARMA_H2O", "PHARMA_CHEM", "PHARMA_PKG", "PHARMA_SIDE", "PHARMA_DEP", "PHARMA_INT",
+        "NAT_PROV", "IND_REQ", "CHAIN_AVOID", "CHAIN_INCUR"
+      ],
+      "description": "Compound code from the UltraLife registry"
+    },
+
+    "compoundFlow": {
+      "type": "object",
+      "required": ["compound", "quantity", "confidence"],
+      "properties": {
+        "compound": { "$ref": "#/definitions/compoundCode" },
+        "quantity": {
+          "type": "number",
+          "description": "Signed quantity: negative = extraction/emission, positive = sequestration/delivery"
+        },
+        "confidence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Measurement confidence: 95+ lab, 80-95 measured, 60-80 calculated, 40-60 estimated, <40 provisional"
+        },
+        "measurement_method": {
+          "type": "string",
+          "enum": ["lab_tested", "surveyor_certified", "direct_measurement", "calculated", "product_spec", "supply_chain", "estimated", "ai_estimate"],
+          "description": "How this value was determined"
+        },
+        "evidence": {
+          "type": "string",
+          "description": "Reference to evidence (receipt ID, sensor log, lab report hash, etc.)"
+        }
+      }
+    },
+
+    "transactionType": {
+      "type": "string",
+      "enum": ["labor", "goods", "services", "gift", "investment", "remediation"],
+      "description": "Type of economic activity"
+    }
+  },
+
+  "type": "object",
+  "required": ["recipient", "amount", "compounds", "description"],
+  "properties": {
+    "recipient": {
+      "type": "string",
+      "description": "Recipient name (test user) or Cardano address"
+    },
+    "amount": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Amount of ULTRA to transfer"
+    },
+    "type": {
+      "$ref": "#/definitions/transactionType",
+      "default": "goods"
+    },
+    "compounds": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/compoundFlow" },
+      "description": "Measured compound flows for this transaction"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10,
+      "description": "Description of what was measured and how"
+    },
+    "note": {
+      "type": "string",
+      "description": "Additional notes"
+    }
+  },
+
+  "examples": [
+    {
+      "recipient": "Alice",
+      "amount": 10,
+      "type": "goods",
+      "compounds": [
+        { "compound": "CO2", "quantity": -450, "confidence": 75, "measurement_method": "calculated", "evidence": "fuel_receipt_123" },
+        { "compound": "H2O", "quantity": -120, "confidence": 60, "measurement_method": "product_spec" },
+        { "compound": "PROT", "quantity": 50, "confidence": 90, "measurement_method": "lab_tested", "evidence": "usda_fdc_beef" },
+        { "compound": "IRON", "quantity": 6, "confidence": 85, "measurement_method": "lab_tested" },
+        { "compound": "NEED_IRON", "quantity": 80, "confidence": 70, "measurement_method": "calculated", "evidence": "alice_health_record" }
+      ],
+      "description": "Grass-fed beef 400g - transport CO2 from fuel receipt, water from processing spec, nutrition from USDA, iron need from Alice health record"
+    }
+  ],
+
+  "cli_format": {
+    "description": "To convert to CLI command",
+    "template": "npm run transfer -- --to {recipient} --amount {amount} --type {type} {compounds_as_flags} --desc \"{description}\"",
+    "compound_flag_format": "--compound {compound}:{quantity}:{confidence}"
+  }
+}
