@@ -11,7 +11,9 @@
     "Only LAND generates sequestration credits (positive capacity)",
     "Nature provides - compare against industrial alternatives",
     "Consumer accumulates all impact debt from purchases",
-    "Confidence reflects measurement quality, not certainty"
+    "Confidence reflects measurement quality, not certainty",
+    "Compound relevance emerges from bioregion and population health",
+    "What we track is determined by what needs healing"
   ],
 
   "compounds": {
@@ -67,6 +69,75 @@
       "IND_REQ": { "name": "Industrial Required", "unit": "%", "note": "How much still requires industrial chain" },
       "CHAIN_AVOID": { "name": "Industrial Chain Avoided", "unit": "units", "note": "Number of industrial products avoided (supplements, pharma, etc.)" },
       "CHAIN_INCUR": { "name": "Industrial Chain Incurred", "unit": "units", "note": "Industrial products required" }
+    }
+  },
+
+  "compound_emergence": {
+    "description": "Compound codes are not a fixed global list - they emerge recursively from bioregion and population health assessment",
+
+    "principle": "What we track is determined by what needs healing",
+
+    "recursive_identification": {
+      "step_1_bioregion_health": {
+        "description": "Assess the health of the bioregion itself",
+        "indicators": [
+          "Water stress → prioritize H2O tracking",
+          "Soil degradation → prioritize SOIL, N, P tracking",
+          "Biodiversity loss → prioritize BIO tracking",
+          "Air quality issues → prioritize CO2, NOx, CH4 tracking",
+          "Aquifer depletion → prioritize groundwater compounds"
+        ],
+        "source": "Land surveys, satellite data, watershed reports, soil tests"
+      },
+
+      "step_2_population_health": {
+        "description": "Assess the health needs of people in the bioregion",
+        "indicators": [
+          "Iron deficiency prevalence → prioritize IRON, NEED_IRON tracking",
+          "B12 deficiency → prioritize B12, NEED_B12 tracking",
+          "Vitamin D deficiency → prioritize VIT_D tracking",
+          "Protein malnutrition → prioritize PROT, NEED_PROT tracking",
+          "Chronic disease patterns → identify relevant nutritional compounds"
+        ],
+        "source": "Public health data, clinic records, blood test aggregates"
+      },
+
+      "step_3_feedback_loop": {
+        "description": "Transaction data refines understanding of what matters",
+        "flow": [
+          "Transactions track compounds based on current priorities",
+          "Aggregated data reveals patterns (deficiencies addressed, impacts accumulated)",
+          "Patterns inform updated bioregion and population health assessment",
+          "Assessment updates compound priority for the bioregion",
+          "Cycle repeats - the system learns what matters"
+        ]
+      }
+    },
+
+    "bioregion_compound_profiles": {
+      "description": "Each bioregion develops its own compound priority profile",
+      "example_sierra_nevada": {
+        "bioregion_stress": ["H2O (drought)", "BIO (fire impact)", "SOIL (erosion)"],
+        "population_needs": ["VIT_D (indoor lifestyle)", "OMEGA3 (heart health)"],
+        "priority_compounds": ["H2O", "BIO", "SOIL", "VIT_D", "OMEGA3", "CO2"]
+      },
+      "example_gulf_coast": {
+        "bioregion_stress": ["NO3 (agricultural runoff)", "P (algae blooms)", "BIO (wetland loss)"],
+        "population_needs": ["IRON (regional deficiency)", "FIBER (diet patterns)"],
+        "priority_compounds": ["NO3", "P", "BIO", "IRON", "FIBER", "H2O"]
+      },
+      "example_pacific_northwest": {
+        "bioregion_stress": ["SOIL (logging impact)", "BIO (salmon habitat)"],
+        "population_needs": ["VIT_D (low sunlight)", "B12 (plant-heavy diets)"],
+        "priority_compounds": ["SOIL", "BIO", "VIT_D", "B12", "OMEGA3"]
+      }
+    },
+
+    "universal_vs_emergent": {
+      "always_tracked": ["CO2", "H2O", "KCAL"],
+      "emerge_from_bioregion": "Environmental compounds based on local stress",
+      "emerge_from_population": "Nutritional/health compounds based on local needs",
+      "note": "The compound registry is comprehensive, but relevance is local"
     }
   },
 
@@ -228,13 +299,23 @@
       "Require confidence levels that match the measurement method",
       "Consider the full chain: production -> nutrition -> health -> care economics",
       "Compare nature providing vs industrial alternative when relevant",
-      "Flag low-confidence estimates for verification"
+      "Flag low-confidence estimates for verification",
+      "Consider bioregion context - what compounds are priority for this region?",
+      "Consider user health context - what deficiencies/needs does this person have?"
+    ],
+    "compound_selection": [
+      "Compounds are not arbitrary - they emerge from bioregion and population health",
+      "Ask: What is stressed in this bioregion? (water, soil, biodiversity, air)",
+      "Ask: What does this person need? (iron, B12, protein, vitamin D)",
+      "Track what matters locally, not a global one-size-fits-all list",
+      "The act of tracking informs future understanding of what needs healing"
     ],
     "generating_commands": [
       "Use the command_templates section to construct valid CLI commands",
       "Include all measured compounds with appropriate confidence levels",
       "Description should explain the measurement methodology",
-      "Quantity sign: negative for consumption/emission, positive for delivery/benefit"
+      "Quantity sign: negative for consumption/emission, positive for delivery/benefit",
+      "Prioritize compounds relevant to the bioregion and individual health context"
     ]
   },
 
