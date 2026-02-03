@@ -1,0 +1,247 @@
+{
+  "protocol": "UltraLife",
+  "version": "1.0.0",
+  "network": "cardano",
+  "spec_url": "https://ultralife.earth/protocol.json",
+  "description": "Impact-tracked economy on Cardano. Every transaction measures compound flows. Land generates sequestration credits. Consumers offset debt.",
+
+  "principles": [
+    "All economic activity has impact (mostly negative extraction)",
+    "No presets - every impact must be measured individually",
+    "Only LAND generates sequestration credits (positive capacity)",
+    "Nature provides - compare against industrial alternatives",
+    "Consumer accumulates all impact debt from purchases",
+    "Confidence reflects measurement quality, not certainty"
+  ],
+
+  "compounds": {
+    "environmental": {
+      "CO2": { "name": "Carbon Dioxide", "unit": "g", "direction": "negative = emission", "example": "-450 for 200g beef transport" },
+      "CH4": { "name": "Methane", "unit": "g", "direction": "negative = emission, 25x CO2 equivalent" },
+      "H2O": { "name": "Water", "unit": "L", "direction": "negative = consumption", "example": "-120 for meat processing" },
+      "N": { "name": "Nitrogen", "unit": "g", "direction": "positive = soil benefit from grazing" },
+      "NO3": { "name": "Nitrate", "unit": "g", "direction": "negative = runoff pollution" },
+      "NH3": { "name": "Ammonia", "unit": "g", "direction": "context dependent" },
+      "NOx": { "name": "Nitrogen Oxides", "unit": "g", "direction": "negative = air emission" },
+      "P": { "name": "Phosphorus", "unit": "g", "direction": "negative = runoff pollution" },
+      "BIO": { "name": "Biodiversity Index", "unit": "idx", "direction": "negative = biodiversity loss" },
+      "SOIL": { "name": "Soil Organic Matter", "unit": "g", "direction": "positive = soil building" },
+      "KWH": { "name": "Energy", "unit": "kWh", "direction": "negative = consumption" }
+    },
+    "nutritional": {
+      "PROT": { "name": "Protein", "unit": "g", "example": "25g from 200g beef" },
+      "FAT": { "name": "Fat", "unit": "g" },
+      "CARB": { "name": "Carbohydrate", "unit": "g" },
+      "FIBER": { "name": "Fiber", "unit": "g" },
+      "B12": { "name": "Vitamin B12", "unit": "mcg", "example": "2.5mcg from 200g beef" },
+      "IRON": { "name": "Iron", "unit": "mg", "example": "3mg from 200g beef" },
+      "ZINC": { "name": "Zinc", "unit": "mg" },
+      "OMEGA3": { "name": "Omega-3", "unit": "mg" },
+      "OMEGA6": { "name": "Omega-6", "unit": "mg" },
+      "VIT_D": { "name": "Vitamin D", "unit": "IU" },
+      "VIT_A": { "name": "Vitamin A", "unit": "IU" },
+      "CA": { "name": "Calcium", "unit": "mg" },
+      "MG": { "name": "Magnesium", "unit": "mg" },
+      "K": { "name": "Potassium", "unit": "mg" },
+      "NA": { "name": "Sodium", "unit": "mg" },
+      "KCAL": { "name": "Calories", "unit": "kcal" }
+    },
+    "health": {
+      "NEED_PROT": { "name": "Protein Need Met", "unit": "%", "direction": "positive = deficiency addressed", "example": "80% of daily need" },
+      "NEED_B12": { "name": "B12 Need Met", "unit": "%" },
+      "NEED_IRON": { "name": "Iron Need Met", "unit": "%", "example": "80% for documented iron-deficient person" },
+      "NEED_ZINC": { "name": "Zinc Need Met", "unit": "%" },
+      "EXCESS": { "name": "Nutritional Excess", "unit": "%", "direction": "negative = overconsumption beyond need" }
+    },
+    "pharma_comparison": {
+      "PHARMA_CO2": { "name": "Pharma Embodied Carbon", "unit": "g", "note": "R&D, manufacturing, distribution of alternative" },
+      "PHARMA_H2O": { "name": "Pharma Water Use", "unit": "L", "note": "Industrial water for pharmaceutical production" },
+      "PHARMA_CHEM": { "name": "Chemical Synthesis", "unit": "g", "note": "Synthetic compound weight" },
+      "PHARMA_PKG": { "name": "Packaging Impact", "unit": "g", "note": "Plastic, foil, cardboard" },
+      "PHARMA_SIDE": { "name": "Side Effect Risk", "unit": "%", "note": "Documented side effect probability" },
+      "PHARMA_DEP": { "name": "Dependency Risk", "unit": "%", "note": "Physical/psychological dependency risk" },
+      "PHARMA_INT": { "name": "Drug Interaction Risk", "unit": "%", "note": "Risk with other medications" }
+    },
+    "chain_economics": {
+      "NAT_PROV": { "name": "Nature Provided", "unit": "%", "note": "Percentage of need met by natural source vs industrial", "example": "80% iron need from beef vs iron supplement" },
+      "IND_REQ": { "name": "Industrial Required", "unit": "%", "note": "How much still requires industrial chain" },
+      "CHAIN_AVOID": { "name": "Industrial Chain Avoided", "unit": "units", "note": "Number of industrial products avoided (supplements, pharma, etc.)" },
+      "CHAIN_INCUR": { "name": "Industrial Chain Incurred", "unit": "units", "note": "Industrial products required" }
+    }
+  },
+
+  "confidence_levels": {
+    "95-100": { "method": "lab_tested", "description": "Lab tested, certified surveyor", "verify_days": null },
+    "85-94": { "method": "direct_measurement", "description": "Direct measurement with calibrated equipment", "verify_days": null },
+    "70-84": { "method": "calculated", "description": "Calculated from documented inputs (receipts, meters)", "verify_days": null },
+    "50-69": { "method": "product_spec", "description": "Product specification, supply chain documentation", "verify_days": 90 },
+    "30-49": { "method": "estimated", "description": "Estimated from similar verified activity", "verify_days": 60 },
+    "10-29": { "method": "ai_estimate", "description": "AI estimate, regional average - MUST verify", "verify_days": 30 }
+  },
+
+  "transaction_types": {
+    "goods": { "code": 2, "description": "Physical products", "example": "food, materials" },
+    "services": { "code": 3, "description": "Service provided", "example": "labor, repair" },
+    "labor": { "code": 1, "description": "Work performed", "example": "hours worked" },
+    "gift": { "code": 4, "description": "Voluntary transfer", "example": "donation" },
+    "investment": { "code": 5, "description": "Capital allocation", "example": "funding project" },
+    "remediation": { "code": 6, "description": "Environmental repair", "example": "restoration work" }
+  },
+
+  "land_sequestration": {
+    "description": "Only land generates positive offset capacity",
+    "rates_tCO2_per_ha_per_year": {
+      "forest": 5.0,
+      "wetland": 3.0,
+      "grassland": 1.0,
+      "agricultural": 0.5,
+      "urban": 0.1,
+      "coastal": 2.5,
+      "desert": 0.05
+    },
+    "credit_price_ultra": 5,
+    "credit_generation": "Land stewards generate credits based on area x rate x time (cycles of ~37 days)"
+  },
+
+  "debt_offset": {
+    "description": "Consumers purchase sequestration credits to offset impact debt",
+    "natural_quota": "~4 tonnes CO2-equivalent per person per year",
+    "market": "Credits traded between land stewards and consumers",
+    "conversion": "1000 impact units = 1 tCO2 for offset purposes"
+  },
+
+  "command_templates": {
+    "description": "Templates for generating CLI commands. LLMs should use these patterns.",
+
+    "transfer": {
+      "template": "npm run transfer -- --to {recipient} --amount {amount} --type {type} {compound_flags} --desc \"{description}\"",
+      "compound_flag": "--compound {CODE}:{quantity}:{confidence}",
+      "example": "npm run transfer -- --to Alice --amount 8 --type goods --compound CO2:-450:75 --compound H2O:-120:60 --compound PROT:25:90 --compound IRON:3:85 --compound NEED_IRON:80:70 --desc \"Grass-fed beef 200g - transport CO2 from fuel receipt, iron for documented deficiency\"",
+      "required": ["recipient", "amount", "compounds", "description"],
+      "notes": [
+        "Quantity is signed: negative for extraction/emission, positive for delivery/sequestration",
+        "Confidence must match measurement method used",
+        "Description should explain what was measured and how"
+      ]
+    },
+
+    "land_mint": {
+      "template": "npm run land:mint -- --name \"{name}\" --area {area_m2} --type {land_type} --bioregion {bioregion}",
+      "example": "npm run land:mint -- --name \"Quincy Forest\" --area 160000 --type forest --bioregion sierra_nevada",
+      "land_types": ["forest", "wetland", "grassland", "agricultural", "urban", "coastal", "desert"]
+    },
+
+    "credits_generate": {
+      "template": "npm run credits:generate -- --all",
+      "or": "npm run credits:generate -- --land {land_id}",
+      "notes": ["Only land stewards can generate credits", "Cycles are ~37 days"]
+    },
+
+    "credits_buy": {
+      "template": "npm run credits:buy -- --user {name} --amount {tCO2}",
+      "or": "npm run credits:buy -- --user {name} --offset-all",
+      "example": "npm run credits:buy -- --user Alice --offset-all",
+      "notes": ["Price is 5 ULTRA per tCO2", "Buying credits reduces impact debt"]
+    },
+
+    "check_debt": {
+      "template": "npm run credits:buy -- --user {name} --my-debt"
+    },
+
+    "list_credits": {
+      "template": "npm run credits:buy -- --list-available"
+    }
+  },
+
+  "transaction_examples": {
+    "grass_fed_beef_with_health_context": {
+      "scenario": "Person with documented iron deficiency buys local grass-fed beef",
+      "compounds": [
+        { "code": "CO2", "quantity": -450, "confidence": 75, "reason": "Transport emissions from fuel receipt" },
+        { "code": "H2O", "quantity": -120, "confidence": 60, "reason": "Processing water from supplier" },
+        { "code": "N", "quantity": 8, "confidence": 55, "reason": "Nitrogen benefit from rotational grazing" },
+        { "code": "PROT", "quantity": 25, "confidence": 90, "reason": "USDA database for beef protein" },
+        { "code": "B12", "quantity": 2.5, "confidence": 85, "reason": "Lab-tested B12 content" },
+        { "code": "IRON", "quantity": 3, "confidence": 85, "reason": "Heme iron content from USDA" },
+        { "code": "NEED_IRON", "quantity": 80, "confidence": 70, "reason": "Calculated from buyer's documented deficiency" },
+        { "code": "NAT_PROV", "quantity": 80, "confidence": 70, "reason": "80% of iron need met naturally" },
+        { "code": "CHAIN_AVOID", "quantity": 1, "confidence": 60, "reason": "Iron supplement avoided" }
+      ],
+      "key_insight": "Nature provided what would otherwise require pharmaceutical/industrial chain"
+    },
+
+    "almond_milk_full_accounting": {
+      "scenario": "Almond milk purchase with full environmental accounting",
+      "compounds": [
+        { "code": "CO2", "quantity": -180, "confidence": 65, "reason": "Processing and transport" },
+        { "code": "H2O", "quantity": -1900, "confidence": 70, "reason": "Almond water footprint per liter" },
+        { "code": "BIO", "quantity": -5, "confidence": 50, "reason": "Bee colony pressure index" },
+        { "code": "CA", "quantity": 300, "confidence": 85, "reason": "Fortified calcium content" },
+        { "code": "PROT", "quantity": 1, "confidence": 90, "reason": "Low natural protein" }
+      ],
+      "key_insight": "Low carbon but high water and biodiversity cost - all must be measured"
+    },
+
+    "renewable_energy_honest": {
+      "scenario": "Solar panel electricity - still has negative impact, just less",
+      "compounds": [
+        { "code": "CO2", "quantity": -20, "confidence": 80, "reason": "Panel manufacturing amortized + grid losses" },
+        { "code": "KWH", "quantity": -10, "confidence": 95, "reason": "Direct meter reading" }
+      ],
+      "key_insight": "Renewable is not 'positive' - it's less negative than fossil (which would be -250g CO2)"
+    }
+  },
+
+  "measurement_guidance": {
+    "how_to_measure": {
+      "transport_co2": "fuel_liters x 2.31 kg CO2/L diesel or 2.39 kg/L gasoline",
+      "electricity_co2": "kWh x grid_factor (varies: 0.4-0.9 kg CO2/kWh by region)",
+      "water": "Direct meter, processing spec sheets, or LCA databases",
+      "nutrition": "USDA FoodData Central, lab tests, or product labels",
+      "health_needs": "Medical records, blood tests, documented deficiencies"
+    },
+    "confidence_guidance": {
+      "90+": "Use only with lab tests, certified measurements, or direct meter readings",
+      "70-89": "Calculated from documented receipts, invoices, or specifications",
+      "50-69": "Product specifications, supply chain documentation",
+      "30-49": "Estimates based on similar verified activities",
+      "below_30": "AI/LLM estimates - flag for verification within 30 days"
+    }
+  },
+
+  "on_chain_types": {
+    "CompoundFlow": {
+      "compound": "ByteArray (code from registry)",
+      "quantity": "Int (signed: negative = extraction, positive = delivery)",
+      "unit": "MassUnit enum",
+      "measurement": "MeasurementMethod enum",
+      "confidence": "Int (0-100)"
+    },
+    "MeasurementMethod": ["Direct", "Calculated", "Estimated", "Surveyed"],
+    "MassUnit": ["Gram", "Kilogram", "Tonne", "Liter", "Kilowatt"]
+  },
+
+  "llm_instructions": {
+    "when_helping_users": [
+      "Always ask what was actually measured and how",
+      "Never assume positive impact - even renewables have negative footprint",
+      "Require confidence levels that match the measurement method",
+      "Consider the full chain: production -> nutrition -> health -> care economics",
+      "Compare nature providing vs industrial alternative when relevant",
+      "Flag low-confidence estimates for verification"
+    ],
+    "generating_commands": [
+      "Use the command_templates section to construct valid CLI commands",
+      "Include all measured compounds with appropriate confidence levels",
+      "Description should explain the measurement methodology",
+      "Quantity sign: negative for consumption/emission, positive for delivery/benefit"
+    ]
+  },
+
+  "endpoints": {
+    "note": "Fetch this spec to understand the protocol",
+    "spec": "https://ultralife.earth/protocol.json",
+    "ipfs_backup": "ipfs://[to be published]",
+    "github": "https://github.com/ultralife-protocol/spec"
+  }
+}

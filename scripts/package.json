@@ -53,7 +53,12 @@
     "credits:list": "node generate-credits.mjs --list",
     "credits:buy": "node buy-credits.mjs",
     "credits:available": "node buy-credits.mjs --list-available",
-    "credits:debt": "node buy-credits.mjs --my-debt"
+    "credits:debt": "node buy-credits.mjs --my-debt",
+    "protocol": "node protocol-fetch.mjs",
+    "protocol:spec": "node protocol-fetch.mjs --show-spec",
+    "protocol:compounds": "node protocol-fetch.mjs --compounds",
+    "protocol:example": "node protocol-fetch.mjs --generate-example",
+    "protocol:llm": "node protocol-fetch.mjs --llm-prompt"
   },
   "dependencies": {
     "@blockfrost/blockfrost-js": "^5.5.0",
