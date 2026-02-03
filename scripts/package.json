@@ -48,7 +48,12 @@
     "measure:nutrition": "node measure-helper.mjs --list-nutrition",
     "land:mint": "node mint-land.mjs",
     "land:list": "node mint-land.mjs --list",
-    "land:types": "node mint-land.mjs --list-types"
+    "land:types": "node mint-land.mjs --list-types",
+    "credits:generate": "node generate-credits.mjs",
+    "credits:list": "node generate-credits.mjs --list",
+    "credits:buy": "node buy-credits.mjs",
+    "credits:available": "node buy-credits.mjs --list-available",
+    "credits:debt": "node buy-credits.mjs --my-debt"
   },
   "dependencies": {
     "@blockfrost/blockfrost-js": "^5.5.0",
