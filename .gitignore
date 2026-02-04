@@ -29,3 +29,5 @@ Thumbs.db
 
 # Test results
 scripts/e2e-test-results.json
+scripts/interaction-test-results.json
+scripts/e2e-results.json
