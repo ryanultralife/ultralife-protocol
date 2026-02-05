@@ -787,7 +787,27 @@ fn is_not_credited(status: CareRecordStatus) -> Bool {
 }
 
 fn validate_attestor_role(attestor: PnftData, record: CareRecord, role: AttestorRole) -> Bool {
-  True // Simplified - would check actual relationships
+  // Validate that the attestor has the appropriate role for this care record
+  when role is {
+    Caregiver -> {
+      // Caregiver must be the one who provided the care
+      attestor.id == record.caregiver
+    }
+    Recipient -> {
+      // Recipient must be who received the care
+      attestor.id == record.recipient
+    }
+    Witness -> {
+      // Witness must be Verified+ level and not caregiver or recipient
+      let is_verified = attestor.level == Verified || attestor.level == Steward
+      let not_participant = attestor.id != record.caregiver && attestor.id != record.recipient
+      is_verified && not_participant
+    }
+    Professional -> {
+      // Professional must be Steward level
+      attestor.level == Steward
+    }
+  }
 }
 
 fn has_attested(attestations: List<CareAttestation>, attestor: AssetName) -> Bool {

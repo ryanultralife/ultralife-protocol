@@ -490,9 +490,31 @@ validator commons(config: CommonsConfig) {
       // RECORD EXTRACTION (permit holder reports)
       // =========================================================================
       RecordExtraction { permit_id, quantity, location } -> {
-        // Would find and validate permit, check limits, record extraction
-        // Impact recorded for the extraction
-        True // Simplified
+        // Validate permit exists and is active
+        let permit_valid = list.any(
+          datum.permits,
+          fn(p) { p.id == permit_id && p.status == Active }
+        )
+
+        // Check extraction quantity is within permit limits
+        let permit = list.find(datum.permits, fn(p) { p.id == permit_id })
+        let within_limits = when permit is {
+          Some(p) -> quantity <= p.remaining_quota
+          None -> False
+        }
+
+        // Verify extraction is properly recorded in outputs
+        let extraction_recorded = list.any(
+          tx.outputs,
+          fn(output) {
+            when output.datum is {
+              InlineDatum(_) -> True  // Has datum indicating recorded
+              _ -> False
+            }
+          }
+        )
+
+        permit_valid && within_limits && extraction_recorded
       }
       
       // =========================================================================

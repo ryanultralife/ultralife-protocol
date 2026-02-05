@@ -756,8 +756,21 @@ fn verify_decision_executable(tx: Transaction, own_ref: OutputReference, datum: 
       // Check threshold met
       let threshold_met = pending.approval_weight_bps >= required_threshold
 
-      // Check delay passed for major decisions (would need current slot)
-      let delay_ok = True  // Simplified - would check slot against initiated_at + delay
+      // Check delay passed for major decisions
+      // Extract current slot from transaction validity range
+      let current_slot = when tx.validity_range.lower_bound.bound_type is {
+        Finite(slot) -> slot
+        _ -> 0
+      }
+
+      // Calculate required delay based on decision type
+      let required_delay = when pending.decision is {
+        UpdateGovernance { .. } -> datum.governance.decision_delay_slots * 2  // Major change needs 2x delay
+        Dissolve { .. } -> datum.governance.decision_delay_slots * 3  // Dissolution needs 3x delay
+        _ -> datum.governance.decision_delay_slots
+      }
+
+      let delay_ok = current_slot >= pending.initiated_at + required_delay
 
       threshold_met && delay_ok
     }

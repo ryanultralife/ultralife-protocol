@@ -330,15 +330,15 @@ Monthly Accruals:
 ├── 2020-02: 250,000,000 ULTRA @ $0.0001
 ├── ...
 ├── 2025-01: 20,833,333 ULTRA @ $0.0012
-└── Running Total: XXX ULTRA
+└── Running Total: 42,500,000,000 ULTRA (~$10k/mo × 60 months, price-adjusted)
 
 Withdrawals:
 ├── 2024-03: 1,500,000,000 ULTRA → 15,000 ADA
 ├── 2024-06: 2,000,000,000 ULTRA → 18,000 ADA
 ├── ...
-└── Total Withdrawn: XXX ULTRA → XXX ADA
+└── Total Withdrawn: 5,000,000,000 ULTRA → 45,000 ADA
 
-Remaining Balance: XXX ULTRA
+Remaining Balance: 37,500,000,000 ULTRA
 Vesting: 100% vested (earned through work)
 ```
 
