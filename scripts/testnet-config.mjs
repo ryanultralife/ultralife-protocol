@@ -25,8 +25,9 @@ const PLACEHOLDER_HASH = '00'.repeat(28);
 // Default threshold for multi-sig operations
 const DEFAULT_THRESHOLD = 1;
 
-// Far-future slot for genesis end (testnet only)
-const GENESIS_END_SLOT = 999999999;
+// Genesis end slot for testnet (~6 months from Feb 2026)
+// Preprod slot ~116,000,000 = Feb 2026, add ~15,000,000 slots (~6 months at 1 slot/sec)
+const GENESIS_END_SLOT = 131000000;
 
 // =============================================================================
 // CONFIG BUILDERS

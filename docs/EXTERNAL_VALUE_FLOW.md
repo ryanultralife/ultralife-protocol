@@ -94,17 +94,17 @@ ULTRA ────────────────────────�
 │                     ULTRALIFE TREASURY                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  ULTRA RESERVES                                                  │
-│  ├── Development Pool: XXX billion (for sales)                  │
-│  ├── Ecosystem Fund: XXX billion (grants, partnerships)         │
-│  ├── UBI Reserve: XXX billion (distribution)                    │
+│  ULTRA RESERVES (200 billion total supply)                      │
+│  ├── Development Pool: 40 billion (20%, for sales)              │
+│  ├── Ecosystem Fund: 20 billion (10%, grants, partnerships)     │
+│  ├── UBI Reserve: 100 billion (50%, distribution over 50 years) │
 │  └── Returned tokens: Accumulates from exits/burns              │
 │                                                                  │
 │  EXTERNAL RESERVES (ADA/BTC)                                    │
-│  ├── Fee Subsidy Pool: XXX ADA (pays L1 fees)                  │
-│  ├── Liquidity Reserve: XXX ADA + XXX BTC (for exits)          │
-│  ├── Development Fund: XXX ADA (operational costs)              │
-│  └── Emergency Reserve: XXX ADA (minimum maintained)            │
+│  ├── Fee Subsidy Pool: 100,000 ADA (pays L1 fees)              │
+│  ├── Liquidity Reserve: 500,000 ADA + 5 BTC (for exits)        │
+│  ├── Development Fund: 50,000 ADA (operational costs)           │
+│  └── Emergency Reserve: 25,000 ADA (minimum maintained)         │
 │                                                                  │
 ├─────────────────────────────────────────────────────────────────┤
 │  RATE MECHANISM                                                  │

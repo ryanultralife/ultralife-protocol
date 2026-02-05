@@ -178,14 +178,24 @@ Agent: Runs npm run mint:pnft:basic
 Result: On-chain pNFT
 ```
 
-### Full MCP Integration (TODO)
+### Full MCP Integration
 
-To enable `claude_desktop_config.json` integration:
+**Completed:**
+- ✅ MCP service scaffolded (`service/src/mcp/`)
+- ✅ LOCAL_MODE simulation with deployment.json
+- ✅ 14 tool handlers implemented (handlers-local.ts)
+- ✅ Web server for protocol spec (`service/src/web/`)
+- ✅ Jest test suite (150+ tests)
 
-1. Migrate builder from Lucid to MeshSDK
-2. Point to deployed reference scripts
-3. Add deployment.json loading for script references
-4. Test all 30+ tools against preprod
+**In Progress:**
+- ⏳ Claude Desktop config integration
+- ⏳ Full preprod testing of MCP tools
+
+**To Complete for Production:**
+1. Point MCP to deployed reference scripts
+2. Add real blockchain queries (vs simulation)
+3. Test all tools against preprod
+4. Document MCP setup for Claude Desktop
 
 ---
 
