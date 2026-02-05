@@ -4,14 +4,14 @@ This guide will help you set up your development environment and start building 
 
 ## Status: Development Complete, Testnet Ready
 
-> **All 27 validators, 33 documentation files, and MCP service are complete.**
+> **All 27 validators, 35 documentation files, and MCP service are complete.**
 > The protocol is now deploying to Cardano Preview Testnet.
 
 | What's Ready | Count |
 |--------------|-------|
 | Aiken Validators | 27 |
 | MCP Tools | 31 |
-| Documentation Files | 33 |
+| Documentation Files | 35 |
 | Library Modules | 6 |
 
 ---

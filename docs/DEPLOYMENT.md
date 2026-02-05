@@ -10,7 +10,7 @@
 | Contract Development | ✅ Complete (27 validators) |
 | Type System & Libraries | ✅ Complete |
 | MCP Service | ✅ Complete (31 tools) |
-| Documentation | ✅ Complete (34 files) |
+| Documentation | ✅ Complete (35 files) |
 | Automated Testing | ✅ Complete (130+ tests) |
 | CI/CD Pipeline | ✅ Active |
 | **Testnet Deployment** | 🔄 **Current Phase** |

@@ -16,7 +16,7 @@ All development sessions completed. Protocol ready for Cardano Preview Testnet d
 |----------|-------|
 | Aiken Validators | 27 |
 | MCP Tools | 31 |
-| Documentation Files | 34 |
+| Documentation Files | 35 |
 | Library Modules | 6 |
 | Automated Tests | 130+ |
 | CI/CD Pipelines | 1 |

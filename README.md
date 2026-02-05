@@ -10,7 +10,7 @@ Built on Cardano | 27 Aiken Validators | Plutus V3 | LLM Interface
 
 ## Status: Testnet Deployment Phase
 
-> **Development Complete** — All 27 validators, 33 documentation files, and MCP service fully implemented.
+> **Development Complete** — All 27 validators, 35 documentation files, and MCP service fully implemented.
 > Now deploying to Cardano Preview Testnet.
 
 | Milestone | Status |
@@ -19,7 +19,7 @@ Built on Cardano | 27 Aiken Validators | Plutus V3 | LLM Interface
 | Validator Implementation (27) | ✅ Complete |
 | Type System & Libraries | ✅ Complete |
 | MCP Service (31 tools) | ✅ Complete |
-| Documentation (34 files) | ✅ Complete |
+| Documentation (35 files) | ✅ Complete |
 | Automated Testing (130+ tests) | ✅ Complete |
 | CI/CD Pipeline | ✅ Active |
 | Testnet Deployment | 🔄 In Progress |
@@ -321,7 +321,7 @@ ultralife-protocol/
 │   │   └── prc37.ak        # 37-day cycle functions
 │   ├── tests/              # Test suites
 │   └── aiken.toml          # Aiken configuration
-├── docs/                   # 33+ documentation files
+├── docs/                   # 35 documentation files
 ├── service/                # MCP service for LLM integration
 │   ├── indexer/            # Read chain state via Blockfrost
 │   ├── builder/            # Construct unsigned transactions
