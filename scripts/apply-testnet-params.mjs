@@ -118,44 +118,146 @@ async function main() {
     ]),
   };
 
-  // For now, just show what we'd apply
-  console.log('\n📋 Config CBOR (for aiken blueprint apply):');
-  for (const [name, cbor] of Object.entries(configs)) {
-    console.log(`\n${name}:`);
-    console.log(`  ${cbor}`);
+  // Additional configs for all validators
+  const additionalConfigs = {
+    // UbiConfig: token_policy, token_name, pnft_policy, bioregion_policy, records_contract, treasury
+    'ubi': encodeConstructor(0, [
+      encodeBytes(zeroPolicy),        // token_policy
+      encodeBytes(zeroAssetName || '554c545241'),  // token_name "ULTRA"
+      encodeBytes(zeroPolicy),        // pnft_policy
+      encodeBytes(zeroPolicy),        // bioregion_policy
+      encodeBytes(zeroHash),          // records_contract
+      encodeBytes(zeroHash),          // treasury
+    ]),
+
+    // TreasuryConfig: token_policy, token_name, pnft_policy, multisig, governance_contract
+    'treasury': encodeConstructor(0, [
+      encodeBytes(zeroPolicy),        // token_policy
+      encodeBytes('554c545241'),      // token_name "ULTRA"
+      encodeBytes(zeroPolicy),        // pnft_policy
+      encodeConstructor(0, [          // multisig config
+        encodeList([encodeBytes(walletPkh)]),
+        encodeInt(1),
+      ]),
+      encodeBytes(zeroHash),          // governance_contract
+    ]),
+
+    // CollectiveConfig: pnft_policy, governance_contract
+    'collective': encodeConstructor(0, [
+      encodeBytes(zeroPolicy),        // pnft_policy
+      encodeBytes(zeroHash),          // governance_contract
+    ]),
+
+    // RecordsConfig: pnft_policy
+    'records': encodeConstructor(0, [
+      encodeBytes(zeroPolicy),        // pnft_policy
+    ]),
+
+    // PreservationConfig: pnft_policy, land_registry
+    'preservation': encodeConstructor(0, [
+      encodeBytes(zeroPolicy),        // pnft_policy
+      encodeBytes(zeroHash),          // land_registry
+    ]),
+
+    // EnergyConfig: pnft_policy, oracle_list
+    'energy': encodeConstructor(0, [
+      encodeBytes(zeroPolicy),        // pnft_policy
+      encodeList([encodeBytes(walletPkh)]),  // oracle_list
+    ]),
+
+    // GrantsConfig: token_policy, pnft_policy, governance_contract
+    'grants': encodeConstructor(0, [
+      encodeBytes(zeroPolicy),        // token_policy
+      encodeBytes(zeroPolicy),        // pnft_policy
+      encodeBytes(zeroHash),          // governance_contract
+    ]),
+
+    // RemediationConfig: pnft_policy, oracle_list
+    'remediation': encodeConstructor(0, [
+      encodeBytes(zeroPolicy),        // pnft_policy
+      encodeList([encodeBytes(walletPkh)]),  // oracle_list
+    ]),
+
+    // CommonsConfig: pnft_policy, governance_contract
+    'commons': encodeConstructor(0, [
+      encodeBytes(zeroPolicy),        // pnft_policy
+      encodeBytes(zeroHash),          // governance_contract
+    ]),
+  };
+
+  // Merge all configs
+  const allConfigs = { ...configs, ...additionalConfigs };
+
+  // Show all config CBOR values
+  console.log('\n📋 Config CBOR values for all validators:');
+  for (const [name, cbor] of Object.entries(allConfigs)) {
+    console.log(`\n  ${name}: ${cbor.slice(0, 40)}...`);
   }
 
-  // Apply PnftConfig to pnft validators
-  console.log('\n🔨 Applying PnftConfig to pnft validators...');
+  // Define validator applications
+  const validatorApps = [
+    { config: 'pnft', module: 'pnft', validators: ['pnft_policy', 'pnft_spend'] },
+    { config: 'registry', module: 'registry', validators: ['registry'] },
+    { config: 'bioregion', module: 'bioregion', validators: ['bioregion'] },
+    { config: 'ubi', module: 'ubi', validators: ['ubi'] },
+    { config: 'treasury', module: 'treasury', validators: ['treasury'] },
+    { config: 'collective', module: 'collective', validators: ['collective'] },
+    { config: 'records', module: 'records', validators: ['records'] },
+    { config: 'preservation', module: 'preservation', validators: ['preservation'] },
+    { config: 'energy', module: 'energy', validators: ['energy'] },
+    { config: 'grants', module: 'grants', validators: ['grants'] },
+    { config: 'remediation', module: 'remediation', validators: ['remediation'] },
+    { config: 'commons', module: 'commons', validators: ['commons'] },
+  ];
 
-  const pnftCbor = configs['pnft'];
+  console.log('\n🔨 Applying parameters to all validators...\n');
 
-  try {
-    // Apply to pnft_policy
-    execSync(
-      `aiken blueprint apply "${pnftCbor}" -m pnft -v pnft_policy -o plutus-pnft-policy.json`,
-      { cwd: ROOT, stdio: 'pipe' }
-    );
-    console.log('✅ Applied to pnft.pnft_policy');
+  const appliedValidators = [];
+  const tempFiles = [];
+  let preamble = null;
 
-    // Apply to pnft_spend
-    execSync(
-      `aiken blueprint apply "${pnftCbor}" -m pnft -v pnft_spend -o plutus-pnft-spend.json`,
-      { cwd: ROOT, stdio: 'pipe' }
-    );
-    console.log('✅ Applied to pnft.pnft_spend');
+  for (const app of validatorApps) {
+    const cbor = allConfigs[app.config];
+    if (!cbor) {
+      console.log(`⚠️  Skipping ${app.module}: no config defined`);
+      continue;
+    }
 
-    // Read and merge the applied validators
-    const policyJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'plutus-pnft-policy.json')));
-    const spendJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'plutus-pnft-spend.json')));
+    for (const validator of app.validators) {
+      const tempFile = `plutus-temp-${app.module}-${validator}.json`;
+      try {
+        execSync(
+          `aiken blueprint apply "${cbor}" -m ${app.module} -v ${validator} -o ${tempFile}`,
+          { cwd: ROOT, stdio: 'pipe' }
+        );
 
-    // Create minimal plutus-testnet.json with just the pnft validators
+        const appliedJson = JSON.parse(fs.readFileSync(path.join(ROOT, tempFile)));
+
+        if (!preamble) {
+          preamble = appliedJson.preamble;
+        }
+
+        appliedValidators.push(...appliedJson.validators);
+        tempFiles.push(tempFile);
+
+        console.log(`  ✅ Applied ${app.config} to ${app.module}.${validator}`);
+      } catch (error) {
+        // Validator might not exist or might not have parameters
+        console.log(`  ⚠️  Skipped ${app.module}.${validator}: ${error.message.split('\n')[0]}`);
+      }
+    }
+  }
+
+  // Create combined plutus-testnet.json
+  if (appliedValidators.length > 0) {
     const testnetPlutus = {
-      preamble: policyJson.preamble,
-      validators: [
-        ...policyJson.validators,
-        ...spendJson.validators,
-      ],
+      preamble: preamble || {
+        title: 'ultralife-protocol/validators',
+        description: 'UltraLife Protocol validators with testnet parameters applied',
+        version: '1.0.0',
+        compiler: { name: 'Aiken', version: '1.0.0' },
+      },
+      validators: appliedValidators,
     };
 
     fs.writeFileSync(
@@ -163,17 +265,38 @@ async function main() {
       JSON.stringify(testnetPlutus, null, 2)
     );
 
-    console.log('\n✅ Created plutus-testnet.json with applied pNFT validators');
+    console.log(`\n✅ Created plutus-testnet.json with ${appliedValidators.length} validators`);
     console.log('   Validators ready for deployment without parameters');
 
-    // Cleanup temp files
-    fs.unlinkSync(path.join(ROOT, 'plutus-pnft-policy.json'));
-    fs.unlinkSync(path.join(ROOT, 'plutus-pnft-spend.json'));
+    // Save config summary to deployment.json
+    const deploymentPath = path.join(__dirname, 'deployment.json');
+    let deployment = {};
+    if (fs.existsSync(deploymentPath)) {
+      deployment = JSON.parse(fs.readFileSync(deploymentPath, 'utf-8'));
+    }
 
-  } catch (error) {
-    console.error('❌ Failed to apply parameters:', error.message);
-    if (error.stderr) console.error(error.stderr.toString());
-    process.exit(1);
+    deployment.testnetParams = {
+      appliedAt: new Date().toISOString(),
+      walletPkh,
+      validatorCount: appliedValidators.length,
+      validators: appliedValidators.map(v => v.title || 'unknown'),
+    };
+
+    const { atomicWriteSync } = await import('./utils.mjs');
+    atomicWriteSync(deploymentPath, deployment);
+    console.log('   Updated deployment.json with parameter info');
+  } else {
+    console.log('\n⚠️  No validators were successfully applied');
+    console.log('   This might be normal if validators are not parameterized');
+  }
+
+  // Cleanup temp files
+  for (const tempFile of tempFiles) {
+    try {
+      fs.unlinkSync(path.join(ROOT, tempFile));
+    } catch (e) {
+      // Ignore cleanup errors
+    }
   }
 }
 

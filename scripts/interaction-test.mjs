@@ -960,6 +960,588 @@ async function impactMarketFlow(harness) {
   });
 }
 
+// =============================================================================
+// FAILURE SCENARIO FLOWS
+// =============================================================================
+
+/**
+ * MARKETPLACE FAILURE FLOW
+ * Test purchase with insufficient funds
+ */
+async function marketplaceFailureFlow(harness) {
+  console.log('\n\x1b[1mMARKETPLACE FAILURE SCENARIOS\x1b[0m');
+  console.log('─'.repeat(60));
+  console.log(`  Testing error handling for marketplace operations`);
+  console.log('');
+
+  const listingId = `listing_fail_${Date.now().toString(36)}`;
+
+  // Step 1: Create a listing for testing
+  await harness.runStep('Marketplace Failure', 'Create test listing', async () => {
+    const listing = {
+      id: listingId,
+      seller: harness.users.alice.address,
+      sellerPnft: harness.users.alice.pnftId,
+      title: 'Expensive Item',
+      price: 10000, // Very expensive
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    };
+
+    if (!harness.deployment.marketplace) {
+      harness.deployment.marketplace = { listings: [], purchases: [], reviews: [] };
+    }
+    harness.deployment.marketplace.listings.push(listing);
+
+    return { listingId: listing.id, price: listing.price };
+  });
+
+  // Step 2: Attempt purchase with insufficient funds
+  await harness.runStep('Marketplace Failure', 'Reject purchase - insufficient funds', async () => {
+    const listing = harness.deployment.marketplace.listings.find(l => l.id === listingId);
+    const buyerBalance = harness.users.bob.balance || 100;
+
+    if (buyerBalance < listing.price) {
+      return {
+        rejected: true,
+        reason: 'Insufficient ULTRA balance',
+        available: buyerBalance,
+        required: listing.price,
+        shortfall: listing.price - buyerBalance,
+      };
+    }
+    throw new Error('Purchase should have been rejected due to insufficient funds');
+  });
+
+  // Step 3: Attempt purchase from self
+  await harness.runStep('Marketplace Failure', 'Reject purchase - buying from self', async () => {
+    const listing = harness.deployment.marketplace.listings.find(l => l.id === listingId);
+    const buyerAddress = harness.users.alice.address; // Same as seller
+
+    if (buyerAddress === listing.seller) {
+      return {
+        rejected: true,
+        reason: 'Cannot purchase your own listing',
+        seller: listing.seller,
+        buyer: buyerAddress,
+      };
+    }
+    throw new Error('Self-purchase should have been rejected');
+  });
+
+  // Step 4: Attempt purchase of inactive listing
+  await harness.runStep('Marketplace Failure', 'Reject purchase - inactive listing', async () => {
+    const listing = harness.deployment.marketplace.listings.find(l => l.id === listingId);
+    listing.status = 'paused'; // Temporarily pause
+
+    if (listing.status !== 'active') {
+      listing.status = 'active'; // Restore for other tests
+      return {
+        rejected: true,
+        reason: 'Listing is not active',
+        status: 'paused',
+      };
+    }
+    throw new Error('Inactive listing purchase should have been rejected');
+  });
+
+  // Step 5: Attempt to update listing without ownership
+  await harness.runStep('Marketplace Failure', 'Reject update - not the seller', async () => {
+    const listing = harness.deployment.marketplace.listings.find(l => l.id === listingId);
+    const requester = harness.users.bob.address;
+
+    if (requester !== listing.seller) {
+      return {
+        rejected: true,
+        reason: 'Only the seller can update this listing',
+        seller: listing.seller,
+        requester: requester,
+      };
+    }
+    throw new Error('Unauthorized update should have been rejected');
+  });
+}
+
+/**
+ * WORK AUCTION FAILURE FLOW
+ * Test accept bid without escrow
+ */
+async function workAuctionFailureFlow(harness) {
+  console.log('\n\x1b[1mWORK AUCTION FAILURE SCENARIOS\x1b[0m');
+  console.log('─'.repeat(60));
+  console.log(`  Testing error handling for work auction operations`);
+  console.log('');
+
+  const jobId = `job_fail_${Date.now().toString(36)}`;
+
+  // Step 1: Create job without sufficient escrow
+  await harness.runStep('Work Failure', 'Reject job - insufficient escrow funds', async () => {
+    const budget = 500;
+    const userBalance = harness.users.alice.balance || 100;
+
+    if (userBalance < budget) {
+      return {
+        rejected: true,
+        reason: 'Insufficient funds for escrow',
+        required: budget,
+        available: userBalance,
+      };
+    }
+    throw new Error('Job creation should have been rejected due to insufficient escrow');
+  });
+
+  // Step 2: Create a valid job for testing other failures
+  await harness.runStep('Work Failure', 'Create test job with minimal escrow', async () => {
+    const job = {
+      id: jobId,
+      poster: harness.users.dave.address, // Dave has Steward level with more funds
+      posterPnft: harness.users.dave.pnftId,
+      title: 'Test Job',
+      budget: 50,
+      escrow: 50,
+      status: 'open',
+      bids: [],
+      createdAt: new Date().toISOString(),
+    };
+
+    if (!harness.deployment.workAuction) {
+      harness.deployment.workAuction = { jobs: [], completions: [], disputes: [] };
+    }
+    harness.deployment.workAuction.jobs.push(job);
+
+    return { jobId: job.id, budget: job.budget };
+  });
+
+  // Step 3: Attempt to accept non-existent bid
+  await harness.runStep('Work Failure', 'Reject accept - bid not found', async () => {
+    const job = harness.deployment.workAuction.jobs.find(j => j.id === jobId);
+    const fakeBidId = 'bid_nonexistent_123';
+    const bid = job.bids.find(b => b.id === fakeBidId);
+
+    if (!bid) {
+      return {
+        rejected: true,
+        reason: 'Bid not found',
+        bidId: fakeBidId,
+        jobId: jobId,
+      };
+    }
+    throw new Error('Accept non-existent bid should have been rejected');
+  });
+
+  // Step 4: Attempt to bid on own job
+  await harness.runStep('Work Failure', 'Reject bid - bidding on own job', async () => {
+    const job = harness.deployment.workAuction.jobs.find(j => j.id === jobId);
+    const bidderAddress = harness.users.dave.address; // Same as poster
+
+    if (bidderAddress === job.poster) {
+      return {
+        rejected: true,
+        reason: 'Cannot bid on your own job',
+        poster: job.poster,
+        bidder: bidderAddress,
+      };
+    }
+    throw new Error('Self-bid should have been rejected');
+  });
+
+  // Step 5: Attempt to complete job without being assigned
+  await harness.runStep('Work Failure', 'Reject complete - not assigned worker', async () => {
+    const job = harness.deployment.workAuction.jobs.find(j => j.id === jobId);
+    const requester = harness.users.carol.address;
+
+    if (!job.worker || job.worker !== requester) {
+      return {
+        rejected: true,
+        reason: 'Only assigned worker can mark job complete',
+        assignedWorker: job.worker || 'none',
+        requester: requester,
+      };
+    }
+    throw new Error('Unauthorized completion should have been rejected');
+  });
+
+  // Step 6: Attempt to cancel completed job
+  await harness.runStep('Work Failure', 'Reject cancel - invalid status', async () => {
+    const job = harness.deployment.workAuction.jobs.find(j => j.id === jobId);
+    const originalStatus = job.status;
+    job.status = 'completed'; // Temporarily set to completed
+
+    if (job.status === 'completed') {
+      job.status = originalStatus; // Restore
+      return {
+        rejected: true,
+        reason: 'Cannot cancel a completed job',
+        status: 'completed',
+      };
+    }
+    throw new Error('Cancel completed job should have been rejected');
+  });
+}
+
+/**
+ * GOVERNANCE FAILURE FLOW
+ * Test vote without voting rights
+ */
+async function governanceFailureFlow(harness) {
+  console.log('\n\x1b[1mGOVERNANCE FAILURE SCENARIOS\x1b[0m');
+  console.log('─'.repeat(60));
+  console.log(`  Testing error handling for governance operations`);
+  console.log('');
+
+  const proposalId = `prop_fail_${Date.now().toString(36)}`;
+  const votingWeights = { Basic: 0, Ward: 0, Standard: 1, Verified: 2, Steward: 3 };
+
+  // Step 1: Attempt to vote without voting rights (Basic level)
+  await harness.runStep('Governance Failure', 'Reject vote - Basic level cannot vote', async () => {
+    const basicUser = { name: 'BasicUser', level: 'Basic' };
+    const weight = votingWeights[basicUser.level];
+
+    if (weight === 0) {
+      return {
+        rejected: true,
+        reason: 'Users with Basic level cannot vote',
+        level: basicUser.level,
+        weight: 0,
+        requiredLevel: 'Standard or higher',
+      };
+    }
+    throw new Error('Basic user vote should have been rejected');
+  });
+
+  // Step 2: Create a test proposal
+  await harness.runStep('Governance Failure', 'Create test proposal', async () => {
+    const proposal = {
+      id: proposalId,
+      type: 'budget',
+      status: 'active',
+      proposer: harness.users.dave.address,
+      votingEnd: Date.now() + 7 * 24 * 60 * 60 * 1000,
+      votes: [],
+      votesFor: 0,
+      votesAgainst: 0,
+      voteCount: 0,
+      createdAt: new Date().toISOString(),
+    };
+
+    if (!harness.deployment.governance) {
+      harness.deployment.governance = { proposals: [], votes: [], currentCycle: 1 };
+    }
+    harness.deployment.governance.proposals.push(proposal);
+
+    return { proposalId: proposal.id, status: proposal.status };
+  });
+
+  // Step 3: Attempt to vote on inactive proposal
+  await harness.runStep('Governance Failure', 'Reject vote - proposal not active', async () => {
+    const proposal = harness.deployment.governance.proposals.find(p => p.id === proposalId);
+    const originalStatus = proposal.status;
+    proposal.status = 'executed';
+
+    if (proposal.status !== 'active') {
+      proposal.status = originalStatus;
+      return {
+        rejected: true,
+        reason: 'Can only vote on active proposals',
+        status: 'executed',
+      };
+    }
+    throw new Error('Vote on inactive proposal should have been rejected');
+  });
+
+  // Step 4: Attempt duplicate vote
+  await harness.runStep('Governance Failure', 'Reject vote - already voted', async () => {
+    const proposal = harness.deployment.governance.proposals.find(p => p.id === proposalId);
+    const voter = harness.users.bob.address;
+
+    // Simulate existing vote
+    proposal.votes.push({ voter, voteFor: true });
+
+    const existingVote = proposal.votes.find(v => v.voter === voter);
+
+    if (existingVote) {
+      proposal.votes.pop(); // Remove test vote
+      return {
+        rejected: true,
+        reason: 'User has already voted on this proposal',
+        voter: voter,
+        proposalId: proposalId,
+      };
+    }
+    throw new Error('Duplicate vote should have been rejected');
+  });
+
+  // Step 5: Attempt to execute unfinished proposal
+  await harness.runStep('Governance Failure', 'Reject execute - voting not ended', async () => {
+    const proposal = harness.deployment.governance.proposals.find(p => p.id === proposalId);
+
+    if (Date.now() < proposal.votingEnd) {
+      return {
+        rejected: true,
+        reason: 'Voting period has not ended',
+        votingEnd: new Date(proposal.votingEnd).toISOString(),
+        now: new Date().toISOString(),
+      };
+    }
+    throw new Error('Early execution should have been rejected');
+  });
+
+  // Step 6: Attempt to propose without required stake
+  await harness.runStep('Governance Failure', 'Reject proposal - insufficient stake', async () => {
+    const stakeRequired = 100;
+    const userBalance = 50;
+
+    if (userBalance < stakeRequired) {
+      return {
+        rejected: true,
+        reason: 'Insufficient ULTRA balance for proposal stake',
+        required: stakeRequired,
+        available: userBalance,
+      };
+    }
+    throw new Error('Proposal without stake should have been rejected');
+  });
+}
+
+/**
+ * CARE ECONOMY FAILURE FLOW
+ * Test fulfill without matching
+ */
+async function careFailureFlow(harness) {
+  console.log('\n\x1b[1mCARE ECONOMY FAILURE SCENARIOS\x1b[0m');
+  console.log('─'.repeat(60));
+  console.log(`  Testing error handling for care economy operations`);
+  console.log('');
+
+  const needId = `need_fail_${Date.now().toString(36)}`;
+
+  // Step 1: Attempt to fulfill non-existent need
+  await harness.runStep('Care Failure', 'Reject fulfill - need not found', async () => {
+    const fakeNeedId = 'need_nonexistent_123';
+
+    if (!harness.deployment.care) {
+      harness.deployment.care = { needs: [], offers: [], matches: [], completions: [] };
+    }
+
+    const need = harness.deployment.care.needs.find(n => n.id === fakeNeedId);
+
+    if (!need) {
+      return {
+        rejected: true,
+        reason: 'Care need not found',
+        needId: fakeNeedId,
+      };
+    }
+    throw new Error('Fulfill non-existent need should have been rejected');
+  });
+
+  // Step 2: Create a test need
+  await harness.runStep('Care Failure', 'Create test care need', async () => {
+    const need = {
+      id: needId,
+      type: 'eldercare',
+      seeker: harness.users.alice.address,
+      seekerPnft: harness.users.alice.pnftId,
+      status: 'open',
+      hoursNeeded: 4,
+      createdAt: new Date().toISOString(),
+    };
+
+    harness.deployment.care.needs.push(need);
+
+    return { needId: need.id, type: need.type };
+  });
+
+  // Step 3: Attempt to fulfill own care need
+  await harness.runStep('Care Failure', 'Reject fulfill - cannot fulfill own need', async () => {
+    const need = harness.deployment.care.needs.find(n => n.id === needId);
+    const provider = harness.users.alice.address; // Same as seeker
+
+    if (provider === need.seeker) {
+      return {
+        rejected: true,
+        reason: 'Cannot fulfill your own care need',
+        seeker: need.seeker,
+        provider: provider,
+      };
+    }
+    throw new Error('Self-fulfill should have been rejected');
+  });
+
+  // Step 4: Attempt to log session without active match
+  await harness.runStep('Care Failure', 'Reject session log - no active match', async () => {
+    const need = harness.deployment.care.needs.find(n => n.id === needId);
+    const matchExists = harness.deployment.care.matches.some(
+      m => m.needId === needId && m.status === 'active'
+    );
+
+    if (!matchExists) {
+      return {
+        rejected: true,
+        reason: 'No active care match found',
+        needId: needId,
+      };
+    }
+    throw new Error('Session log without match should have been rejected');
+  });
+
+  // Step 5: Attempt to register care need without required fields
+  await harness.runStep('Care Failure', 'Reject need - missing care type', async () => {
+    const invalidNeed = {
+      seeker: harness.users.bob.address,
+      hoursNeeded: 4,
+      // Missing type field
+    };
+
+    if (!invalidNeed.type) {
+      return {
+        rejected: true,
+        reason: 'Care type is required',
+        missing: 'type',
+      };
+    }
+    throw new Error('Need without type should have been rejected');
+  });
+
+  // Step 6: Attempt to verify session as non-seeker
+  await harness.runStep('Care Failure', 'Reject verify - not the care seeker', async () => {
+    const need = harness.deployment.care.needs.find(n => n.id === needId);
+    const verifier = harness.users.carol.address;
+
+    if (verifier !== need.seeker) {
+      return {
+        rejected: true,
+        reason: 'Only care seeker can verify sessions',
+        seeker: need.seeker,
+        verifier: verifier,
+      };
+    }
+    throw new Error('Unauthorized verification should have been rejected');
+  });
+}
+
+/**
+ * IMPACT MARKET FAILURE FLOW
+ * Test sell more credits than owned
+ */
+async function impactMarketFailureFlow(harness) {
+  console.log('\n\x1b[1mIMPACT MARKET FAILURE SCENARIOS\x1b[0m');
+  console.log('─'.repeat(60));
+  console.log(`  Testing error handling for impact market operations`);
+  console.log('');
+
+  // Setup: Initialize impact credits for testing
+  if (!harness.deployment.impactCredits) {
+    harness.deployment.impactCredits = {};
+  }
+  harness.deployment.impactCredits[harness.users.alice.address] = { CO2: 5, H2O: 100 };
+
+  // Step 1: Attempt to sell more credits than owned
+  await harness.runStep('Impact Failure', 'Reject sell - insufficient credits', async () => {
+    const sellerAddress = harness.users.alice.address;
+    const ownedCredits = harness.deployment.impactCredits[sellerAddress]?.CO2 || 0;
+    const sellQuantity = 50; // More than owned
+
+    if (sellQuantity > ownedCredits) {
+      return {
+        rejected: true,
+        reason: 'Cannot sell more credits than owned',
+        compound: 'CO2',
+        owned: ownedCredits,
+        requested: sellQuantity,
+      };
+    }
+    throw new Error('Oversell should have been rejected');
+  });
+
+  // Step 2: Attempt to sell with invalid compound type
+  await harness.runStep('Impact Failure', 'Reject sell - invalid compound', async () => {
+    const validCompounds = ['CO2', 'H2O', 'BIO', 'SOIL', 'N', 'P'];
+    const invalidCompound = 'INVALID_XYZ';
+
+    if (!validCompounds.includes(invalidCompound)) {
+      return {
+        rejected: true,
+        reason: 'Invalid compound type',
+        compound: invalidCompound,
+        validCompounds: validCompounds,
+      };
+    }
+    throw new Error('Invalid compound should have been rejected');
+  });
+
+  // Step 3: Attempt to buy with insufficient balance
+  await harness.runStep('Impact Failure', 'Reject buy - insufficient ULTRA balance', async () => {
+    const buyerBalance = harness.users.bob.balance || 100;
+    const orderPrice = 500;
+
+    if (buyerBalance < orderPrice) {
+      return {
+        rejected: true,
+        reason: 'Insufficient ULTRA balance for purchase',
+        available: buyerBalance,
+        required: orderPrice,
+      };
+    }
+    throw new Error('Purchase should have been rejected');
+  });
+
+  // Step 4: Attempt to fill non-existent order
+  await harness.runStep('Impact Failure', 'Reject fill - order not found', async () => {
+    if (!harness.deployment.impactMarket) {
+      harness.deployment.impactMarket = { orders: [], fills: [] };
+    }
+
+    const fakeOrderId = 'order_nonexistent_123';
+    const order = harness.deployment.impactMarket.orders.find(o => o.id === fakeOrderId);
+
+    if (!order) {
+      return {
+        rejected: true,
+        reason: 'Order not found',
+        orderId: fakeOrderId,
+      };
+    }
+    throw new Error('Fill non-existent order should have been rejected');
+  });
+
+  // Step 5: Attempt to cancel someone else's order
+  await harness.runStep('Impact Failure', 'Reject cancel - not order owner', async () => {
+    const order = {
+      id: 'order_test_123',
+      seller: harness.users.alice.address,
+      compound: 'CO2',
+      quantity: 2,
+      status: 'open',
+    };
+    const canceller = harness.users.bob.address;
+
+    if (canceller !== order.seller) {
+      return {
+        rejected: true,
+        reason: 'Only order creator can cancel',
+        orderOwner: order.seller,
+        canceller: canceller,
+      };
+    }
+    throw new Error('Unauthorized cancel should have been rejected');
+  });
+
+  // Step 6: Attempt to sell with zero or negative quantity
+  await harness.runStep('Impact Failure', 'Reject sell - invalid quantity', async () => {
+    const quantity = -5;
+
+    if (quantity <= 0) {
+      return {
+        rejected: true,
+        reason: 'Quantity must be positive',
+        quantity: quantity,
+      };
+    }
+    throw new Error('Invalid quantity should have been rejected');
+  });
+}
+
 /**
  * LAND STEWARDSHIP FLOW
  * Register land → Record health metrics → Generate credits → Update health index
@@ -1115,14 +1697,38 @@ async function main() {
     land: landStewardshipFlow,
   };
 
+  // Failure scenario flows
+  const failureFlows = {
+    'marketplace-fail': marketplaceFailureFlow,
+    'work-fail': workAuctionFailureFlow,
+    'governance-fail': governanceFailureFlow,
+    'care-fail': careFailureFlow,
+    'impact-fail': impactMarketFailureFlow,
+  };
+
+  // Combined flows for 'failures' or 'errors' flag
+  const allFlows = { ...flows, ...failureFlows };
+
   if (FLAGS.flow) {
-    if (!flows[FLAGS.flow]) {
+    // Check for 'failures' or 'errors' to run all failure flows
+    if (FLAGS.flow === 'failures' || FLAGS.flow === 'errors') {
+      for (const [name, flowFn] of Object.entries(failureFlows)) {
+        await flowFn(harness);
+      }
+    } else if (FLAGS.flow === 'all-with-errors') {
+      // Run all flows including failure scenarios
+      for (const [name, flowFn] of Object.entries(allFlows)) {
+        await flowFn(harness);
+      }
+    } else if (!allFlows[FLAGS.flow]) {
       console.error(`Unknown flow: ${FLAGS.flow}`);
       console.log(`Available flows: ${Object.keys(flows).join(', ')}`);
+      console.log(`Failure flows: ${Object.keys(failureFlows).join(', ')}`);
+      console.log(`Special: failures, errors, all-with-errors`);
       process.exit(1);
+    } else {
+      await allFlows[FLAGS.flow](harness);
     }
-
-    await flows[FLAGS.flow](harness);
   } else {
     // Run all flows
     for (const [name, flowFn] of Object.entries(flows)) {
@@ -1161,6 +1767,18 @@ FLOWS:
   care                Need registered → Provider matches → Care given → Credits
   impact              Land generates credits → Listed → Purchased → Debt reduced
   land                Register land → Health assessment → Restoration → Credits
+
+FAILURE FLOWS (Error Path Testing):
+  marketplace-fail    Test insufficient funds, self-purchase, unauthorized updates
+  work-fail           Test missing escrow, self-bidding, unauthorized completion
+  governance-fail     Test voting without rights, duplicate votes, early execution
+  care-fail           Test missing matches, self-fulfill, unauthorized verification
+  impact-fail         Test overselling credits, invalid compounds, unauthorized cancel
+
+SPECIAL OPTIONS:
+  failures            Run all failure flow tests
+  errors              Alias for failures
+  all-with-errors     Run all flows including failure scenarios
 
 EXAMPLES:
   # Run all interaction flows

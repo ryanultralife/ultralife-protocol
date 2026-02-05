@@ -20,11 +20,14 @@
 // =============================================================================
 
 use aiken/collection/list
-use aiken/crypto.{VerificationKeyHash}
+use aiken/crypto.{VerificationKeyHash, blake2b_256}
+use aiken/interval
+use aiken/primitive/bytearray
+use cardano/address
 use cardano/assets.{PolicyId, AssetName, Value, quantity_of}
 use cardano/transaction.{Transaction, Input, Output, OutputReference, InlineDatum}
 use ultralife/types.{
-  PnftDatum, VerificationLevel, Standard, Verified, Steward,
+  PnftDatum, VerificationLevel, Basic, Ward, Standard, Verified, Steward,
   CompoundFlow, CompoundCode, MassUnit,
 }
 
@@ -646,7 +649,52 @@ fn validate_apply_to_ubi(
 // =============================================================================
 
 fn find_signer_pnft(tx: Transaction, pnft_policy: PolicyId) -> Option<PnftData> {
-  None // Simplified
+  // Find a pNFT in inputs or reference inputs whose owner has signed the transaction
+  let from_inputs = list.find_map(tx.inputs, fn(input) {
+    when input.output.datum is {
+      InlineDatum(data) -> {
+        expect datum: PnftDatum = data
+        if list.has(tx.extra_signatories, datum.owner) &&
+           quantity_of(input.output.value, pnft_policy, datum.pnft_id) == 1 {
+          Some(PnftData {
+            pnft_id: datum.pnft_id,
+            owner: datum.owner,
+            level: datum.level,
+            bioregion: datum.bioregion,
+          })
+        } else {
+          None
+        }
+      }
+      _ -> None
+    }
+  })
+
+  when from_inputs is {
+    Some(d) -> Some(d)
+    None -> {
+      // Also check reference inputs
+      list.find_map(tx.reference_inputs, fn(input) {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            if list.has(tx.extra_signatories, datum.owner) &&
+               quantity_of(input.output.value, pnft_policy, datum.pnft_id) == 1 {
+              Some(PnftData {
+                pnft_id: datum.pnft_id,
+                owner: datum.owner,
+                level: datum.level,
+                bioregion: datum.bioregion,
+              })
+            } else {
+              None
+            }
+          }
+          _ -> None
+        }
+      })
+    }
+  }
 }
 
 type PnftData {
@@ -657,7 +705,17 @@ type PnftData {
 }
 
 fn verification_level_gte(a: VerificationLevel, b: VerificationLevel) -> Bool {
-  True // Simplified
+  // Compare verification levels: Basic < Ward < Standard < Verified < Steward
+  let level_to_int = fn(level: VerificationLevel) -> Int {
+    when level is {
+      Basic -> 0
+      Ward -> 1
+      Standard -> 2
+      Verified -> 3
+      Steward -> 4
+    }
+  }
+  level_to_int(a) >= level_to_int(b)
 }
 
 fn days_between(start: Int, end: Int) -> Int {
@@ -665,11 +723,23 @@ fn days_between(start: Int, end: Int) -> Int {
 }
 
 fn get_current_slot(tx: Transaction) -> Int {
-  0 // Simplified
+  // Extract current slot from transaction validity range
+  when tx.validity_range.lower_bound.bound_type is {
+    interval.Finite(slot) -> slot
+    _ -> {
+      // Fallback to upper bound if lower is unbounded
+      when tx.validity_range.upper_bound.bound_type is {
+        interval.Finite(slot) -> slot
+        _ -> 0
+      }
+    }
+  }
 }
 
 fn generate_record_id(caregiver: AssetName, timestamp: Int) -> ByteArray {
-  "" // Simplified
+  // Generate unique record ID from caregiver pNFT and timestamp
+  let timestamp_bytes = bytearray.from_int_big_endian(timestamp, 8)
+  blake2b_256(bytearray.concat(caregiver, timestamp_bytes))
 }
 
 fn get_bioregion(pnft: PnftData) -> ByteArray {
@@ -680,7 +750,18 @@ fn get_bioregion(pnft: PnftData) -> ByteArray {
 }
 
 fn find_care_record_output(outputs: List<Output>) -> Option<Output> {
-  list.head(outputs) // Simplified - returns first output
+  list.find(outputs, fn(output) {
+    when output.datum is {
+      InlineDatum(data) -> {
+        expect care_datum: CareDatum = data
+        when care_datum is {
+          Record(_) -> True
+          _ -> False
+        }
+      }
+      _ -> False
+    }
+  })
 }
 
 fn is_attestable(status: CareRecordStatus) -> Bool {
@@ -714,7 +795,25 @@ fn has_attested(attestations: List<CareAttestation>, attestor: AssetName) -> Boo
 }
 
 fn find_all_care_records(tx: Transaction, ids: List<ByteArray>) -> List<CareRecord> {
-  [] // Simplified
+  // Find all care records from inputs that match the given IDs
+  list.filter_map(tx.inputs, fn(input) {
+    when input.output.datum is {
+      InlineDatum(data) -> {
+        expect care_datum: CareDatum = data
+        when care_datum is {
+          Record(record) -> {
+            if list.has(ids, record.record_id) {
+              Some(record)
+            } else {
+              None
+            }
+          }
+          _ -> None
+        }
+      }
+      _ -> None
+    }
+  })
 }
 
 fn calculate_credits(record: CareRecord, config: CareConfig) -> Int {
@@ -727,21 +826,197 @@ fn find_credit_record_output(outputs: List<Output>, _caregiver: AssetName) -> Op
 }
 
 fn verify_ubi_contract_called(tx: Transaction, ubi_contract: ByteArray) -> Bool {
-  True // Simplified
+  // Verify that the UBI contract is being called in this transaction
+  // Check if UBI contract is in inputs (being spent)
+  let in_inputs = list.any(tx.inputs, fn(input) {
+    when input.output.address.payment_credential is {
+      address.Script(hash) -> hash == ubi_contract
+      _ -> False
+    }
+  })
+
+  // Also check if UBI contract is in reference inputs
+  let in_ref_inputs = list.any(tx.reference_inputs, fn(input) {
+    when input.output.address.payment_credential is {
+      address.Script(hash) -> hash == ubi_contract
+      _ -> False
+    }
+  })
+
+  in_inputs || in_ref_inputs
 }
 
 fn validate_update_record(tx: Transaction, datum: Option<CareDatum>, record_id: ByteArray, new_hours: Option<Int>, new_notes: Option<ByteArray>, config: CareConfig) -> Bool {
-  True // Simplified
+  // 1. Get existing record
+  expect Some(Record(record)) = datum
+  expect record.record_id == record_id
+
+  // 2. Must be pending (not yet attested)
+  expect record.status == Pending
+
+  // 3. Caregiver must sign
+  let caregiver_pnft = find_signer_pnft(tx, config.pnft_policy)
+  expect Some(caregiver) = caregiver_pnft
+  expect caregiver.pnft_id == record.caregiver
+  expect list.has(tx.extra_signatories, caregiver.owner)
+
+  // 4. Apply updates
+  let updated_hours = when new_hours is {
+    Some(h) -> h
+    None -> record.hours
+  }
+  let updated_notes = when new_notes is {
+    Some(n) -> Some(n)
+    None -> record.notes_hash
+  }
+
+  // 5. Hours must still be valid
+  expect updated_hours > 0
+  expect updated_hours <= config.max_daily_hours * days_between(record.started_at, record.ended_at)
+
+  // 6. Verify output has updated record
+  let output = find_care_record_output(tx.outputs)
+  expect Some(out) = output
+  expect InlineDatum(data) = out.datum
+  expect Record(result): CareDatum = data
+
+  result.record_id == record_id &&
+  result.hours == updated_hours &&
+  result.notes_hash == updated_notes &&
+  result.caregiver == record.caregiver
 }
 
 fn validate_cancel_record(tx: Transaction, datum: Option<CareDatum>, record_id: ByteArray, config: CareConfig) -> Bool {
-  True // Simplified
+  // 1. Get existing record
+  expect Some(Record(record)) = datum
+  expect record.record_id == record_id
+
+  // 2. Must be pending (not yet attested or credited)
+  expect record.status == Pending
+
+  // 3. Caregiver must sign
+  let caregiver_pnft = find_signer_pnft(tx, config.pnft_policy)
+  expect Some(caregiver) = caregiver_pnft
+  expect caregiver.pnft_id == record.caregiver
+  expect list.has(tx.extra_signatories, caregiver.owner)
+
+  // 4. Record should not be recreated (UTxO is consumed without replacement)
+  let no_record_output = !list.any(tx.outputs, fn(output) {
+    when output.datum is {
+      InlineDatum(data) -> {
+        expect care_datum: CareDatum = data
+        when care_datum is {
+          Record(r) -> r.record_id == record_id
+          _ -> False
+        }
+      }
+      _ -> False
+    }
+  })
+
+  no_record_output
 }
 
 fn validate_dispute_record(tx: Transaction, datum: Option<CareDatum>, record_id: ByteArray, reason: ByteArray, config: CareConfig) -> Bool {
-  True // Simplified
+  // 1. Get existing record
+  expect Some(Record(record)) = datum
+  expect record.record_id == record_id
+
+  // 2. Record must be Pending or Attested (not yet credited)
+  expect is_attestable(record.status)
+
+  // 3. Disputer must sign (any pNFT holder can dispute)
+  let disputer_pnft = find_signer_pnft(tx, config.pnft_policy)
+  expect Some(disputer) = disputer_pnft
+  expect list.has(tx.extra_signatories, disputer.owner)
+
+  // 4. Disputer cannot be the caregiver (would use CancelRecord instead)
+  expect disputer.pnft_id != record.caregiver
+
+  // 5. Reason must be provided
+  expect reason != #""
+
+  // 6. Record should be updated with Disputed status
+  let output = find_care_record_output(tx.outputs)
+  expect Some(out) = output
+  expect InlineDatum(data) = out.datum
+  expect Record(result): CareDatum = data
+
+  result.record_id == record_id &&
+  result.status == Disputed { reason: reason }
 }
 
 fn validate_aggregate_bioregion(tx: Transaction, datum: Option<CareDatum>, bioregion: ByteArray, cycle: Int, config: CareConfig) -> Bool {
-  True // Simplified
+  // 1. Must have existing bioregion stats or create new
+  let existing_stats = when datum is {
+    Some(BioregionCareStats(stats)) -> Some(stats)
+    _ -> None
+  }
+
+  // 2. Aggregator must be Steward level in this bioregion
+  let aggregator_pnft = find_signer_pnft(tx, config.pnft_policy)
+  expect Some(aggregator) = aggregator_pnft
+  expect aggregator.level == Steward
+  expect aggregator.bioregion == Some(bioregion)
+  expect list.has(tx.extra_signatories, aggregator.owner)
+
+  // 3. Gather all care records for this bioregion from inputs
+  let care_records = list.filter_map(tx.inputs, fn(input) {
+    when input.output.datum is {
+      InlineDatum(data) -> {
+        expect care_datum: CareDatum = data
+        when care_datum is {
+          Record(record) -> {
+            if record.bioregion == bioregion {
+              Some(record)
+            } else {
+              None
+            }
+          }
+          _ -> None
+        }
+      }
+      _ -> None
+    }
+  })
+
+  // 4. Calculate aggregated stats
+  let total_hours = list.foldl(care_records, 0, fn(r, acc) { acc + r.hours })
+  // Count unique caregivers by folding over records
+  let caregivers = list.map(care_records, fn(r) { r.caregiver })
+  let active_caregivers = count_unique(caregivers)
+
+  // 5. Verify output has correct aggregated data
+  let output = list.find(tx.outputs, fn(out) {
+    when out.datum is {
+      InlineDatum(data) -> {
+        expect result: CareDatum = data
+        when result is {
+          BioregionCareStats(stats) -> stats.bioregion == bioregion && stats.cycle == cycle
+          _ -> False
+        }
+      }
+      _ -> False
+    }
+  })
+  expect Some(out) = output
+  expect InlineDatum(out_data) = out.datum
+  expect BioregionCareStats(result_stats): CareDatum = out_data
+
+  result_stats.bioregion == bioregion &&
+  result_stats.cycle == cycle &&
+  result_stats.total_hours >= total_hours &&
+  result_stats.active_caregivers >= active_caregivers
+}
+
+/// Count unique items in a list
+fn count_unique(items: List<AssetName>) -> Int {
+  list.foldl(items, ([], 0), fn(item, acc) {
+    let (seen, count) = acc
+    if list.has(seen, item) {
+      (seen, count)
+    } else {
+      (list.concat(seen, [item]), count + 1)
+    }
+  }).2nd
 }

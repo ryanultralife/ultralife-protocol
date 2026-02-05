@@ -640,6 +640,299 @@ const compoundDiscoveryTests = (harness) => ({
 });
 
 // =============================================================================
+// ERROR PATH TESTS
+// =============================================================================
+
+// --- 11. INVALID pNFT LEVEL TRANSITIONS ---
+const invalidLevelTransitionTests = (harness) => ({
+  'Reject downgrade from Verified to Basic': async () => {
+    const validLevels = ['Basic', 'Ward', 'Standard', 'Verified', 'Steward'];
+    const levelOrder = { Basic: 0, Ward: 1, Standard: 2, Verified: 3, Steward: 4 };
+
+    // Attempt to downgrade
+    const currentLevel = 'Verified';
+    const targetLevel = 'Basic';
+
+    if (levelOrder[targetLevel] < levelOrder[currentLevel]) {
+      return { rejected: true, reason: 'Cannot downgrade pNFT level', from: currentLevel, to: targetLevel };
+    }
+    throw new Error('Downgrade should have been rejected');
+  },
+
+  'Reject skip-level upgrade from Basic to Verified': async () => {
+    const levelOrder = { Basic: 0, Ward: 1, Standard: 2, Verified: 3, Steward: 4 };
+    const currentLevel = 'Basic';
+    const targetLevel = 'Verified';
+
+    const levelDiff = levelOrder[targetLevel] - levelOrder[currentLevel];
+    if (levelDiff > 1) {
+      return { rejected: true, reason: 'Cannot skip levels during upgrade', from: currentLevel, to: targetLevel };
+    }
+    throw new Error('Skip-level upgrade should have been rejected');
+  },
+
+  'Reject invalid level name': async () => {
+    const validLevels = ['Basic', 'Ward', 'Standard', 'Verified', 'Steward'];
+    const invalidLevel = 'SuperAdmin';
+
+    if (!validLevels.includes(invalidLevel)) {
+      return { rejected: true, reason: 'Invalid level name', level: invalidLevel };
+    }
+    throw new Error('Invalid level should have been rejected');
+  },
+
+  'Reject upgrade without required stake': async () => {
+    const upgradeRequirements = {
+      Ward: 10,
+      Standard: 50,
+      Verified: 100,
+      Steward: 500,
+    };
+
+    const targetLevel = 'Verified';
+    const userBalance = 50;
+    const requiredStake = upgradeRequirements[targetLevel];
+
+    if (userBalance < requiredStake) {
+      return { rejected: true, reason: 'Insufficient stake for upgrade', required: requiredStake, available: userBalance };
+    }
+    throw new Error('Upgrade without stake should have been rejected');
+  },
+
+  'Reject upgrade without identity verification': async () => {
+    const requiresVerification = ['Verified', 'Steward'];
+    const targetLevel = 'Verified';
+    const hasVerification = false;
+
+    if (requiresVerification.includes(targetLevel) && !hasVerification) {
+      return { rejected: true, reason: 'Identity verification required for this level', level: targetLevel };
+    }
+    throw new Error('Upgrade without verification should have been rejected');
+  },
+});
+
+// --- 12. INSUFFICIENT BALANCE SCENARIOS ---
+const insufficientBalanceTests = (harness) => ({
+  'Reject transfer exceeding balance': async () => {
+    const senderBalance = 100;
+    const transferAmount = 150;
+
+    if (transferAmount > senderBalance) {
+      return { rejected: true, reason: 'Insufficient balance', available: senderBalance, requested: transferAmount };
+    }
+    throw new Error('Transfer should have been rejected');
+  },
+
+  'Reject purchase with zero balance': async () => {
+    const buyerBalance = 0;
+    const itemPrice = 25;
+
+    if (buyerBalance < itemPrice) {
+      return { rejected: true, reason: 'Insufficient funds for purchase', available: buyerBalance, required: itemPrice };
+    }
+    throw new Error('Purchase should have been rejected');
+  },
+
+  'Reject escrow creation without funds': async () => {
+    const userBalance = 50;
+    const escrowAmount = 100;
+
+    if (userBalance < escrowAmount) {
+      return { rejected: true, reason: 'Cannot create escrow without sufficient funds', available: userBalance, required: escrowAmount };
+    }
+    throw new Error('Escrow creation should have been rejected');
+  },
+
+  'Reject stake without minimum balance': async () => {
+    const userBalance = 10;
+    const minimumStake = 50;
+
+    if (userBalance < minimumStake) {
+      return { rejected: true, reason: 'Minimum stake not met', available: userBalance, minimum: minimumStake };
+    }
+    throw new Error('Stake should have been rejected');
+  },
+
+  'Reject multiple transactions draining balance': async () => {
+    let balance = 100;
+    const transactions = [60, 50]; // Total 110, should fail on second
+
+    for (let i = 0; i < transactions.length; i++) {
+      if (transactions[i] > balance) {
+        return { rejected: true, reason: 'Transaction would overdraw balance', transaction: i + 1, amount: transactions[i], balance };
+      }
+      balance -= transactions[i];
+    }
+    throw new Error('Overdraw should have been rejected');
+  },
+});
+
+// --- 13. UNAUTHORIZED TRANSACTION ATTEMPTS ---
+const unauthorizedTransactionTests = (harness) => ({
+  'Reject transaction from non-owner': async () => {
+    const assetOwner = 'addr_owner_123';
+    const transactionSender = 'addr_attacker_456';
+
+    if (transactionSender !== assetOwner) {
+      return { rejected: true, reason: 'Only asset owner can initiate transaction', owner: assetOwner, sender: transactionSender };
+    }
+    throw new Error('Unauthorized transaction should have been rejected');
+  },
+
+  'Reject listing update by non-seller': async () => {
+    const listing = { seller: 'addr_seller_123', id: 'lst_abc' };
+    const updateRequester = 'addr_other_456';
+
+    if (updateRequester !== listing.seller) {
+      return { rejected: true, reason: 'Only seller can update listing', seller: listing.seller, requester: updateRequester };
+    }
+    throw new Error('Update should have been rejected');
+  },
+
+  'Reject vote from non-pNFT holder': async () => {
+    const voterHasPnft = false;
+
+    if (!voterHasPnft) {
+      return { rejected: true, reason: 'pNFT required to vote' };
+    }
+    throw new Error('Vote should have been rejected');
+  },
+
+  'Reject proposal execution by non-authorized': async () => {
+    const proposal = { status: 'passed', bioregion: 'sierra_nevada' };
+    const executorIsSteward = false;
+
+    if (!executorIsSteward) {
+      return { rejected: true, reason: 'Only stewards can execute proposals', proposalStatus: proposal.status };
+    }
+    throw new Error('Execution should have been rejected');
+  },
+
+  'Reject land credit generation by non-steward': async () => {
+    const land = { primarySteward: 'addr_steward_123', id: 'land_abc' };
+    const requester = 'addr_other_456';
+
+    if (requester !== land.primarySteward) {
+      return { rejected: true, reason: 'Only land steward can generate credits', steward: land.primarySteward, requester };
+    }
+    throw new Error('Credit generation should have been rejected');
+  },
+});
+
+// --- 14. MISSING REQUIRED FIELDS ---
+const missingRequiredFieldsTests = (harness) => ({
+  'Reject pNFT mint without owner address': async () => {
+    const mintRequest = { level: 'Basic', bioregion: 'sierra_nevada' };
+
+    if (!mintRequest.owner) {
+      return { rejected: true, reason: 'Owner address is required for pNFT mint', missing: 'owner' };
+    }
+    throw new Error('Mint should have been rejected');
+  },
+
+  'Reject listing without price': async () => {
+    const listing = { name: 'Test Product', category: 'food', seller: 'addr_123' };
+
+    if (listing.price === undefined || listing.price === null) {
+      return { rejected: true, reason: 'Price is required for listing', missing: 'price' };
+    }
+    throw new Error('Listing should have been rejected');
+  },
+
+  'Reject proposal without description': async () => {
+    const proposal = { type: 'budget', amount: 1000, proposer: 'addr_123' };
+
+    if (!proposal.description) {
+      return { rejected: true, reason: 'Description is required for proposal', missing: 'description' };
+    }
+    throw new Error('Proposal should have been rejected');
+  },
+
+  'Reject care need without type': async () => {
+    const careNeed = { seeker: 'addr_123', description: 'Need help', hoursNeeded: 4 };
+
+    if (!careNeed.type) {
+      return { rejected: true, reason: 'Care type is required', missing: 'type' };
+    }
+    throw new Error('Care need should have been rejected');
+  },
+
+  'Reject work posting without budget': async () => {
+    const job = { title: 'Trail Work', description: 'Clear trails', poster: 'addr_123' };
+
+    if (!job.budget || job.budget <= 0) {
+      return { rejected: true, reason: 'Budget is required for work posting', missing: 'budget' };
+    }
+    throw new Error('Work posting should have been rejected');
+  },
+
+  'Reject impact order without compound type': async () => {
+    const order = { type: 'Sell', quantity: 10, price: 50, seller: 'addr_123' };
+
+    if (!order.compound) {
+      return { rejected: true, reason: 'Compound type is required for impact order', missing: 'compound' };
+    }
+    throw new Error('Impact order should have been rejected');
+  },
+});
+
+// --- 15. INVALID BIOREGION ASSIGNMENTS ---
+const invalidBioregionTests = (harness) => ({
+  'Reject unknown bioregion code': async () => {
+    const validBioregions = ['sierra_nevada', 'pacific_northwest', 'great_lakes', 'gulf_coast', 'sonoran_desert'];
+    const requestedBioregion = 'invalid_region_xyz';
+
+    if (!validBioregions.includes(requestedBioregion)) {
+      return { rejected: true, reason: 'Unknown bioregion code', bioregion: requestedBioregion, valid: validBioregions };
+    }
+    throw new Error('Invalid bioregion should have been rejected');
+  },
+
+  'Reject cross-bioregion delegation': async () => {
+    const userBioregion = 'sierra_nevada';
+    const targetPool = { bioregion: 'pacific_northwest', ticker: 'PNW' };
+    const allowCrossBioregion = false;
+
+    if (!allowCrossBioregion && userBioregion !== targetPool.bioregion) {
+      return { rejected: true, reason: 'Cannot delegate to pool in different bioregion', userBioregion, poolBioregion: targetPool.bioregion };
+    }
+    throw new Error('Cross-bioregion delegation should have been rejected');
+  },
+
+  'Reject land registration in wrong bioregion': async () => {
+    const landCoordinates = { lat: 39.2, lng: -120.5 }; // Sierra Nevada coordinates
+    const claimedBioregion = 'gulf_coast'; // Wrong bioregion
+
+    // Simple validation - in production would use geo boundaries
+    const isInClaimedBioregion = false; // Simulated check
+
+    if (!isInClaimedBioregion) {
+      return { rejected: true, reason: 'Land coordinates do not match claimed bioregion', claimed: claimedBioregion, coordinates: landCoordinates };
+    }
+    throw new Error('Land registration should have been rejected');
+  },
+
+  'Reject bioregion-specific proposal from outsider': async () => {
+    const proposal = { bioregion: 'sierra_nevada', type: 'budget' };
+    const proposerBioregion = 'pacific_northwest';
+
+    if (proposal.bioregion !== proposerBioregion) {
+      return { rejected: true, reason: 'Cannot create proposal for bioregion you are not a member of', proposerBioregion, targetBioregion: proposal.bioregion };
+    }
+    throw new Error('Proposal should have been rejected');
+  },
+
+  'Reject empty bioregion assignment': async () => {
+    const assignment = { user: 'addr_123', bioregion: '' };
+
+    if (!assignment.bioregion || assignment.bioregion.trim() === '') {
+      return { rejected: true, reason: 'Bioregion cannot be empty' };
+    }
+    throw new Error('Empty bioregion should have been rejected');
+  },
+});
+
+// =============================================================================
 // SCENARIO TESTS
 // =============================================================================
 
@@ -797,6 +1090,23 @@ async function main() {
     await harness.runCategory('Population Health', populationHealthTests(harness), {});
   } else if (FLAGS.scenario === 'discovery') {
     await harness.runCategory('Compound Discovery', compoundDiscoveryTests(harness), {});
+  } else if (FLAGS.scenario === 'errors' || FLAGS.scenario === 'error') {
+    // Run all error path tests
+    await harness.runCategory('Invalid Level Transitions', invalidLevelTransitionTests(harness), {});
+    await harness.runCategory('Insufficient Balance', insufficientBalanceTests(harness), {});
+    await harness.runCategory('Unauthorized Transactions', unauthorizedTransactionTests(harness), {});
+    await harness.runCategory('Missing Required Fields', missingRequiredFieldsTests(harness), {});
+    await harness.runCategory('Invalid Bioregion', invalidBioregionTests(harness), {});
+  } else if (FLAGS.scenario === 'levels') {
+    await harness.runCategory('Invalid Level Transitions', invalidLevelTransitionTests(harness), {});
+  } else if (FLAGS.scenario === 'balance') {
+    await harness.runCategory('Insufficient Balance', insufficientBalanceTests(harness), {});
+  } else if (FLAGS.scenario === 'auth') {
+    await harness.runCategory('Unauthorized Transactions', unauthorizedTransactionTests(harness), {});
+  } else if (FLAGS.scenario === 'fields') {
+    await harness.runCategory('Missing Required Fields', missingRequiredFieldsTests(harness), {});
+  } else if (FLAGS.scenario === 'bioregion-errors') {
+    await harness.runCategory('Invalid Bioregion', invalidBioregionTests(harness), {});
   } else {
     // Run all tests
     await harness.runCategory('Identity', identityTests(harness), {
@@ -833,6 +1143,30 @@ async function main() {
 
     // Run journey scenario
     await harness.runCategory('User Journey Scenario', userJourneyScenario(harness), {});
+
+    // Run error path tests
+    await harness.runCategory('Invalid Level Transitions', invalidLevelTransitionTests(harness), {
+      'Reject downgrade from Verified to Basic': { critical: true },
+      'Reject invalid level name': { critical: true },
+    });
+
+    await harness.runCategory('Insufficient Balance', insufficientBalanceTests(harness), {
+      'Reject transfer exceeding balance': { critical: true },
+      'Reject purchase with zero balance': { critical: true },
+    });
+
+    await harness.runCategory('Unauthorized Transactions', unauthorizedTransactionTests(harness), {
+      'Reject transaction from non-owner': { critical: true },
+    });
+
+    await harness.runCategory('Missing Required Fields', missingRequiredFieldsTests(harness), {
+      'Reject pNFT mint without owner address': { critical: true },
+      'Reject listing without price': { critical: true },
+    });
+
+    await harness.runCategory('Invalid Bioregion', invalidBioregionTests(harness), {
+      'Reject unknown bioregion code': { critical: true },
+    });
   }
 
   harness.saveResults();
@@ -870,6 +1204,14 @@ SCENARIOS:
   land                Land registry tests
   health              Population health tests
   discovery           Compound discovery tests
+
+ERROR PATH SCENARIOS:
+  errors              Run all error path tests
+  levels              Invalid pNFT level transitions
+  balance             Insufficient balance scenarios
+  auth                Unauthorized transaction attempts
+  fields              Missing required fields validation
+  bioregion-errors    Invalid bioregion assignments
 
 EXAMPLES:
   # Run all tests

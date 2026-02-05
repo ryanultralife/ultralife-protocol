@@ -16,11 +16,14 @@
 // =============================================================================
 
 use aiken/collection/list
-use aiken/crypto.{VerificationKeyHash}
-use cardano/assets.{PolicyId, AssetName, Value, quantity_of}
+use aiken/crypto.{VerificationKeyHash, blake2b_256}
+use aiken/interval
+use aiken/primitive/bytearray
+use cardano/address
+use cardano/assets.{PolicyId, AssetName, Value, quantity_of, flatten}
 use cardano/transaction.{Transaction, Input, Output, OutputReference, InlineDatum}
 use ultralife/types.{
-  PnftDatum, VerificationLevel, Standard, Verified, Steward,
+  PnftDatum, VerificationLevel, Basic, Ward, Standard, Verified, Steward,
   CompoundFlow, CompoundBalance,
 }
 
@@ -669,7 +672,52 @@ fn validate_mark_sold(
 // =============================================================================
 
 fn find_signer_pnft(tx: Transaction, pnft_policy: PolicyId) -> Option<PnftData> {
-  None // Simplified
+  // Find a pNFT in inputs or reference inputs whose owner has signed
+  let from_inputs = list.find_map(tx.inputs, fn(input) {
+    when input.output.datum is {
+      InlineDatum(data) -> {
+        expect datum: PnftDatum = data
+        if list.has(tx.extra_signatories, datum.owner) &&
+           quantity_of(input.output.value, pnft_policy, datum.pnft_id) == 1 {
+          Some(PnftData {
+            pnft_id: datum.pnft_id,
+            owner: datum.owner,
+            level: datum.level,
+            bioregion: datum.bioregion,
+          })
+        } else {
+          None
+        }
+      }
+      _ -> None
+    }
+  })
+
+  when from_inputs is {
+    Some(d) -> Some(d)
+    None -> {
+      // Check reference inputs
+      list.find_map(tx.reference_inputs, fn(input) {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            if list.has(tx.extra_signatories, datum.owner) &&
+               quantity_of(input.output.value, pnft_policy, datum.pnft_id) == 1 {
+              Some(PnftData {
+                pnft_id: datum.pnft_id,
+                owner: datum.owner,
+                level: datum.level,
+                bioregion: datum.bioregion,
+              })
+            } else {
+              None
+            }
+          }
+          _ -> None
+        }
+      })
+    }
+  }
 }
 
 type PnftData {
@@ -680,15 +728,36 @@ type PnftData {
 }
 
 fn verification_level_gte(a: VerificationLevel, b: VerificationLevel) -> Bool {
-  True // Simplified
+  // Compare verification levels: Basic < Ward < Standard < Verified < Steward
+  let level_to_int = fn(level: VerificationLevel) -> Int {
+    when level is {
+      Basic -> 0
+      Ward -> 1
+      Standard -> 2
+      Verified -> 3
+      Steward -> 4
+    }
+  }
+  level_to_int(a) >= level_to_int(b)
 }
 
 fn get_current_slot(tx: Transaction) -> Int {
-  0 // Simplified
+  // Extract current slot from transaction validity range
+  when tx.validity_range.lower_bound.bound_type is {
+    interval.Finite(slot) -> slot
+    _ -> {
+      when tx.validity_range.upper_bound.bound_type is {
+        interval.Finite(slot) -> slot
+        _ -> 0
+      }
+    }
+  }
 }
 
 fn generate_listing_id(seller: AssetName, timestamp: Int) -> ByteArray {
-  "" // Simplified
+  // Generate unique listing ID from seller pNFT and timestamp
+  let timestamp_bytes = bytearray.from_int_big_endian(timestamp, 8)
+  blake2b_256(bytearray.concat(seller, timestamp_bytes))
 }
 
 fn get_bioregion(pnft: PnftData) -> ByteArray {
@@ -699,15 +768,63 @@ fn get_bioregion(pnft: PnftData) -> ByteArray {
 }
 
 fn verify_fee_paid(tx: Transaction, amount: Int, treasury: ByteArray, token_policy: PolicyId) -> Bool {
-  True // Simplified
+  // Verify that the listing fee is paid to the treasury
+  list.any(tx.outputs, fn(output) {
+    when output.address.payment_credential is {
+      address.Script(hash) -> {
+        hash == treasury &&
+        list.any(assets.flatten(output.value), fn(asset) {
+          let (p, _, qty) = asset
+          p == token_policy && qty >= amount
+        })
+      }
+      _ -> False
+    }
+  })
 }
 
 fn verify_asset_ownership(tx: Transaction, asset: AssetName, owner: AssetName, config: MarketplaceConfig) -> Bool {
-  True // Simplified
+  // Verify that the owner pNFT holder controls the asset
+  // Check inputs for asset ownership
+  list.any(tx.inputs, fn(input) {
+    // Input must have the asset
+    let has_asset = quantity_of(input.output.value, config.token_policy, asset) >= 1
+    // And be associated with the owner pNFT
+    let owned_by = when input.output.datum is {
+      InlineDatum(data) -> {
+        expect datum: PnftDatum = data
+        datum.pnft_id == owner
+      }
+      _ -> False
+    }
+    has_asset && owned_by
+  }) || list.any(tx.reference_inputs, fn(input) {
+    // Also check reference inputs for ownership proof
+    let has_asset = quantity_of(input.output.value, config.token_policy, asset) >= 1
+    let owned_by = when input.output.datum is {
+      InlineDatum(data) -> {
+        expect datum: PnftDatum = data
+        datum.pnft_id == owner
+      }
+      _ -> False
+    }
+    has_asset && owned_by
+  })
 }
 
 fn find_listing_output(outputs: List<Output>) -> Option<Output> {
-  None // Simplified
+  list.find(outputs, fn(output) {
+    when output.datum is {
+      InlineDatum(data) -> {
+        expect market_datum: MarketplaceDatum = data
+        when market_datum is {
+          Listing(_) -> True
+          _ -> False
+        }
+      }
+      _ -> False
+    }
+  })
 }
 
 fn option_or(opt: Option<a>, default: a) -> a {
@@ -718,21 +835,167 @@ fn option_or(opt: Option<a>, default: a) -> a {
 }
 
 fn validate_pause_listing(tx: Transaction, datum: Option<MarketplaceDatum>, listing_id: ByteArray, reason: Option<ByteArray>, config: MarketplaceConfig) -> Bool {
-  True // Simplified
+  // 1. Get existing listing
+  expect Some(Listing(listing)) = datum
+  expect listing.listing_id == listing_id
+
+  // 2. Must be active
+  expect listing.status == Active
+
+  // 3. Seller must sign
+  let seller_pnft = find_signer_pnft(tx, config.pnft_policy)
+  expect Some(seller) = seller_pnft
+  expect seller.pnft_id == listing.seller
+  expect list.has(tx.extra_signatories, seller.owner)
+
+  // 4. Verify output has paused status
+  let output = find_listing_output(tx.outputs)
+  expect Some(out) = output
+  expect InlineDatum(data) = out.datum
+  expect Listing(result): MarketplaceDatum = data
+
+  result.listing_id == listing_id &&
+  result.seller == listing.seller &&
+  result.status == Paused { reason: reason }
 }
 
 fn validate_resume_listing(tx: Transaction, datum: Option<MarketplaceDatum>, listing_id: ByteArray, config: MarketplaceConfig) -> Bool {
-  True // Simplified
+  // 1. Get existing listing
+  expect Some(Listing(listing)) = datum
+  expect listing.listing_id == listing_id
+
+  // 2. Must be paused
+  expect Paused { .. } = listing.status
+
+  // 3. Seller must sign
+  let seller_pnft = find_signer_pnft(tx, config.pnft_policy)
+  expect Some(seller) = seller_pnft
+  expect seller.pnft_id == listing.seller
+  expect list.has(tx.extra_signatories, seller.owner)
+
+  // 4. Verify output has active status
+  let output = find_listing_output(tx.outputs)
+  expect Some(out) = output
+  expect InlineDatum(data) = out.datum
+  expect Listing(result): MarketplaceDatum = data
+
+  result.listing_id == listing_id &&
+  result.seller == listing.seller &&
+  result.status == Active
 }
 
 fn validate_cancel_listing(tx: Transaction, datum: Option<MarketplaceDatum>, listing_id: ByteArray, config: MarketplaceConfig) -> Bool {
-  True // Simplified
+  // 1. Get existing listing
+  expect Some(Listing(listing)) = datum
+  expect listing.listing_id == listing_id
+
+  // 2. Must not already be sold or cancelled
+  let can_cancel = when listing.status is {
+    Active -> True
+    Paused { .. } -> True
+    _ -> False
+  }
+  expect can_cancel
+
+  // 3. Seller must sign
+  let seller_pnft = find_signer_pnft(tx, config.pnft_policy)
+  expect Some(seller) = seller_pnft
+  expect seller.pnft_id == listing.seller
+  expect list.has(tx.extra_signatories, seller.owner)
+
+  // 4. Verify output has cancelled status
+  let output = find_listing_output(tx.outputs)
+  expect Some(out) = output
+  expect InlineDatum(data) = out.datum
+  expect Listing(result): MarketplaceDatum = data
+
+  result.listing_id == listing_id &&
+  result.seller == listing.seller &&
+  result.status == Cancelled
 }
 
 fn validate_express_interest(tx: Transaction, datum: Option<MarketplaceDatum>, listing_id: ByteArray, config: MarketplaceConfig) -> Bool {
-  True // Simplified
+  // 1. Get existing listing
+  expect Some(Listing(listing)) = datum
+  expect listing.listing_id == listing_id
+
+  // 2. Must be active
+  expect listing.status == Active
+
+  // 3. Interested party must have pNFT and sign
+  let interested_pnft = find_signer_pnft(tx, config.pnft_policy)
+  expect Some(interested) = interested_pnft
+  expect list.has(tx.extra_signatories, interested.owner)
+
+  // 4. Interested party cannot be the seller
+  expect interested.pnft_id != listing.seller
+
+  // 5. Verify output has incremented interest count
+  let output = find_listing_output(tx.outputs)
+  expect Some(out) = output
+  expect InlineDatum(data) = out.datum
+  expect Listing(result): MarketplaceDatum = data
+
+  result.listing_id == listing_id &&
+  result.interest_count == listing.interest_count + 1 &&
+  result.seller == listing.seller &&
+  result.status == Active
 }
 
 fn validate_update_index(tx: Transaction, datum: Option<MarketplaceDatum>, bioregion: ByteArray, config: MarketplaceConfig) -> Bool {
-  True // Simplified
+  // 1. Authorized updater must sign (Steward level)
+  let updater_pnft = find_signer_pnft(tx, config.pnft_policy)
+  expect Some(updater) = updater_pnft
+  expect updater.level == Steward
+  expect list.has(tx.extra_signatories, updater.owner)
+
+  // 2. Count listings in inputs for this bioregion
+  let listing_counts = list.foldl(tx.reference_inputs, (0, 0, 0, 0, 0), fn(input, acc) {
+    let (products, services, work, sale, rental) = acc
+    when input.output.datum is {
+      InlineDatum(data) -> {
+        expect market_datum: MarketplaceDatum = data
+        when market_datum is {
+          Listing(listing) -> {
+            if listing.bioregion == bioregion && listing.status == Active {
+              when listing.listing_type is {
+                Product { .. } -> (products + 1, services, work, sale, rental)
+                Service { .. } -> (products, services + 1, work, sale, rental)
+                WorkCapacity { .. } -> (products, services, work + 1, sale, rental)
+                AssetSale { .. } -> (products, services, work, sale + 1, rental)
+                AssetRental { .. } -> (products, services, work, sale, rental + 1)
+              }
+            } else {
+              acc
+            }
+          }
+          _ -> acc
+        }
+      }
+      _ -> acc
+    }
+  })
+
+  let (product_count, service_count, work_count, asset_sale_count, asset_rental_count) = listing_counts
+
+  // 3. Verify output index has correct counts
+  list.any(tx.outputs, fn(output) {
+    when output.datum is {
+      InlineDatum(data) -> {
+        expect market_datum: MarketplaceDatum = data
+        when market_datum is {
+          Index(idx) -> {
+            idx.bioregion == bioregion &&
+            idx.product_count == product_count &&
+            idx.service_count == service_count &&
+            idx.work_count == work_count &&
+            idx.asset_sale_count == asset_sale_count &&
+            idx.asset_rental_count == asset_rental_count
+          }
+          _ -> False
+        }
+      }
+      _ -> False
+    }
+  })
 }

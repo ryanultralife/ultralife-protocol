@@ -412,6 +412,7 @@ fn verify_impact_datum(
 
 fn verify_impact_owner_signed(tx: Transaction, policy: PolicyId) -> Bool {
   // Impact token owner must have signed
+  // Find the impact token in inputs and verify the holder (issuer's pNFT owner) signed
   list.any(tx.inputs, fn(input) {
     let has_impact = list.any(flatten(input.output.value), fn(asset) {
       let (p, _, qty) = asset
@@ -421,8 +422,37 @@ fn verify_impact_owner_signed(tx: Transaction, policy: PolicyId) -> Bool {
       when input.output.datum is {
         InlineDatum(data) -> {
           expect datum: ImpactDatum = data
-          // Check issuer's owner signed
-          True  // Simplified - full impl checks pNFT
+          // Find the issuer's pNFT in reference inputs to get owner
+          let issuer_pnft = list.find_map(tx.reference_inputs, fn(ref_input) {
+            when ref_input.output.datum is {
+              InlineDatum(ref_data) -> {
+                expect pnft_datum: PnftDatum = ref_data
+                if pnft_datum.pnft_id == datum.issuer {
+                  Some(pnft_datum.owner)
+                } else {
+                  None
+                }
+              }
+              _ -> None
+            }
+          })
+          // Verify the issuer's owner signed the transaction
+          when issuer_pnft is {
+            Some(owner) -> list.has(tx.extra_signatories, owner)
+            None -> {
+              // Fallback: check if any signer owns the pNFT in inputs
+              list.any(tx.inputs, fn(pnft_input) {
+                when pnft_input.output.datum is {
+                  InlineDatum(pnft_data) -> {
+                    expect pnft_datum: PnftDatum = pnft_data
+                    pnft_datum.pnft_id == datum.issuer &&
+                    list.has(tx.extra_signatories, pnft_datum.owner)
+                  }
+                  _ -> False
+                }
+              })
+            }
+          }
         }
         _ -> False
       }
