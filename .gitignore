@@ -31,3 +31,4 @@ Thumbs.db
 scripts/e2e-test-results.json
 scripts/interaction-test-results.json
 scripts/e2e-results.json
+scripts/error-test-results.json
