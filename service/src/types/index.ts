@@ -306,6 +306,289 @@ export interface MachineryNftDatum {
 }
 
 // =============================================================================
+// DIGITAL ASSET TWIN & AUTOMATION CONTROL
+// =============================================================================
+//
+// Every physical asset can have a digital record with:
+// 1. All attributes stored innately on-chain
+// 2. Complete service history queryable from ledger
+// 3. Automation control endpoints
+//
+// No scanning required - query the ledger to see past services.
+// Same interface can control IoT/automations on the asset.
+//
+// =============================================================================
+
+export type AssetCategory =
+  | 'Land'
+  | 'Building'
+  | 'Vehicle'
+  | 'Machinery'
+  | 'Equipment'
+  | 'Infrastructure'
+  | 'Appliance';
+
+export interface DigitalAssetTwin {
+  // Identity
+  asset_id: AssetName;
+  category: AssetCategory;
+  owner_pnft: AssetName;
+
+  // Physical attributes (stored innately, no scanning needed)
+  attributes: AssetAttributes;
+
+  // Service history (readable directly from ledger)
+  service_history_ref: ByteArray;  // Contract address for service records
+
+  // Automation control (IoT endpoints)
+  automations: AutomationEndpoint[];
+
+  // Access control for automations
+  automation_permissions: AutomationPermission[];
+}
+
+export interface AssetAttributes {
+  // Common attributes
+  name: string;
+  description_hash: ByteArray;  // IPFS hash for detailed specs
+  location: LocationScope;
+  acquired_at: number;
+
+  // Category-specific attributes
+  specs: AssetSpecs;
+
+  // Current state (updated by sensors/IoT)
+  current_state: AssetState | null;
+}
+
+export type AssetSpecs =
+  | { type: 'Land'; parcel_id: ByteArray; area_sqm: number; zoning: string; coordinates: GeoCoordinates }
+  | { type: 'Building'; structure_type: string; floors: number; area_sqm: number; year_built: number; land_parcel: AssetName }
+  | { type: 'Vehicle'; vin_hash: ByteArray; make: string; model: string; year: number; fuel_type: string }
+  | { type: 'Machinery'; serial_hash: ByteArray; machinery_class: string; capacity: number; power_kw: number }
+  | { type: 'Equipment'; serial_hash: ByteArray; equipment_type: string; specs_hash: ByteArray }
+  | { type: 'Infrastructure'; infra_type: string; capacity: number; connected_assets: AssetName[] }
+  | { type: 'Appliance'; model: string; power_w: number; smart_enabled: boolean };
+
+export interface GeoCoordinates {
+  latitude: number;
+  longitude: number;
+  altitude_m?: number;
+}
+
+export interface AssetState {
+  // Updated by IoT sensors or manual input
+  last_updated: number;
+  status: 'Active' | 'Idle' | 'Maintenance' | 'Offline';
+  sensor_readings: SensorReading[];
+  alerts: AssetAlert[];
+}
+
+export interface SensorReading {
+  sensor_id: ByteArray;
+  sensor_type: SensorType;
+  value: number;
+  unit: string;
+  timestamp: number;
+}
+
+export type SensorType =
+  | 'Temperature'
+  | 'Humidity'
+  | 'Pressure'
+  | 'Power'
+  | 'Fuel'
+  | 'Speed'
+  | 'Location'
+  | 'Occupancy'
+  | 'Flow'
+  | 'Level'
+  | 'Vibration'
+  | 'Custom';
+
+export interface AssetAlert {
+  alert_id: ByteArray;
+  severity: 'Info' | 'Warning' | 'Critical';
+  message_hash: ByteArray;
+  triggered_at: number;
+  acknowledged: boolean;
+}
+
+// =============================================================================
+// AUTOMATION CONTROL
+// =============================================================================
+//
+// Control IoT devices and automations from the same LLM interface.
+// "Turn off the lights in the barn" → LLM → MCP → Blockchain → IoT endpoint
+//
+// =============================================================================
+
+export interface AutomationEndpoint {
+  endpoint_id: ByteArray;
+  name: string;
+  device_type: DeviceType;
+
+  // Connection details (encrypted, only owner can decrypt)
+  connection_hash: ByteArray;  // Encrypted endpoint URL/protocol
+
+  // Available commands
+  commands: AutomationCommand[];
+
+  // Current state (if readable)
+  readable: boolean;
+  current_value?: string;
+}
+
+export type DeviceType =
+  | 'Light'
+  | 'HVAC'
+  | 'Lock'
+  | 'Gate'
+  | 'Irrigation'
+  | 'Generator'
+  | 'Pump'
+  | 'Sensor'
+  | 'Camera'
+  | 'Alarm'
+  | 'Thermostat'
+  | 'Switch'
+  | 'Motor'
+  | 'Valve'
+  | 'Custom';
+
+export interface AutomationCommand {
+  command_id: ByteArray;
+  name: string;
+  description: string;
+
+  // Parameters for the command
+  parameters: CommandParameter[];
+
+  // Impact estimation (if command has environmental impact)
+  estimated_impact?: CompoundFlow[];
+}
+
+export interface CommandParameter {
+  name: string;
+  param_type: 'Boolean' | 'Number' | 'String' | 'Enum';
+  required: boolean;
+  default_value?: string;
+  enum_values?: string[];  // For Enum type
+  min?: number;  // For Number type
+  max?: number;  // For Number type
+}
+
+export interface AutomationPermission {
+  // Who can control this automation
+  permitted_pnft: AssetName;
+
+  // What commands they can execute
+  allowed_commands: ByteArray[];  // Empty = all commands
+
+  // Time restrictions
+  time_restrictions?: TimeRestriction;
+
+  // Granted by owner
+  granted_by: AssetName;
+  granted_at: number;
+  expires_at?: number;
+}
+
+export interface TimeRestriction {
+  // Only allow control during these hours (0-23)
+  allowed_hours?: { start: number; end: number };
+
+  // Only on these days (0=Sunday, 6=Saturday)
+  allowed_days?: number[];
+}
+
+// =============================================================================
+// AUTOMATION EXECUTION RECORD
+// =============================================================================
+
+export interface AutomationExecution {
+  execution_id: ByteArray;
+  asset_id: AssetName;
+  endpoint_id: ByteArray;
+  command_id: ByteArray;
+
+  // Who executed
+  executed_by: AssetName;
+  executed_at: number;
+
+  // Parameters used
+  parameters: Record<string, string>;
+
+  // Result
+  success: boolean;
+  result_hash?: ByteArray;  // Result details on IPFS
+
+  // Impact if any
+  actual_impact?: CompoundFlow[];
+}
+
+// =============================================================================
+// ASSET SERVICE HISTORY QUERY
+// =============================================================================
+//
+// Query past services directly from ledger - no scanning needed.
+// The ledger IS the record of all services performed on the asset.
+//
+// =============================================================================
+
+export interface AssetServiceQuery {
+  asset_id: AssetName;
+
+  // Filter options
+  service_types?: string[];
+  performer_pnft?: AssetName;
+  date_range?: { from: number; to: number };
+
+  // Pagination
+  limit?: number;
+  offset?: number;
+}
+
+export interface AssetServiceHistory {
+  asset_id: AssetName;
+  owner: AssetName;
+
+  // Complete service record from ledger
+  services: ServiceRecord[];
+
+  // Aggregated stats
+  total_services: number;
+  total_spend: bigint;
+  total_impact: CompoundBalance[];
+
+  // Last service
+  last_service_at: number;
+}
+
+export interface ServiceRecord {
+  service_id: ByteArray;
+  service_type: string;
+  performer: AssetName;
+  performed_at: number;
+
+  // What was done
+  description_hash: ByteArray;
+
+  // Payment
+  amount_paid: bigint;
+
+  // Verification
+  verification_method: string;
+  verified_by?: AssetName[];
+
+  // Impact
+  impact: CompoundFlow[];
+
+  // Evidence
+  evidence_hash?: ByteArray;
+}
+
+// =============================================================================
 // NEEDS
 // =============================================================================
 
