@@ -1173,3 +1173,358 @@ test verification_levels_ordered() {
   voting_weight(Standard) < voting_weight(Verified) &&
   voting_weight(Verified) < voting_weight(Steward)
 }
+
+// =============================================================================
+// HASH-BASED ACCESS CONTROL
+// =============================================================================
+//
+// Stores only hashes on-chain (tiny transactions).
+// Actual content stored off-chain (IPFS/Arweave).
+// Owner grants time-limited access to view actual files.
+// LLM interface generates viewable formats (JPEG, JSON, etc.) on demand.
+//
+// =============================================================================
+
+/// Types of content that can be stored off-chain
+pub type ContentType {
+  Document        // PDF, contracts, agreements
+  Image           // JPEG, PNG, photos
+  Video           // MP4, recordings
+  Audio           // MP3, voice memos
+  DataFile        // JSON, CSV, structured data
+  Model3D         // CAD, 3D scans
+  Certificate     // Credentials, certifications
+  Evidence        // Work completion proofs
+  Medical         // Health records (extra privacy)
+  Financial       // Bank statements, invoices
+  Legal           // Legal documents
+  Identity        // ID documents
+  Custom { type_code: ByteArray }
+}
+
+/// Storage networks for off-chain content
+pub type StorageNetwork {
+  IPFS
+  Arweave
+  Filecoin
+  PrivateStorage
+}
+
+/// Content reference — only the hash goes on-chain
+pub type ContentReference {
+  /// The hash that goes on-chain (32 bytes)
+  content_hash: ByteArray,
+  /// What type of content
+  content_type: ContentType,
+  /// Size in bytes (for optimization)
+  size_bytes: Int,
+  /// Where it's stored
+  storage_network: StorageNetwork,
+  /// Is it encrypted?
+  encrypted: Bool,
+  /// Who owns this content
+  owner_pnft: AssetName,
+  /// When registered
+  registered_at: Int,
+  /// Linked asset (optional)
+  linked_asset: Option<AssetName>,
+  /// Linked agreement (optional)
+  linked_agreement: Option<ByteArray>,
+}
+
+/// Grant duration presets
+pub type GrantDuration {
+  /// Fixed hours: 1, 2, 4, 8, 12, or 24
+  Hours { hours: Int }
+  /// Fixed days: 1, 3, 7, 14, or 30
+  Days { days: Int }
+  /// Tied to work contract duration
+  WorkContract { agreement_id: ByteArray }
+  /// Never expires
+  Permanent
+  /// One-time view only
+  SingleView
+  /// Custom expiry timestamp
+  Custom { expires_at: Int }
+}
+
+/// Access level for granted content
+pub type AccessLevel {
+  ViewOnly      // Can view but not download
+  Download      // Can download a copy
+  Share         // Can share with others (limited)
+  Full          // Full access including resharing
+}
+
+/// Access grant — permission to view content behind a hash
+/// This is what goes on-chain (small datum)
+pub type AccessGrant {
+  /// Unique grant ID
+  grant_id: ByteArray,
+  /// Content hash being granted access to
+  content_hash: ByteArray,
+  /// Who is granted access
+  grantee_pnft: AssetName,
+  /// Who granted access
+  grantor_pnft: AssetName,
+  /// Duration type
+  duration: GrantDuration,
+  /// When granted
+  granted_at: Int,
+  /// When expires (None = permanent)
+  expires_at: Option<Int>,
+  /// Access level
+  access_level: AccessLevel,
+  /// Whether revoked
+  revoked: Bool,
+  /// View count
+  view_count: Int,
+  /// Max views allowed (None = unlimited)
+  max_views: Option<Int>,
+  /// Linked work agreement (if auto-granted)
+  work_agreement_id: Option<ByteArray>,
+}
+
+/// Batch grant for multiple contents at once
+pub type BatchAccessGrant {
+  batch_id: ByteArray,
+  content_hashes: List<ByteArray>,
+  grantee_pnft: AssetName,
+  grantor_pnft: AssetName,
+  duration: GrantDuration,
+  access_level: AccessLevel,
+  granted_at: Int,
+  expires_at: Option<Int>,
+  work_agreement_id: Option<ByteArray>,
+}
+
+/// Work contract access integration
+/// Auto-grants when work contract is created
+pub type WorkContractAccessGrants {
+  /// The work agreement this is attached to
+  agreement_id: ByteArray,
+  /// Grants from client to worker (e.g., specs, requirements)
+  grants_client_to_worker: List<ContentReference>,
+  /// Grants from worker to client (e.g., deliverables)
+  grants_worker_to_client: List<ContentReference>,
+  /// Additional grants on verification (unlocked on completion)
+  on_verification_grants: List<ContentReference>,
+}
+
+/// Access grant redeemer actions
+pub type AccessGrantRedeemer {
+  /// Grant access to content
+  GrantAccess {
+    content_hash: ByteArray,
+    grantee: AssetName,
+    duration: GrantDuration,
+    access_level: AccessLevel,
+  }
+  /// Revoke existing access
+  RevokeAccess {
+    grant_id: ByteArray,
+    reason_hash: Option<ByteArray>,
+  }
+  /// Extend access duration
+  ExtendAccess {
+    grant_id: ByteArray,
+    new_expiry: Int,
+  }
+  /// Transfer content ownership
+  TransferOwnership {
+    content_hash: ByteArray,
+    new_owner: AssetName,
+  }
+  /// Batch grant to multiple contents
+  BatchGrant {
+    content_hashes: List<ByteArray>,
+    grantee: AssetName,
+    duration: GrantDuration,
+  }
+  /// Auto-grant from work contract
+  WorkContractGrant {
+    agreement_id: ByteArray,
+  }
+  /// Record a view (increments view_count)
+  RecordView {
+    grant_id: ByteArray,
+  }
+}
+
+/// Output format for LLM view generation
+pub type OutputFormat {
+  JSON
+  JPEG
+  PNG
+  PDF
+  Markdown
+  PlainText
+  HTML
+  CSV
+  Summary       // LLM-generated summary
+  Thumbnail     // Small preview
+}
+
+/// View request for LLM to generate viewable content
+pub type ViewRequest {
+  content_hash: ByteArray,
+  requester_pnft: AssetName,
+  output_format: OutputFormat,
+  /// For paginated content
+  page: Option<Int>,
+  page_size: Option<Int>,
+}
+
+/// Access log entry for audit trail
+pub type AccessLogEntry {
+  log_id: ByteArray,
+  content_hash: ByteArray,
+  accessor_pnft: AssetName,
+  access_type: AccessType,
+  accessed_at: Int,
+  output_format: OutputFormat,
+  success: Bool,
+}
+
+pub type AccessType {
+  View
+  Download
+  ShareAction
+}
+
+// =============================================================================
+// ACCESS CONTROL HELPER FUNCTIONS
+// =============================================================================
+
+/// Calculate expiry slot from grant duration
+pub fn calculate_expiry(duration: GrantDuration, start_slot: Int, slots_per_hour: Int) -> Option<Int> {
+  when duration is {
+    Hours { hours } -> Some(start_slot + hours * slots_per_hour)
+    Days { days } -> Some(start_slot + days * 24 * slots_per_hour)
+    Permanent -> None
+    SingleView -> Some(start_slot + 24 * slots_per_hour)  // 24hr max for single view
+    Custom { expires_at } -> Some(expires_at)
+    WorkContract { .. } -> None  // Resolved by work contract
+  }
+}
+
+/// Check if an access grant is currently valid
+pub fn is_grant_valid(grant: AccessGrant, current_slot: Int) -> Bool {
+  // Not revoked
+  !grant.revoked &&
+  // Not expired (if has expiry)
+  (when grant.expires_at is {
+    None -> True
+    Some(exp) -> current_slot <= exp
+  }) &&
+  // Not over view limit (if has limit)
+  (when grant.max_views is {
+    None -> True
+    Some(max) -> grant.view_count < max
+  })
+}
+
+/// Check if grantor owns the content
+pub fn can_grant_access(content: ContentReference, grantor: AssetName) -> Bool {
+  content.owner_pnft == grantor
+}
+
+/// Increment view count on grant
+pub fn record_view(grant: AccessGrant, slot: Int) -> AccessGrant {
+  AccessGrant {
+    ..grant,
+    view_count: grant.view_count + 1,
+  }
+}
+
+// =============================================================================
+// ACCESS CONTROL TESTS
+// =============================================================================
+
+test grant_duration_hours_expiry() {
+  let start = 1000
+  let slots_per_hour = 3600
+  calculate_expiry(Hours { hours: 8 }, start, slots_per_hour) == Some(1000 + 8 * 3600)
+}
+
+test grant_duration_days_expiry() {
+  let start = 1000
+  let slots_per_hour = 3600
+  calculate_expiry(Days { days: 7 }, start, slots_per_hour) == Some(1000 + 7 * 24 * 3600)
+}
+
+test grant_duration_permanent_no_expiry() {
+  calculate_expiry(Permanent, 1000, 3600) == None
+}
+
+test valid_grant_not_revoked() {
+  let grant = AccessGrant {
+    grant_id: "test",
+    content_hash: "hash",
+    grantee_pnft: "grantee",
+    grantor_pnft: "grantor",
+    duration: Permanent,
+    granted_at: 1000,
+    expires_at: None,
+    access_level: ViewOnly,
+    revoked: False,
+    view_count: 0,
+    max_views: None,
+    work_agreement_id: None,
+  }
+  is_grant_valid(grant, 2000)
+}
+
+test invalid_grant_revoked() {
+  let grant = AccessGrant {
+    grant_id: "test",
+    content_hash: "hash",
+    grantee_pnft: "grantee",
+    grantor_pnft: "grantor",
+    duration: Permanent,
+    granted_at: 1000,
+    expires_at: None,
+    access_level: ViewOnly,
+    revoked: True,
+    view_count: 0,
+    max_views: None,
+    work_agreement_id: None,
+  }
+  !is_grant_valid(grant, 2000)
+}
+
+test invalid_grant_expired() {
+  let grant = AccessGrant {
+    grant_id: "test",
+    content_hash: "hash",
+    grantee_pnft: "grantee",
+    grantor_pnft: "grantor",
+    duration: Hours { hours: 8 },
+    granted_at: 1000,
+    expires_at: Some(1500),
+    access_level: ViewOnly,
+    revoked: False,
+    view_count: 0,
+    max_views: None,
+    work_agreement_id: None,
+  }
+  !is_grant_valid(grant, 2000)
+}
+
+test invalid_grant_max_views_reached() {
+  let grant = AccessGrant {
+    grant_id: "test",
+    content_hash: "hash",
+    grantee_pnft: "grantee",
+    grantor_pnft: "grantor",
+    duration: Permanent,
+    granted_at: 1000,
+    expires_at: None,
+    access_level: ViewOnly,
+    revoked: False,
+    view_count: 5,
+    max_views: Some(5),
+    work_agreement_id: None,
+  }
+  !is_grant_valid(grant, 2000)
+}

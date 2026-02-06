@@ -1172,3 +1172,366 @@ export interface UltraLifeConfig {
   contracts: ContractAddresses;
   referenceScripts: ReferenceScripts;
 }
+
+// =============================================================================
+// HASH-BASED ACCESS CONTROL & CONTENT REGISTRY
+// =============================================================================
+//
+// Stores only hashes on-chain (tiny transactions).
+// Actual content stored off-chain (IPFS/Arweave).
+// Owner grants time-limited access to view actual files.
+// LLM interface can generate viewable formats (JPEG, JSON, etc.) on demand.
+//
+// =============================================================================
+
+/**
+ * Content types that can be stored off-chain and referenced by hash
+ */
+export type ContentType =
+  | 'Document'      // PDF, contracts, agreements
+  | 'Image'         // JPEG, PNG, photos
+  | 'Video'         // MP4, recordings
+  | 'Audio'         // MP3, voice memos
+  | 'Data'          // JSON, CSV, structured data
+  | 'Model3D'       // CAD, 3D scans of assets
+  | 'Certificate'   // Credentials, certifications
+  | 'Evidence'      // Work completion proofs
+  | 'Medical'       // Health records (extra privacy)
+  | 'Financial'     // Bank statements, invoices
+  | 'Legal'         // Legal documents
+  | 'Identity'      // ID documents
+  | 'Custom';
+
+/**
+ * Content stored off-chain, referenced by hash on-chain
+ * Only the hash goes in transactions - keeps them tiny
+ */
+export interface ContentReference {
+  // The hash that goes on-chain (32 bytes)
+  content_hash: ByteArray;
+
+  // What type of content this is
+  content_type: ContentType;
+
+  // Size in bytes (for network optimization)
+  size_bytes: number;
+
+  // Storage location hint (not the actual URL, just the network)
+  storage_network: 'IPFS' | 'Arweave' | 'Filecoin' | 'Private';
+
+  // Encryption info
+  encrypted: boolean;
+  encryption_type?: 'AES256' | 'ChaCha20' | 'RSA' | 'Threshold';
+
+  // Who owns this content
+  owner_pnft: AssetName;
+
+  // When it was registered
+  registered_at: number;
+
+  // Optional: linked asset or agreement
+  linked_asset?: AssetName;
+  linked_agreement?: ByteArray;
+
+  // Human-readable description hash (also stored off-chain)
+  description_hash?: ByteArray;
+}
+
+/**
+ * Grant duration presets
+ */
+export type GrantDuration =
+  | { type: 'Hours'; hours: 1 | 2 | 4 | 8 | 12 | 24 }
+  | { type: 'Days'; days: 1 | 3 | 7 | 14 | 30 }
+  | { type: 'WorkContract'; agreement_id: ByteArray }  // Tied to work contract duration
+  | { type: 'Permanent' }                              // Never expires
+  | { type: 'SingleView' }                             // One-time access
+  | { type: 'Custom'; expires_at: number };            // Custom expiry timestamp
+
+/**
+ * Access grant - permission to view content behind a hash
+ * This is what goes on-chain (small datum)
+ */
+export interface AccessGrant {
+  grant_id: ByteArray;
+
+  // What content is being accessed
+  content_hash: ByteArray;
+
+  // Who is granted access
+  grantee_pnft: AssetName;
+
+  // Who granted access
+  grantor_pnft: AssetName;
+
+  // Duration/expiry
+  duration: GrantDuration;
+  granted_at: number;
+  expires_at: number | null;  // null = permanent
+
+  // Access level
+  access_level: AccessLevel;
+
+  // Revocation
+  revoked: boolean;
+  revoked_at?: number;
+  revoke_reason_hash?: ByteArray;
+
+  // Usage tracking
+  view_count: number;
+  last_viewed_at?: number;
+  max_views?: number;  // Optional view limit
+
+  // Linked to work contract?
+  work_agreement_id?: ByteArray;
+}
+
+export type AccessLevel =
+  | 'ViewOnly'           // Can view but not download
+  | 'Download'           // Can download a copy
+  | 'Share'              // Can share with others (limited)
+  | 'Full';              // Full access including resharing
+
+/**
+ * Batch grant - grant access to multiple contents at once
+ * Useful when work contract gives access to many files
+ */
+export interface BatchAccessGrant {
+  batch_id: ByteArray;
+
+  // Multiple content hashes
+  content_hashes: ByteArray[];
+
+  // Single grantee
+  grantee_pnft: AssetName;
+  grantor_pnft: AssetName;
+
+  // Shared settings for all
+  duration: GrantDuration;
+  access_level: AccessLevel;
+  granted_at: number;
+  expires_at: number | null;
+
+  // Link to agreement
+  work_agreement_id?: ByteArray;
+}
+
+/**
+ * Work contract access grant integration
+ * When a work contract is created, these accesses are auto-granted
+ */
+export interface WorkContractAccessGrants {
+  agreement_id: ByteArray;
+
+  // Grants from party_a to party_b (e.g., client shares specs with worker)
+  grants_a_to_b: ContentReference[];
+
+  // Grants from party_b to party_a (e.g., worker will share deliverables)
+  grants_b_to_a: ContentReference[];
+
+  // When work is verified, these additional grants unlock
+  on_verification_grants: ContentReference[];
+
+  // Grant duration tied to agreement
+  grant_duration: GrantDuration;
+}
+
+// =============================================================================
+// LLM-ACCESSIBLE VIEW GENERATION
+// =============================================================================
+//
+// The LLM interface generates viewable files on demand when access is valid.
+// This keeps on-chain data minimal while allowing rich content viewing.
+//
+// =============================================================================
+
+/**
+ * Request format for LLM to generate a viewable file
+ */
+export interface ViewRequest {
+  // What to view
+  content_hash: ByteArray;
+
+  // Who is requesting
+  requester_pnft: AssetName;
+
+  // Preferred output format
+  output_format: OutputFormat;
+
+  // For paginated content
+  page?: number;
+  page_size?: number;
+
+  // For images - resize options
+  max_width?: number;
+  max_height?: number;
+
+  // For data - query/filter
+  query?: string;
+  fields?: string[];
+}
+
+export type OutputFormat =
+  | 'JSON'              // Structured data
+  | 'JPEG'              // Compressed image
+  | 'PNG'               // Lossless image
+  | 'PDF'               // Document
+  | 'Markdown'          // Text with formatting
+  | 'PlainText'         // Simple text
+  | 'HTML'              // Rich text
+  | 'CSV'               // Tabular data
+  | 'Summary'           // LLM-generated summary
+  | 'Thumbnail';        // Small preview image
+
+/**
+ * Response from LLM view generation
+ */
+export interface ViewResponse {
+  // Request info
+  content_hash: ByteArray;
+  requester_pnft: AssetName;
+
+  // Access validation
+  access_valid: boolean;
+  access_expires_at?: number;
+  remaining_views?: number;
+
+  // Generated content (if access valid)
+  output_format: OutputFormat;
+  generated_content?: string;  // Base64 for binary, raw for text
+
+  // Metadata
+  generated_at: number;
+  content_type: ContentType;
+  original_size_bytes: number;
+
+  // Error info (if access denied)
+  error?: ViewError;
+}
+
+export type ViewError =
+  | { type: 'NoAccess' }
+  | { type: 'Expired'; expired_at: number }
+  | { type: 'Revoked'; revoked_at: number }
+  | { type: 'ViewLimitReached'; max_views: number }
+  | { type: 'ContentNotFound' }
+  | { type: 'DecryptionFailed' }
+  | { type: 'FormatNotSupported'; requested: OutputFormat; available: OutputFormat[] };
+
+/**
+ * Content preview - LLM can generate these for quick browsing
+ */
+export interface ContentPreview {
+  content_hash: ByteArray;
+  content_type: ContentType;
+
+  // Auto-generated preview
+  thumbnail?: string;           // Base64 small image
+  summary?: string;             // Text summary (LLM generated)
+  key_fields?: Record<string, string>;  // Important metadata
+
+  // Access info
+  has_access: boolean;
+  access_expires_at?: number;
+
+  // Preview generated at
+  generated_at: number;
+}
+
+// =============================================================================
+// ACCESS CONTROL VALIDATOR ACTIONS
+// =============================================================================
+
+export type AccessGrantRedeemer =
+  | { GrantAccess: { content_hash: ByteArray; grantee: AssetName; duration: GrantDuration; access_level: AccessLevel } }
+  | { RevokeAccess: { grant_id: ByteArray; reason_hash?: ByteArray } }
+  | { ExtendAccess: { grant_id: ByteArray; new_expiry: number } }
+  | { TransferOwnership: { content_hash: ByteArray; new_owner: AssetName } }
+  | { BatchGrant: { content_hashes: ByteArray[]; grantee: AssetName; duration: GrantDuration } }
+  | { WorkContractGrant: { agreement_id: ByteArray; grants: WorkContractAccessGrants } };
+
+/**
+ * Access log entry - tracks who viewed what when
+ * Used for audit trail and usage analytics
+ */
+export interface AccessLogEntry {
+  log_id: ByteArray;
+  content_hash: ByteArray;
+  accessor_pnft: AssetName;
+  access_type: 'View' | 'Download' | 'Share';
+  accessed_at: number;
+  output_format: OutputFormat;
+  success: boolean;
+  error?: ViewError;
+}
+
+/**
+ * Content registry - owner's view of all their content
+ */
+export interface ContentRegistry {
+  owner_pnft: AssetName;
+
+  // All registered content
+  contents: ContentReference[];
+
+  // All active grants (given by this owner)
+  active_grants: AccessGrant[];
+
+  // All received grants (given to this owner)
+  received_grants: AccessGrant[];
+
+  // Stats
+  total_contents: number;
+  total_active_grants: number;
+  total_views: number;
+}
+
+// =============================================================================
+// HELPER FUNCTIONS FOR ACCESS GRANTS
+// =============================================================================
+
+/**
+ * Calculate expiry timestamp from grant duration
+ */
+export function calculateExpiry(duration: GrantDuration, startTime: number): number | null {
+  switch (duration.type) {
+    case 'Hours':
+      return startTime + (duration.hours * 60 * 60 * 1000);
+    case 'Days':
+      return startTime + (duration.days * 24 * 60 * 60 * 1000);
+    case 'Permanent':
+      return null;
+    case 'SingleView':
+      return startTime + (24 * 60 * 60 * 1000);  // 24hr max for single view
+    case 'Custom':
+      return duration.expires_at;
+    case 'WorkContract':
+      // Expiry tied to agreement - caller must resolve
+      return null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Check if an access grant is currently valid
+ */
+export function isGrantValid(grant: AccessGrant, currentTime: number): boolean {
+  if (grant.revoked) return false;
+  if (grant.expires_at && currentTime > grant.expires_at) return false;
+  if (grant.max_views && grant.view_count >= grant.max_views) return false;
+  return true;
+}
+
+/**
+ * Common grant duration presets
+ */
+export const GRANT_DURATIONS = {
+  QUICK_VIEW: { type: 'Hours', hours: 1 } as GrantDuration,
+  SHORT_ACCESS: { type: 'Hours', hours: 8 } as GrantDuration,
+  DAY_PASS: { type: 'Hours', hours: 24 } as GrantDuration,
+  WEEK_ACCESS: { type: 'Days', days: 7 } as GrantDuration,
+  MONTH_ACCESS: { type: 'Days', days: 30 } as GrantDuration,
+  PERMANENT: { type: 'Permanent' } as GrantDuration,
+  SINGLE_VIEW: { type: 'SingleView' } as GrantDuration,
+} as const;

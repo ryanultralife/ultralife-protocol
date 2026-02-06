@@ -221,6 +221,15 @@ pub type WorkEscrow {
   deadline: Int,
   /// Status
   status: EscrowStatus,
+  // =========================================================================
+  // ACCESS GRANTS - Content shared during work contract
+  // =========================================================================
+  /// Content hashes requester grants worker access to (specs, requirements)
+  requester_content_grants: List<ByteArray>,
+  /// Content hashes worker will grant requester on completion (deliverables)
+  worker_content_grants: List<ByteArray>,
+  /// Additional content unlocked on verification
+  verification_unlocks: List<ByteArray>,
 }
 
 /// Escrow status
@@ -264,6 +273,10 @@ pub type WorkAuctionRedeemer {
     required_certifications: List<ByteArray>,
     bid_deadline: Int,
     work_deadline: Int,
+    /// Content hashes to share with accepted worker (auto-granted on AcceptBid)
+    content_to_share: List<ByteArray>,
+    /// Expected deliverables worker must provide (auto-granted on verification)
+    expected_deliverables: List<ByteArray>,
   }
   /// Cancel request (only if no accepted bid)
   CancelRequest { reason: ByteArray }
@@ -286,7 +299,12 @@ pub type WorkAuctionRedeemer {
   /// Withdraw bid (only if Pending)
   WithdrawBid { bid_id: ByteArray }
   /// Accept bid (requester only)
-  AcceptBid { bid_id: ByteArray }
+  /// This triggers auto-grant of requester's content to worker
+  AcceptBid {
+    bid_id: ByteArray,
+    /// Duration for content access (matches work deadline by default)
+    access_duration_hours: Option<Int>,
+  }
   /// Reject bid (requester only)
   RejectBid { bid_id: ByteArray, reason: Option<ByteArray> }
   
