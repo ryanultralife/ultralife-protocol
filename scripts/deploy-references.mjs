@@ -18,7 +18,7 @@ import {
   BlockfrostProvider,
   MeshWallet,
   MeshTxBuilder,
-  serializePlutusScript,
+  resolvePaymentKeyHash,
 } from '@meshsdk/core';
 import fs from 'fs';
 import path from 'path';
@@ -31,9 +31,14 @@ import {
   selectUtxos,
   validateUtxoSelection,
   estimateFee,
-  calculateRequiredBalance,
   formatAda,
 } from './utils.mjs';
+
+// Centralized config - single source of truth for all validator parameters
+import {
+  applyValidatorParams,
+  getUniqueValidators,
+} from './testnet-config.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -42,15 +47,28 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // =============================================================================
 
 const CONFIG = {
-  network: process.env.NETWORK || 'preview',
+  network: process.env.NETWORK || 'preprod',
   blockfrostKey: process.env.BLOCKFROST_API_KEY,
   walletMnemonic: process.env.WALLET_SEED_PHRASE,
   plutusPath: path.join(__dirname, '..', 'plutus.json'),
   deploymentPath: path.join(__dirname, 'deployment.json'),
 };
 
-// Minimum ADA to lock with reference script (protocol minimum)
-const MIN_REFERENCE_LOVELACE = 25_000_000n; // 25 ADA (safe minimum)
+// Minimum ADA to lock with reference script - calculated dynamically based on script size
+// Formula: coinsPerUTxOByte (4310) * (baseSize + scriptBytes)
+const COINS_PER_UTXO_BYTE = 4310n;
+const BASE_OUTPUT_SIZE = 160n; // Base UTXO overhead
+
+function calculateMinLovelace(scriptHex) {
+  // Script size in bytes (hex string / 2)
+  const scriptBytes = BigInt(Math.ceil(scriptHex.length / 2));
+  // Add overhead for script hash, address, etc.
+  const totalSize = BASE_OUTPUT_SIZE + scriptBytes + 50n; // 50 bytes overhead for reference script
+  // Calculate minimum with 20% safety margin
+  const minUtxo = (COINS_PER_UTXO_BYTE * totalSize * 120n) / 100n;
+  return minUtxo;
+}
+
 
 // =============================================================================
 // UTILITIES
@@ -62,10 +80,6 @@ const log = {
   warn: (msg) => console.log(`⚠️  ${msg}`),
   error: (msg) => console.log(`❌ ${msg}`),
 };
-
-function formatAda(lovelace) {
-  return (Number(lovelace) / 1_000_000).toFixed(6) + ' ADA';
-}
 
 async function waitForConfirmation(provider, txHash, maxAttempts = 60) {
   log.info(`Waiting for confirmation: ${txHash}`);
@@ -91,7 +105,7 @@ async function waitForConfirmation(provider, txHash, maxAttempts = 60) {
 // DEPLOY SINGLE REFERENCE SCRIPT
 // =============================================================================
 
-async function deployReferenceScript(provider, wallet, validator, deployment) {
+async function deployReferenceScript(provider, wallet, validator, deployment, walletPkh) {
   const key = validator.title.replace(/\./g, '_');
 
   // Check if already deployed
@@ -99,8 +113,6 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
     log.info(`${key}: Already deployed at ${deployment.references[key].txHash}`);
     return null;
   }
-
-  log.info(`Deploying: ${validator.title}`);
 
   try {
     const address = wallet.getChangeAddress();
@@ -110,11 +122,20 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
       throw new Error('No UTxOs available. Fund the wallet first.');
     }
 
-    // Build reference script output
-    const script = {
-      code: validator.compiledCode,
-      version: 'V3',
-    };
+    // Apply parameters using centralized config
+    const applied = applyValidatorParams(validator, walletPkh);
+
+    // Skip if params couldn't be applied
+    if (!applied) {
+      throw new Error('Could not apply validator parameters');
+    }
+
+    const { script, encodedScript, scriptHash, config, configTypeName } = applied;
+
+    // Calculate minimum lovelace based on final script size
+    const scriptSizeBytes = Math.ceil(script.length / 2);
+    const minLovelace = calculateMinLovelace(script);
+    log.info(`Deploying: ${validator.title} (${(scriptSizeBytes / 1024).toFixed(1)} KB, min ${formatAda(minLovelace)})`);
 
     // Build transaction
     const txBuilder = new MeshTxBuilder({
@@ -123,12 +144,11 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
       verbose: false,
     });
 
-    // Calculate script size for fee estimation
-    const scriptSize = validator.compiledCode.length / 2; // hex to bytes
-    const estimatedFee = estimateFee('referenceScript', { scriptSize });
+    // Calculate fee estimation
+    const estimatedFee = estimateFee('referenceScript', { scriptSize: scriptSizeBytes });
 
     // Select UTxOs with proper validation
-    const targetAmount = MIN_REFERENCE_LOVELACE + estimatedFee;
+    const targetAmount = minLovelace + estimatedFee;
     const selection = selectUtxos(utxos, targetAmount);
 
     if (!selection.sufficient) {
@@ -139,7 +159,7 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
     }
 
     // Validate selection before building transaction
-    const validation = validateUtxoSelection(selection.selected, MIN_REFERENCE_LOVELACE, estimatedFee);
+    const validation = validateUtxoSelection(selection.selected, minLovelace, estimatedFee);
     if (!validation.valid) {
       throw new Error(`UTxO validation failed: ${validation.errors.join(', ')}`);
     }
@@ -155,14 +175,11 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
       );
     }
 
-    // Add reference script output
-    // Store at a script address derived from the script itself
-    const serialized = serializePlutusScript(script);
-
+    // Add reference script output with CBOR-encoded script
     txBuilder.txOut(address, [
-      { unit: 'lovelace', quantity: MIN_REFERENCE_LOVELACE.toString() }
+      { unit: 'lovelace', quantity: minLovelace.toString() }
     ]);
-    txBuilder.txOutReferenceScript(serialized.code, 'V3');
+    txBuilder.txOutReferenceScript(encodedScript, 'V3');
 
     // Add change output
     txBuilder.changeAddress(address);
@@ -178,15 +195,21 @@ async function deployReferenceScript(provider, wallet, validator, deployment) {
     // Wait for confirmation
     await waitForConfirmation(provider, txHash);
 
+    // Return deployment record with all details needed for future use
     return {
       txHash,
       outputIndex: 0,
-      scriptHash: serialized.address,
+      scriptHash,
+      configTypeName,
+      config,  // Store config for verification
+      scriptSize: scriptSizeBytes,
+      deployedAt: new Date().toISOString(),
     };
 
   } catch (error) {
-    log.error(`Failed to deploy ${validator.title}: ${error.message}`);
-    throw error;
+    const errMsg = error?.message || error?.toString() || JSON.stringify(error) || 'Unknown error';
+    log.error(`Failed to deploy ${validator.title}: ${errMsg}`);
+    throw new Error(errMsg);
   }
 }
 
@@ -253,8 +276,10 @@ async function main() {
   }, 0n);
   log.info(`Balance: ${formatAda(balance)}`);
 
-  // Filter validators to deploy
-  let validators = plutus.validators;
+  // Filter validators to deploy (skip .else duplicates)
+  let validators = getUniqueValidators(plutus.validators);
+  log.info(`Filtered to ${validators.length} unique validators (skipping .else duplicates)`);
+
   if (specificValidator) {
     validators = validators.filter(v =>
       v.title.toLowerCase().includes(specificValidator.toLowerCase())
@@ -267,6 +292,10 @@ async function main() {
 
   log.info(`Validators to deploy: ${validators.length}`);
 
+  // Get wallet's payment key hash for parameterized validators
+  const walletPkh = resolvePaymentKeyHash(address);
+  log.info(`Using wallet PKH for config: ${walletPkh.slice(0, 16)}...`);
+
   // Deploy each validator
   let deployed = 0;
   let skipped = 0;
@@ -276,7 +305,7 @@ async function main() {
     const key = validator.title.replace(/\./g, '_');
 
     try {
-      const result = await deployReferenceScript(provider, wallet, validator, deployment);
+      const result = await deployReferenceScript(provider, wallet, validator, deployment, walletPkh);
 
       if (result) {
         deployment.references[key] = result;

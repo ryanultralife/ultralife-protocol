@@ -1,0 +1,482 @@
+{
+  "protocol": "UltraLife",
+  "version": "1.0.0",
+  "network": "cardano",
+  "spec_url": "https://ultralife.earth/protocol.json",
+  "description": "Impact-tracked economy on Cardano. Every transaction measures compound flows. Land generates sequestration credits. Consumers offset debt.",
+
+  "principles": [
+    "All economic activity has impact (mostly negative extraction)",
+    "No presets - every impact must be measured individually",
+    "Only LAND generates sequestration credits (positive capacity)",
+    "Nature provides - compare against industrial alternatives",
+    "Consumer accumulates all impact debt from purchases",
+    "Confidence reflects measurement quality, not certainty",
+    "Compound relevance emerges from bioregion and population health",
+    "What we track is determined by what needs healing"
+  ],
+
+  "compounds": {
+    "environmental": {
+      "CO2": { "name": "Carbon Dioxide", "unit": "g", "direction": "negative = emission", "example": "-450 for 200g beef transport" },
+      "CH4": { "name": "Methane", "unit": "g", "direction": "negative = emission, 25x CO2 equivalent" },
+      "H2O": { "name": "Water", "unit": "L", "direction": "negative = consumption", "example": "-120 for meat processing" },
+      "N": { "name": "Nitrogen", "unit": "g", "direction": "positive = soil benefit from grazing" },
+      "NO3": { "name": "Nitrate", "unit": "g", "direction": "negative = runoff pollution" },
+      "NH3": { "name": "Ammonia", "unit": "g", "direction": "context dependent" },
+      "NOx": { "name": "Nitrogen Oxides", "unit": "g", "direction": "negative = air emission" },
+      "P": { "name": "Phosphorus", "unit": "g", "direction": "negative = runoff pollution" },
+      "BIO": { "name": "Biodiversity Index", "unit": "idx", "direction": "negative = biodiversity loss" },
+      "SOIL": { "name": "Soil Organic Matter", "unit": "g", "direction": "positive = soil building" },
+      "KWH": { "name": "Energy", "unit": "kWh", "direction": "negative = consumption" }
+    },
+    "nutritional": {
+      "PROT": { "name": "Protein", "unit": "g", "example": "25g from 200g beef" },
+      "FAT": { "name": "Fat", "unit": "g" },
+      "CARB": { "name": "Carbohydrate", "unit": "g" },
+      "FIBER": { "name": "Fiber", "unit": "g" },
+      "B12": { "name": "Vitamin B12", "unit": "mcg", "example": "2.5mcg from 200g beef" },
+      "IRON": { "name": "Iron", "unit": "mg", "example": "3mg from 200g beef" },
+      "ZINC": { "name": "Zinc", "unit": "mg" },
+      "OMEGA3": { "name": "Omega-3", "unit": "mg" },
+      "OMEGA6": { "name": "Omega-6", "unit": "mg" },
+      "VIT_D": { "name": "Vitamin D", "unit": "IU" },
+      "VIT_A": { "name": "Vitamin A", "unit": "IU" },
+      "CA": { "name": "Calcium", "unit": "mg" },
+      "MG": { "name": "Magnesium", "unit": "mg" },
+      "K": { "name": "Potassium", "unit": "mg" },
+      "NA": { "name": "Sodium", "unit": "mg" },
+      "KCAL": { "name": "Calories", "unit": "kcal" }
+    },
+    "health": {
+      "NEED_PROT": { "name": "Protein Need Met", "unit": "%", "direction": "positive = deficiency addressed", "example": "80% of daily need" },
+      "NEED_B12": { "name": "B12 Need Met", "unit": "%" },
+      "NEED_IRON": { "name": "Iron Need Met", "unit": "%", "example": "80% for documented iron-deficient person" },
+      "NEED_ZINC": { "name": "Zinc Need Met", "unit": "%" },
+      "EXCESS": { "name": "Nutritional Excess", "unit": "%", "direction": "negative = overconsumption beyond need" }
+    },
+    "health_root_cause": {
+      "GLYPHOSATE": { "name": "Glyphosate Exposure", "unit": "ppb", "note": "Herbicide residue linked to gut microbiome disruption" },
+      "PESTICIDE": { "name": "Pesticide Load", "unit": "idx", "note": "Aggregate pesticide exposure from food" },
+      "PROC_FOOD": { "name": "Ultra-Processed", "unit": "%", "note": "Percentage of calories from ultra-processed sources" },
+      "SEED_OIL": { "name": "Industrial Seed Oil", "unit": "g", "note": "Inflammatory omega-6 from processed oils" },
+      "ADDED_SUGAR": { "name": "Added Sugar", "unit": "g", "note": "Non-natural sugar added to products" },
+      "MICROBIOME": { "name": "Microbiome Impact", "unit": "idx", "note": "Effect on gut health: negative = disruption, positive = support" },
+      "ANTIBIOTIC": { "name": "Antibiotic Exposure", "unit": "mg", "note": "Antibiotic residue from animal products" },
+      "HORMONE": { "name": "Synthetic Hormone", "unit": "mcg", "note": "Growth hormones and endocrine disruptors" },
+      "HEAVY_METAL": { "name": "Heavy Metal Load", "unit": "ppb", "note": "Lead, mercury, arsenic, cadmium" },
+      "INFLAM": { "name": "Inflammatory Index", "unit": "idx", "note": "Net inflammatory effect: negative = pro-inflammatory" }
+    },
+    "chronic_disease_factors": {
+      "INSULIN_IMPACT": { "name": "Insulin Response", "unit": "idx", "note": "Effect on insulin sensitivity: negative = resistance promoting" },
+      "AUTOIMMUNE_RISK": { "name": "Autoimmune Trigger", "unit": "%", "note": "Association with autoimmune conditions" },
+      "GUT_PERMEABILITY": { "name": "Gut Barrier Effect", "unit": "idx", "note": "Leaky gut: negative = barrier damage" },
+      "NEURO_IMPACT": { "name": "Neurological Impact", "unit": "idx", "note": "Effect on brain health and cognition" },
+      "CARDIO_IMPACT": { "name": "Cardiovascular Effect", "unit": "idx", "note": "Heart health: negative = risk increasing" },
+      "METABOLIC": { "name": "Metabolic Health", "unit": "idx", "note": "Effect on metabolic function" }
+    },
+    "food_as_medicine": {
+      "WHOLE_FOOD": { "name": "Whole Food Ratio", "unit": "%", "note": "Percentage from unprocessed whole foods" },
+      "LOCAL_FOOD": { "name": "Local Sourcing", "unit": "%", "note": "Percentage from within bioregion" },
+      "REGEN_SOURCE": { "name": "Regenerative Source", "unit": "%", "note": "From regenerative agriculture practices" },
+      "WILD_FORAGE": { "name": "Wild/Foraged", "unit": "%", "note": "From wild or foraged sources" },
+      "FERMENTED": { "name": "Fermented/Probiotic", "unit": "g", "note": "Live culture foods supporting microbiome" },
+      "PHYTONUTRIENT": { "name": "Phytonutrient Diversity", "unit": "count", "note": "Number of distinct plant compounds" }
+    },
+    "pharma_comparison": {
+      "PHARMA_CO2": { "name": "Pharma Embodied Carbon", "unit": "g", "note": "R&D, manufacturing, distribution of alternative" },
+      "PHARMA_H2O": { "name": "Pharma Water Use", "unit": "L", "note": "Industrial water for pharmaceutical production" },
+      "PHARMA_CHEM": { "name": "Chemical Synthesis", "unit": "g", "note": "Synthetic compound weight" },
+      "PHARMA_PKG": { "name": "Packaging Impact", "unit": "g", "note": "Plastic, foil, cardboard" },
+      "PHARMA_SIDE": { "name": "Side Effect Risk", "unit": "%", "note": "Documented side effect probability" },
+      "PHARMA_DEP": { "name": "Dependency Risk", "unit": "%", "note": "Physical/psychological dependency risk" },
+      "PHARMA_INT": { "name": "Drug Interaction Risk", "unit": "%", "note": "Risk with other medications" }
+    },
+    "chain_economics": {
+      "NAT_PROV": { "name": "Nature Provided", "unit": "%", "note": "Percentage of need met by natural source vs industrial", "example": "80% iron need from beef vs iron supplement" },
+      "IND_REQ": { "name": "Industrial Required", "unit": "%", "note": "How much still requires industrial chain" },
+      "CHAIN_AVOID": { "name": "Industrial Chain Avoided", "unit": "units", "note": "Number of industrial products avoided (supplements, pharma, etc.)" },
+      "CHAIN_INCUR": { "name": "Industrial Chain Incurred", "unit": "units", "note": "Industrial products required" }
+    }
+  },
+
+  "compound_emergence": {
+    "description": "Compound codes emerge recursively through transaction data and health indices - the system learns what to track",
+
+    "principle": "What we track is determined by what needs healing - discovered through the data itself",
+
+    "recursive_discovery": {
+      "description": "Compounds are discovered, not predetermined",
+      "mechanism": [
+        "Initial transactions track basic compounds (CO2, H2O, KCAL)",
+        "Health indices reveal deficiencies in population (blood tests, clinic data)",
+        "Bioregion indices reveal stress in land (soil tests, water quality, biodiversity surveys)",
+        "Transaction data aggregates show patterns: which compounds correlate with health outcomes?",
+        "Correlations surface new compounds to track",
+        "Cycle deepens - more data reveals more connections"
+      ],
+      "example_discovery": {
+        "observation": "Bioregion shows high iron deficiency despite adequate caloric intake",
+        "data_query": "Which transactions are providing iron? Which are depleting it?",
+        "discovery": "Soil iron content declining → crops have less iron → population deficient",
+        "new_tracking": "SOIL_FE (soil iron) becomes priority compound for this bioregion",
+        "feedback": "Land stewardship practices that restore soil iron get measured and valued"
+      }
+    },
+
+    "health_indices": {
+      "bioregion_health_index": {
+        "description": "Aggregated measure of land/ecosystem health",
+        "inputs": ["Soil organic matter", "Water quality", "Biodiversity counts", "Air quality", "Aquifer levels"],
+        "output": "Identifies which environmental compounds are stressed",
+        "data_source": "Land surveys, satellite imagery, watershed monitoring, soil tests"
+      },
+      "population_health_index": {
+        "description": "Aggregated measure of human health in the bioregion",
+        "inputs": ["Blood test aggregates", "Deficiency prevalence", "Chronic disease rates", "Nutritional status"],
+        "output": "Identifies which nutritional/health compounds are needed",
+        "data_source": "Anonymized clinic data, public health records, voluntary health sharing"
+      },
+      "correlation_engine": {
+        "description": "Discovers relationships between transaction compounds and health indices",
+        "process": [
+          "Track transactions with measured compounds over time",
+          "Monitor changes in bioregion and population health indices",
+          "Identify correlations: which compounds improve which indices?",
+          "Surface emerging compounds that weren't initially tracked",
+          "Adjust compound priorities based on evidence"
+        ]
+      }
+    },
+
+    "recursive_identification": {
+      "step_1_bioregion_health": {
+        "description": "Health indices reveal what's stressed in the bioregion",
+        "indicators": [
+          "Water stress → prioritize H2O tracking",
+          "Soil degradation → prioritize SOIL, N, P tracking",
+          "Biodiversity loss → prioritize BIO tracking",
+          "Air quality issues → prioritize CO2, NOx, CH4 tracking",
+          "Aquifer depletion → prioritize groundwater compounds"
+        ],
+        "source": "Land surveys, satellite data, watershed reports, soil tests"
+      },
+
+      "step_2_population_health": {
+        "description": "Health indices reveal what people in the bioregion need",
+        "indicators": [
+          "Iron deficiency prevalence → prioritize IRON, NEED_IRON tracking",
+          "B12 deficiency → prioritize B12, NEED_B12 tracking",
+          "Vitamin D deficiency → prioritize VIT_D tracking",
+          "Protein malnutrition → prioritize PROT, NEED_PROT tracking",
+          "Chronic disease patterns → identify relevant nutritional compounds"
+        ],
+        "source": "Public health data, clinic records, blood test aggregates"
+      },
+
+      "step_3_data_driven_discovery": {
+        "description": "Transaction data reveals compounds we didn't know to track",
+        "flow": [
+          "Aggregate transaction compound data across bioregion",
+          "Correlate with health index changes over time",
+          "Identify: which tracked compounds predict health improvements?",
+          "Identify: which untracked factors might explain unexplained variance?",
+          "Propose new compounds for tracking based on evidence",
+          "Validate through targeted measurement campaigns"
+        ],
+        "key_insight": "The data teaches us what matters - we don't have to know in advance"
+      }
+    },
+
+    "bioregion_compound_profiles": {
+      "description": "Each bioregion develops its own compound priority profile",
+      "example_sierra_nevada": {
+        "bioregion_stress": ["H2O (drought)", "BIO (fire impact)", "SOIL (erosion)"],
+        "population_needs": ["VIT_D (indoor lifestyle)", "OMEGA3 (heart health)"],
+        "priority_compounds": ["H2O", "BIO", "SOIL", "VIT_D", "OMEGA3", "CO2"]
+      },
+      "example_gulf_coast": {
+        "bioregion_stress": ["NO3 (agricultural runoff)", "P (algae blooms)", "BIO (wetland loss)"],
+        "population_needs": ["IRON (regional deficiency)", "FIBER (diet patterns)"],
+        "priority_compounds": ["NO3", "P", "BIO", "IRON", "FIBER", "H2O"]
+      },
+      "example_pacific_northwest": {
+        "bioregion_stress": ["SOIL (logging impact)", "BIO (salmon habitat)"],
+        "population_needs": ["VIT_D (low sunlight)", "B12 (plant-heavy diets)"],
+        "priority_compounds": ["SOIL", "BIO", "VIT_D", "B12", "OMEGA3"]
+      }
+    },
+
+    "universal_vs_emergent": {
+      "always_tracked": ["CO2", "H2O", "KCAL"],
+      "emerge_from_bioregion": "Environmental compounds based on local stress",
+      "emerge_from_population": "Nutritional/health compounds based on local needs",
+      "note": "The compound registry is comprehensive, but relevance is local"
+    }
+  },
+
+  "confidence_levels": {
+    "95-100": { "method": "lab_tested", "description": "Lab tested, certified surveyor", "verify_days": null },
+    "85-94": { "method": "direct_measurement", "description": "Direct measurement with calibrated equipment", "verify_days": null },
+    "70-84": { "method": "calculated", "description": "Calculated from documented inputs (receipts, meters)", "verify_days": null },
+    "50-69": { "method": "product_spec", "description": "Product specification, supply chain documentation", "verify_days": 90 },
+    "30-49": { "method": "estimated", "description": "Estimated from similar verified activity", "verify_days": 60 },
+    "10-29": { "method": "ai_estimate", "description": "AI estimate, regional average - MUST verify", "verify_days": 30 }
+  },
+
+  "transaction_types": {
+    "goods": { "code": 2, "description": "Physical products", "example": "food, materials" },
+    "services": { "code": 3, "description": "Service provided", "example": "labor, repair" },
+    "labor": { "code": 1, "description": "Work performed", "example": "hours worked" },
+    "gift": { "code": 4, "description": "Voluntary transfer", "example": "donation" },
+    "investment": { "code": 5, "description": "Capital allocation", "example": "funding project" },
+    "remediation": { "code": 6, "description": "Environmental repair", "example": "restoration work" }
+  },
+
+  "land_sequestration": {
+    "description": "Only land generates positive offset capacity",
+    "rates_tCO2_per_ha_per_year": {
+      "forest": 5.0,
+      "wetland": 3.0,
+      "grassland": 1.0,
+      "agricultural": 0.5,
+      "urban": 0.1,
+      "coastal": 2.5,
+      "desert": 0.05
+    },
+    "credit_price_ultra": 5,
+    "credit_generation": "Land stewards generate credits based on area x rate x time (cycles of ~37 days)"
+  },
+
+  "debt_offset": {
+    "description": "Consumers purchase sequestration credits to offset impact debt",
+    "natural_quota": "~4 tonnes CO2-equivalent per person per year",
+    "market": "Credits traded between land stewards and consumers",
+    "conversion": "1000 impact units = 1 tCO2 for offset purposes"
+  },
+
+  "command_templates": {
+    "description": "Templates for generating CLI commands. LLMs should use these patterns.",
+
+    "transfer": {
+      "template": "npm run transfer -- --to {recipient} --amount {amount} --type {type} {compound_flags} --desc \"{description}\"",
+      "compound_flag": "--compound {CODE}:{quantity}:{confidence}",
+      "example": "npm run transfer -- --to Alice --amount 8 --type goods --compound CO2:-450:75 --compound H2O:-120:60 --compound PROT:25:90 --compound IRON:3:85 --compound NEED_IRON:80:70 --desc \"Grass-fed beef 200g - transport CO2 from fuel receipt, iron for documented deficiency\"",
+      "required": ["recipient", "amount", "compounds", "description"],
+      "notes": [
+        "Quantity is signed: negative for extraction/emission, positive for delivery/sequestration",
+        "Confidence must match measurement method used",
+        "Description should explain what was measured and how"
+      ]
+    },
+
+    "land_mint": {
+      "template": "npm run land:mint -- --name \"{name}\" --area {area_m2} --type {land_type} --bioregion {bioregion}",
+      "example": "npm run land:mint -- --name \"Quincy Forest\" --area 160000 --type forest --bioregion sierra_nevada",
+      "land_types": ["forest", "wetland", "grassland", "agricultural", "urban", "coastal", "desert"]
+    },
+
+    "credits_generate": {
+      "template": "npm run credits:generate -- --all",
+      "or": "npm run credits:generate -- --land {land_id}",
+      "notes": ["Only land stewards can generate credits", "Cycles are ~37 days"]
+    },
+
+    "credits_buy": {
+      "template": "npm run credits:buy -- --user {name} --amount {tCO2}",
+      "or": "npm run credits:buy -- --user {name} --offset-all",
+      "example": "npm run credits:buy -- --user Alice --offset-all",
+      "notes": ["Price is 5 ULTRA per tCO2", "Buying credits reduces impact debt"]
+    },
+
+    "check_debt": {
+      "template": "npm run credits:buy -- --user {name} --my-debt"
+    },
+
+    "list_credits": {
+      "template": "npm run credits:buy -- --list-available"
+    }
+  },
+
+  "transaction_examples": {
+    "grass_fed_beef_with_health_context": {
+      "scenario": "Person with documented iron deficiency buys local grass-fed beef",
+      "compounds": [
+        { "code": "CO2", "quantity": -450, "confidence": 75, "reason": "Transport emissions from fuel receipt" },
+        { "code": "H2O", "quantity": -120, "confidence": 60, "reason": "Processing water from supplier" },
+        { "code": "N", "quantity": 8, "confidence": 55, "reason": "Nitrogen benefit from rotational grazing" },
+        { "code": "PROT", "quantity": 25, "confidence": 90, "reason": "USDA database for beef protein" },
+        { "code": "B12", "quantity": 2.5, "confidence": 85, "reason": "Lab-tested B12 content" },
+        { "code": "IRON", "quantity": 3, "confidence": 85, "reason": "Heme iron content from USDA" },
+        { "code": "NEED_IRON", "quantity": 80, "confidence": 70, "reason": "Calculated from buyer's documented deficiency" },
+        { "code": "NAT_PROV", "quantity": 80, "confidence": 70, "reason": "80% of iron need met naturally" },
+        { "code": "CHAIN_AVOID", "quantity": 1, "confidence": 60, "reason": "Iron supplement avoided" }
+      ],
+      "key_insight": "Nature provided what would otherwise require pharmaceutical/industrial chain"
+    },
+
+    "almond_milk_full_accounting": {
+      "scenario": "Almond milk purchase with full environmental accounting",
+      "compounds": [
+        { "code": "CO2", "quantity": -180, "confidence": 65, "reason": "Processing and transport" },
+        { "code": "H2O", "quantity": -1900, "confidence": 70, "reason": "Almond water footprint per liter" },
+        { "code": "BIO", "quantity": -5, "confidence": 50, "reason": "Bee colony pressure index" },
+        { "code": "CA", "quantity": 300, "confidence": 85, "reason": "Fortified calcium content" },
+        { "code": "PROT", "quantity": 1, "confidence": 90, "reason": "Low natural protein" }
+      ],
+      "key_insight": "Low carbon but high water and biodiversity cost - all must be measured"
+    },
+
+    "renewable_energy_honest": {
+      "scenario": "Solar panel electricity - still has negative impact, just less",
+      "compounds": [
+        { "code": "CO2", "quantity": -20, "confidence": 80, "reason": "Panel manufacturing amortized + grid losses" },
+        { "code": "KWH", "quantity": -10, "confidence": 95, "reason": "Direct meter reading" }
+      ],
+      "key_insight": "Renewable is not 'positive' - it's less negative than fossil (which would be -250g CO2)"
+    },
+
+    "regenerative_vs_industrial": {
+      "scenario": "Comparing pastured eggs from regenerative farm vs conventional store eggs",
+      "regenerative_option": {
+        "compounds": [
+          { "code": "CO2", "quantity": -80, "confidence": 70, "reason": "Local transport, pasture-based" },
+          { "code": "PROT", "quantity": 12, "confidence": 90, "reason": "Two eggs protein content" },
+          { "code": "OMEGA3", "quantity": 400, "confidence": 75, "reason": "Pastured hens have 2-3x omega-3" },
+          { "code": "OMEGA6", "quantity": 600, "confidence": 75, "reason": "Better omega ratio than conventional" },
+          { "code": "VIT_D", "quantity": 200, "confidence": 70, "reason": "Sunlight exposure increases D" },
+          { "code": "ANTIBIOTIC", "quantity": 0, "confidence": 85, "reason": "No routine antibiotics" },
+          { "code": "GLYPHOSATE", "quantity": 0, "confidence": 60, "reason": "No sprayed feed" },
+          { "code": "WHOLE_FOOD", "quantity": 100, "confidence": 95, "reason": "Unprocessed whole food" },
+          { "code": "REGEN_SOURCE", "quantity": 100, "confidence": 80, "reason": "Verified regenerative practice" },
+          { "code": "MICROBIOME", "quantity": 5, "confidence": 50, "reason": "Supports gut health" },
+          { "code": "INFLAM", "quantity": 2, "confidence": 45, "reason": "Anti-inflammatory omega ratio" }
+        ]
+      },
+      "industrial_option": {
+        "compounds": [
+          { "code": "CO2", "quantity": -250, "confidence": 65, "reason": "Long supply chain, CAFO energy" },
+          { "code": "PROT", "quantity": 12, "confidence": 90, "reason": "Same protein content" },
+          { "code": "OMEGA3", "quantity": 150, "confidence": 70, "reason": "Grain-fed lower omega-3" },
+          { "code": "OMEGA6", "quantity": 1800, "confidence": 70, "reason": "High inflammatory omega-6" },
+          { "code": "VIT_D", "quantity": 40, "confidence": 65, "reason": "Indoor hens, no sunlight" },
+          { "code": "ANTIBIOTIC", "quantity": 15, "confidence": 50, "reason": "Routine antibiotic residue" },
+          { "code": "GLYPHOSATE", "quantity": 20, "confidence": 45, "reason": "Sprayed grain feed" },
+          { "code": "WHOLE_FOOD", "quantity": 100, "confidence": 95, "reason": "Still whole food" },
+          { "code": "REGEN_SOURCE", "quantity": 0, "confidence": 80, "reason": "Extractive CAFO system" },
+          { "code": "MICROBIOME", "quantity": -3, "confidence": 40, "reason": "Antibiotic disruption risk" },
+          { "code": "INFLAM", "quantity": -8, "confidence": 40, "reason": "Pro-inflammatory omega ratio" }
+        ]
+      },
+      "key_insight": "Same food, vastly different health impact. The industrial system creates chronic disease; regenerative heals."
+    },
+
+    "processed_food_exposure": {
+      "scenario": "Ultra-processed snack bar vs whole food equivalent",
+      "processed_option": {
+        "compounds": [
+          { "code": "KCAL", "quantity": 200, "confidence": 95, "reason": "Label data" },
+          { "code": "PROT", "quantity": 5, "confidence": 90, "reason": "Added protein isolate" },
+          { "code": "SEED_OIL", "quantity": 8, "confidence": 85, "reason": "Soybean/canola oil listed" },
+          { "code": "ADDED_SUGAR", "quantity": 12, "confidence": 90, "reason": "Multiple sugar sources" },
+          { "code": "PROC_FOOD", "quantity": 100, "confidence": 95, "reason": "Ultra-processed category" },
+          { "code": "GLYPHOSATE", "quantity": 50, "confidence": 35, "reason": "Oat/soy ingredients likely sprayed" },
+          { "code": "INFLAM", "quantity": -15, "confidence": 45, "reason": "Seed oils + sugar inflammatory" },
+          { "code": "INSULIN_IMPACT", "quantity": -20, "confidence": 50, "reason": "Rapid glucose spike" },
+          { "code": "MICROBIOME", "quantity": -8, "confidence": 40, "reason": "Emulsifiers damage gut lining" },
+          { "code": "GUT_PERMEABILITY", "quantity": -5, "confidence": 35, "reason": "Leaky gut risk" }
+        ]
+      },
+      "whole_food_option": {
+        "compounds": [
+          { "code": "KCAL", "quantity": 200, "confidence": 90, "reason": "Handful of nuts + apple" },
+          { "code": "PROT", "quantity": 5, "confidence": 85, "reason": "Natural nut protein" },
+          { "code": "SEED_OIL", "quantity": 0, "confidence": 95, "reason": "No added oils" },
+          { "code": "ADDED_SUGAR", "quantity": 0, "confidence": 95, "reason": "Only fruit sugar" },
+          { "code": "PROC_FOOD", "quantity": 0, "confidence": 95, "reason": "Whole foods only" },
+          { "code": "GLYPHOSATE", "quantity": 5, "confidence": 40, "reason": "Some if not organic" },
+          { "code": "INFLAM", "quantity": 3, "confidence": 50, "reason": "Anti-inflammatory whole foods" },
+          { "code": "INSULIN_IMPACT", "quantity": 2, "confidence": 55, "reason": "Fiber slows glucose" },
+          { "code": "MICROBIOME", "quantity": 8, "confidence": 45, "reason": "Fiber feeds good bacteria" },
+          { "code": "FIBER", "quantity": 6, "confidence": 80, "reason": "Natural fiber intact" }
+        ]
+      },
+      "key_insight": "Same calories, opposite health trajectory. Processed food drives chronic disease; whole food heals."
+    }
+  },
+
+  "measurement_guidance": {
+    "how_to_measure": {
+      "transport_co2": "fuel_liters x 2.31 kg CO2/L diesel or 2.39 kg/L gasoline",
+      "electricity_co2": "kWh x grid_factor (varies: 0.4-0.9 kg CO2/kWh by region)",
+      "water": "Direct meter, processing spec sheets, or LCA databases",
+      "nutrition": "USDA FoodData Central, lab tests, or product labels",
+      "health_needs": "Medical records, blood tests, documented deficiencies"
+    },
+    "confidence_guidance": {
+      "90+": "Use only with lab tests, certified measurements, or direct meter readings",
+      "70-89": "Calculated from documented receipts, invoices, or specifications",
+      "50-69": "Product specifications, supply chain documentation",
+      "30-49": "Estimates based on similar verified activities",
+      "below_30": "AI/LLM estimates - flag for verification within 30 days"
+    }
+  },
+
+  "on_chain_types": {
+    "CompoundFlow": {
+      "compound": "ByteArray (code from registry)",
+      "quantity": "Int (signed: negative = extraction, positive = delivery)",
+      "unit": "MassUnit enum",
+      "measurement": "MeasurementMethod enum",
+      "confidence": "Int (0-100)"
+    },
+    "MeasurementMethod": ["Direct", "Calculated", "Estimated", "Surveyed"],
+    "MassUnit": ["Gram", "Kilogram", "Tonne", "Liter", "Kilowatt"]
+  },
+
+  "llm_instructions": {
+    "when_helping_users": [
+      "Always ask what was actually measured and how",
+      "Never assume positive impact - even renewables have negative footprint",
+      "Require confidence levels that match the measurement method",
+      "Consider the full chain: production -> nutrition -> health -> care economics",
+      "Compare nature providing vs industrial alternative when relevant",
+      "Flag low-confidence estimates for verification",
+      "Consider bioregion context - what compounds are priority for this region?",
+      "Consider user health context - what deficiencies/needs does this person have?"
+    ],
+    "health_philosophy": [
+      "Root cause over symptom management - track what causes chronic disease",
+      "Food is medicine - whole foods from healthy soil heal; processed foods harm",
+      "Industrial food system accountability - glyphosate, seed oils, antibiotics in supply chain",
+      "Question synthetic interventions - pharma addresses symptoms, nature addresses causes",
+      "Gut health is foundational - microbiome disruption underlies many chronic conditions",
+      "Environmental health = human health - soil health, water quality, air purity affect us",
+      "Individual health sovereignty - people own their health data and make informed choices",
+      "Transparency over convenience - know what you're consuming and its true impact"
+    ],
+    "compound_selection": [
+      "Compounds are not arbitrary - they emerge from bioregion and population health",
+      "Ask: What is stressed in this bioregion? (water, soil, biodiversity, air)",
+      "Ask: What does this person need? (iron, B12, protein, vitamin D)",
+      "Ask: What root cause factors are present? (glyphosate, seed oils, heavy metals)",
+      "Track what matters locally, not a global one-size-fits-all list",
+      "The act of tracking informs future understanding of what needs healing",
+      "Compare: whole food from regenerative source vs processed industrial alternative"
+    ],
+    "generating_commands": [
+      "Use the command_templates section to construct valid CLI commands",
+      "Include all measured compounds with appropriate confidence levels",
+      "Description should explain the measurement methodology",
+      "Quantity sign: negative for consumption/emission, positive for delivery/benefit",
+      "Prioritize compounds relevant to the bioregion and individual health context"
+    ]
+  },
+
+  "endpoints": {
+    "note": "Fetch this spec to understand the protocol",
+    "spec": "https://ultralife.earth/protocol.json",
+    "ipfs_backup": "ipfs://[to be published]",
+    "github": "https://github.com/ultralife-protocol/spec"
+  }
+}

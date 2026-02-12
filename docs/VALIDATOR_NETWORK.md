@@ -266,3 +266,253 @@ A: Yes. They delegate ULTRA to your validator, share in fees proportionally.
 | ADA required everywhere | ADA abstracted away |
 
 **The protocol absorbs ADA complexity. Validators operate in ULTRA.**
+
+---
+
+## Bioregion Economic Infrastructure
+
+### SPOs as Bioregion Economic Infrastructure
+
+In UltraLife, stake pools are the **data and credit infrastructure** for their bioregion:
+
+1. **Underwrite credit** - Pool stake backs bioregion projects
+2. **Collate data** - All transactions flow through with bioregion markers
+3. **Track economy** - Sector breakdown, trade flows, economic health
+4. **Aggregate health** - Environmental and economic indices
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    SIERRA NEVADA BIOREGION                      │
+│                                                                 │
+│  Community Members          Stake Pools            Treasury     │
+│  ┌─────────┐               ┌─────────────┐       ┌───────────┐ │
+│  │ Farmers │──delegate──▶  │   Pool A    │──5%──▶│ Bioregion │ │
+│  │ Makers  │     ULTRA     │   Pool B    │       │ Treasury  │ │
+│  │ Artists │◀──rewards───  │   Pool C    │       │           │ │
+│  └─────────┘               └──────┬──────┘       └─────┬─────┘ │
+│                                   │                    │       │
+│                       Track Metrics + Underwrite  Fund Projects │
+│                                   │                    │       │
+│                            ┌──────▼──────┐      ┌──────▼─────┐ │
+│                            │ Health Index │      │ Restoration│ │
+│                            │ Credit Cap   │      │ UBI Boost  │ │
+│                            │ Impact Data  │      │ Grants     │ │
+│                            └─────────────┘      └────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### What SPOs Track
+
+SPOs are the **data infrastructure** for their bioregion. All transactions flow through with bioregion markers, enabling complete economic tracking.
+
+**Credit Underwriting:**
+- Total ULTRA delegated = Underwriting capacity
+- Active projects backed
+- Credit utilization rate
+
+**Economic Data Collation:**
+- All transactions tagged by bioregion
+- Sector breakdown (agriculture, services, goods, energy)
+- Transaction volume and velocity
+- Trade flows between bioregions
+
+**Health Metrics:**
+- Environmental indices (air, water, biodiversity, carbon, soil)
+- Resident count and growth
+- Economic participation rate
+
+**Liquid Staking Flow:**
+```
+Person → pNFT (bioregion tagged)
+    │
+    └─→ All transactions carry bioregion marker
+            │
+            └─→ Flows through bioregion pools
+                    │
+                    └─→ SPOs collate and aggregate
+                            │
+                            └─→ Bioregion economic picture
+```
+
+### Delegation Flow
+
+Anyone with a pNFT can delegate ULTRA to a bioregion pool:
+
+```bash
+# Tell your LLM agent:
+"Delegate 1000 ULTRA to Sierra Nevada Pool A"
+"Show me the pools in my bioregion"
+"What's the credit capacity of Sierra Nevada?"
+```
+
+**Why delegate?**
+1. Increase your bioregion's credit capacity
+2. Earn ULTRA rewards (share of pool epoch earnings)
+3. Support local projects (your stake backs real work)
+4. Participate in governance (delegators can vote)
+
+### Reward Distribution
+
+Each epoch, pools distribute rewards:
+
+```
+Total Epoch Rewards: 10,000 ULTRA
+│
+├── Operator Share (2%):      200 ULTRA → Pool operator
+├── Treasury Share (5%):      500 ULTRA → Bioregion treasury
+├── Local Reinvestment (10%): 1,000 ULTRA → Local projects
+└── Delegator Share (83%):    8,300 ULTRA → Pro-rata to delegators
+```
+
+### Impact Tracking
+
+Impact flows through the same data infrastructure—no special treatment for anyone:
+
+```
+Every transaction:
+  │
+  ├── Economic data → Bioregion economic tracking
+  │
+  └── Impact data → Bioregion impact tracking
+          │
+          ├── Measured in compounds (CO2, H2O, N, P, etc.)
+          ├── Consumer accrues full supply chain impact
+          └── Aggregated by bioregion for health indices
+```
+
+Pool operations generate impact like any other activity:
+- Energy consumption
+- Hardware lifecycle
+- Facility operations
+
+All tracked, all transparent, all aggregated into bioregion data. No bonuses, no penalties—just the truth.
+
+### Economic Signal
+
+A bioregion's total delegated stake is a **real-time economic health indicator**:
+
+```
+High stake = Community confidence
+  → More treasury funding
+  → More local projects funded
+  → Better health indices
+  → Attracts more delegation (positive feedback)
+
+Low stake = Economic concern
+  → Limited treasury funds
+  → Fewer projects possible
+  → Signal to address issues
+  → Call to action for community
+```
+
+This creates a **decentralized economic indicator** that:
+- Cannot be manipulated by central authorities
+- Reflects genuine community confidence
+- Incentivizes environmental stewardship
+- Automatically funds local action
+
+### SPO Registration for Bioregion
+
+```bash
+# List available bioregions
+npm run list:bioregions
+
+# Register your pool for Sierra Nevada
+npm run register:pool:sierra-a
+
+# Or with custom parameters
+node register-bioregion-pool.mjs \
+  --bioregion "Sierra Nevada" \
+  --pool-id pool1abc... \
+  --ticker SNA
+```
+
+### Requirements to Register
+
+1. **pNFT** — On-chain identity
+2. **Bioregion selection** — Which bioregion to serve
+3. **Commitment** — Ready to underwrite the bioregion's credit needs
+
+---
+
+## Multi-Pool Bioregions
+
+Large bioregions can have multiple pools working together:
+
+| Pool | Stake | Underwriting Capacity | Focus Area |
+|------|-------|----------------------|------------|
+| Sierra Nevada A | 1.25M ULTRA | 625K credit | General infrastructure |
+| Sierra Nevada B | 890K ULTRA | 445K credit | Water/watershed projects |
+| Sierra Nevada C | 2.1M ULTRA | 1.05M credit | Conservation/restoration |
+
+**Total Sierra Nevada stake: 4.24M ULTRA**
+**Total Bioregion Credit Capacity: ~2.1M ULTRA**
+
+Pools don't compete—they **cooperate to support the bioregion**:
+- Combined stake = Total bioregion credit capacity
+- Each pool can underwrite projects up to 50% of their stake
+- Pools coordinate on large regional projects
+- Specialization by area (water, energy, agriculture, etc.)
+
+---
+
+## Credit Underwriting
+
+### Pools as Bioregion Credit Unions
+
+A stake pool's delegation determines how much credit it can extend to the bioregion:
+
+```
+Pool Stake: 1,000,000 ULTRA
+      │
+      ├── Underwriting Capacity: 500,000 ULTRA (50% of stake)
+      │
+      ├── Can back:
+      │     • Restoration projects
+      │     • Local business loans
+      │     • Emergency response
+      │     • Infrastructure improvements
+      │
+      └── Risk: Pool's stake backs the credit
+            If project fails, pool absorbs loss
+```
+
+### How Credit Works
+
+1. **Community proposes project** ("Restore 100 acres of watershed")
+2. **Pool evaluates and underwrites** (commits portion of stake as backing)
+3. **Treasury releases funds** against the pool's guarantee
+4. **Project executes** with on-chain milestones
+5. **Success:** Pool earns bonus, stake unlocked
+6. **Failure:** Pool stake partially slashed to cover losses
+
+### Underwriting Example
+
+```
+Project: Sierra Nevada Reforestation
+Cost: 200,000 ULTRA
+Duration: 24 epochs
+
+Underwriters:
+  Sierra Nevada A:  100,000 ULTRA (50%)
+  Sierra Nevada B:   60,000 ULTRA (30%)
+  Sierra Nevada C:   40,000 ULTRA (20%)
+
+On success: Pools earn 5% bonus on underwritten amount
+On failure: Pools lose up to 30% of underwritten amount
+```
+
+### Credit Capacity by Bioregion
+
+The total stake delegated to a bioregion = its credit capacity:
+
+| Bioregion | Total Stake | Credit Capacity | Active Projects |
+|-----------|-------------|-----------------|-----------------|
+| Sierra Nevada | 4.24M ULTRA | 2.12M ULTRA | 12 |
+| Pacific Northwest | 6.8M ULTRA | 3.4M ULTRA | 18 |
+| Great Lakes | 3.1M ULTRA | 1.55M ULTRA | 8 |
+| Gulf Coast | 2.5M ULTRA | 1.25M ULTRA | 6 |
+
+**Higher stake = more credit = more projects funded = healthier bioregion**
+
+This creates a direct link between community confidence (delegation) and the bioregion's ability to fund improvements.

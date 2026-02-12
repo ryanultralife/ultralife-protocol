@@ -9,6 +9,7 @@ scripts/node_modules/
 
 # Deployment records
 deployment-*.json
+scripts/deployment.json
 
 # Environment
 .env
@@ -25,3 +26,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Test results
+scripts/e2e-test-results.json
+scripts/interaction-test-results.json
+scripts/e2e-results.json
+scripts/error-test-results.json

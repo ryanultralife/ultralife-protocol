@@ -20,6 +20,8 @@ import {
   MeshWallet,
   MeshTxBuilder,
   deserializeAddress,
+  resolveScriptHash,
+  stringToHex,
 } from '@meshsdk/core';
 import fs from 'fs';
 import path from 'path';
@@ -27,7 +29,14 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import 'dotenv/config';
 
-import { atomicWriteSync } from './utils.mjs';
+import { atomicWriteSync, safeReadJson } from './utils.mjs';
+
+// Centralized config - single source of truth for all validator parameters
+import {
+  applyValidatorParams,
+  findValidator,
+  getAdminPkh,
+} from './testnet-config.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -36,7 +45,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // =============================================================================
 
 const CONFIG = {
-  network: process.env.NETWORK || 'preview',
+  network: process.env.NETWORK || 'preprod',
   blockfrostKey: process.env.BLOCKFROST_API_KEY,
   walletMnemonic: process.env.WALLET_SEED_PHRASE,
   deploymentPath: path.join(__dirname, 'deployment.json'),
@@ -261,8 +270,6 @@ async function main() {
     currentSlot: currentSlot,
   });
 
-  log.info('pNFT datum constructed');
-
   // Record pNFT
   const pnftRecord = {
     id: pnftId,
@@ -278,30 +285,214 @@ async function main() {
     },
   };
 
+  log.info('pNFT datum constructed');
+
+  // =========================================================================
+  // ON-CHAIN MINTING
+  // =========================================================================
+
+  // Check for pNFT policy reference script
+  const pnftPolicyRef = deployment.references?.pnft_pnft_policy_mint;
+  if (!pnftPolicyRef?.txHash) {
+    log.error('pNFT policy reference script not deployed!');
+    log.info('Run: npm run deploy:references -- --validator pnft_policy');
+    process.exit(1);
+  }
+
+  log.info(`Using pNFT policy ref: ${pnftPolicyRef.txHash}#${pnftPolicyRef.outputIndex}`);
+
+  // Load the pNFT policy script from plutus.json
+  const plutusPath = path.join(__dirname, '..', 'plutus.json');
+  const plutus = safeReadJson(plutusPath);
+  const pnftPolicyValidator = findValidator(plutus?.validators || [], 'pnft_policy.mint');
+
+  if (!pnftPolicyValidator) {
+    log.error('pNFT policy validator not found in plutus.json');
+    process.exit(1);
+  }
+
+  // Apply parameters using the SAME centralized config as deployment
+  // This ensures policy ID consistency across the protocol
+  const adminPkh = getAdminPkh(address);
+  const applied = applyValidatorParams(pnftPolicyValidator, adminPkh);
+
+  if (!applied) {
+    log.error('Could not apply params to pnft policy');
+    process.exit(1);
+  }
+
+  const { encodedScript, scriptHash: policyId, config } = applied;
+
+  // Verify consistency with deployed reference
+  if (pnftPolicyRef.scriptHash && pnftPolicyRef.scriptHash !== policyId) {
+    log.warn(`Policy ID mismatch!`);
+    log.warn(`  Deployment: ${pnftPolicyRef.scriptHash}`);
+    log.warn(`  Computed:   ${policyId}`);
+    log.error('Configuration inconsistency detected. Ensure same wallet is used for all operations.');
+    process.exit(1);
+  }
+
+  log.info(`Policy ID: ${policyId}`);
+  log.info(`Config type: ${applied.configTypeName || 'none'}`);
+
+  // Asset name is the pNFT ID in hex
+  const assetNameHex = stringToHex(pnftId);
+  log.info(`Asset name (hex): ${assetNameHex.slice(0, 32)}...`);
+
+  // Build minting redeemer (MintBasic { owner: VerificationKeyHash })
+  const mintRedeemer = {
+    constructor: 0,  // MintBasic variant
+    fields: [
+      { bytes: ownerHash },  // owner field
+    ],
+  };
+
+  // Build the minting transaction
+  log.info('Building minting transaction...');
+
+  const txBuilder = new MeshTxBuilder({
+    fetcher: provider,
+    submitter: provider,
+    verbose: false,
+  });
+
+  // Select a UTxO with enough ADA (need ~5 ADA for output + fees)
+  // IMPORTANT: Skip UTxOs that have reference scripts attached (they have scriptRef)
+  const minRequired = 5_000_000n;
+  const cleanUtxos = utxos.filter(u => {
+    // Skip UTxOs with reference scripts or other assets
+    const hasRefScript = u.output.scriptRef || u.output.plutusData;
+    const hasOtherAssets = u.output.amount.some(a => a.unit !== 'lovelace');
+    return !hasRefScript && !hasOtherAssets;
+  });
+
+  log.info(`Found ${cleanUtxos.length} clean UTxOs (no scripts/assets) out of ${utxos.length} total`);
+
+  const inputUtxo = cleanUtxos.find(u => {
+    const lovelace = u.output.amount.find(a => a.unit === 'lovelace');
+    return BigInt(lovelace?.quantity || 0) >= minRequired;
+  });
+
+  if (!inputUtxo) {
+    // Fallback: try any UTxO with enough ADA
+    const anyUtxo = utxos.find(u => {
+      const lovelace = u.output.amount.find(a => a.unit === 'lovelace');
+      return BigInt(lovelace?.quantity || 0) >= minRequired;
+    });
+    if (!anyUtxo) {
+      log.error(`No UTxO found with at least ${Number(minRequired) / 1_000_000} ADA`);
+      log.info('UTxO breakdown:');
+      utxos.slice(0, 5).forEach(u => {
+        const lovelace = u.output.amount.find(a => a.unit === 'lovelace');
+        log.info(`  ${u.input.txHash.slice(0, 12)}...#${u.input.outputIndex}: ${formatAda(lovelace?.quantity || 0)}`);
+      });
+      process.exit(1);
+    }
+    log.warn('Using UTxO with attached data (may have issues)');
+  }
+
+  const selectedUtxo = inputUtxo || cleanUtxos[0] || utxos[0];
+  const inputLovelace = selectedUtxo.output.amount.find(a => a.unit === 'lovelace')?.quantity || '0';
+  log.info(`Using input UTxO: ${selectedUtxo.input.txHash.slice(0, 16)}...#${selectedUtxo.input.outputIndex} (${formatAda(inputLovelace)})`);
+
+  // Provide full UTxO details to txIn for proper handling
+  txBuilder.txIn(
+    selectedUtxo.input.txHash,
+    selectedUtxo.input.outputIndex,
+    selectedUtxo.output.amount,
+    selectedUtxo.output.address
+  );
+
+  // Add the mint operation with reference script
+  txBuilder.mintPlutusScriptV3();
+  txBuilder.mint('1', policyId, assetNameHex);
+  txBuilder.mintTxInReference(pnftPolicyRef.txHash, pnftPolicyRef.outputIndex);
+  txBuilder.mintRedeemerValue(mintRedeemer, 'JSON');
+
+  // CRITICAL: Add required signer - the script checks for owner's signature
+  txBuilder.requiredSignerHash(ownerHash);
+
+  // Output the minted pNFT to the owner's address with inline datum
+  txBuilder.txOut(address, [
+    { unit: 'lovelace', quantity: '2000000' },  // 2 ADA min
+    { unit: policyId + assetNameHex, quantity: '1' },
+  ]);
+  txBuilder.txOutInlineDatumValue(datum, 'JSON');
+
+  // Change output
+  txBuilder.changeAddress(address);
+
+  // Set collateral (required for Plutus scripts)
+  // Use a different UTxO than the input, preferring clean UTxOs
+  const collateralUtxo = cleanUtxos.find(u => {
+    if (u.input.txHash === selectedUtxo.input.txHash &&
+        u.input.outputIndex === selectedUtxo.input.outputIndex) {
+      return false; // Don't use same UTxO as input
+    }
+    const lovelace = u.output.amount.find(a => a.unit === 'lovelace');
+    return BigInt(lovelace?.quantity || 0) >= 5_000_000n;
+  }) || selectedUtxo; // Fall back to same UTxO if no other option
+
+  log.info(`Using collateral: ${collateralUtxo.input.txHash.slice(0, 16)}...#${collateralUtxo.input.outputIndex}`);
+  txBuilder.txInCollateral(
+    collateralUtxo.input.txHash,
+    collateralUtxo.input.outputIndex,
+    collateralUtxo.output.amount,
+    collateralUtxo.output.address
+  );
+
+  // Complete, sign, and submit
+  log.info('Completing transaction...');
+  const unsignedTx = await txBuilder.complete();
+
+  log.info('Signing transaction...');
+  const signedTx = await wallet.signTx(unsignedTx);
+
+  log.info('Submitting transaction...');
+  const txHash = await provider.submitTx(signedTx);
+  log.success(`Transaction submitted: ${txHash}`);
+
+  // Wait for confirmation
+  log.info('Waiting for confirmation...');
+  for (let i = 0; i < 60; i++) {
+    try {
+      const tx = await provider.fetchTxInfo(txHash);
+      if (tx) {
+        log.success(`Transaction confirmed in block ${tx.block}`);
+        break;
+      }
+    } catch {
+      // Not found yet
+    }
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    process.stdout.write('.');
+  }
+
+  // Update record with on-chain info
+  pnftRecord.status = 'minted';
+  pnftRecord.txHash = txHash;
+  pnftRecord.policyId = policyId;
+  pnftRecord.assetName = assetNameHex;
+  pnftRecord.assetId = policyId + assetNameHex;
+
   deployment.pnfts.push(pnftRecord);
   atomicWriteSync(CONFIG.deploymentPath, deployment);
 
-  log.success('pNFT prepared!');
-
   console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
-║                      pNFT Summary                             ║
+║                   🎉 pNFT MINTED! 🎉                          ║
 ╠═══════════════════════════════════════════════════════════════╣
 ║  ID:        ${pnftId.padEnd(48)}║
 ║  Owner:     ${address.slice(0, 48).padEnd(48)}║
 ║  Level:     ${level.padEnd(48)}║
-║  DNA:       ${(dnaHash || 'Not provided').slice(0, 48).padEnd(48)}║
-║  Bioregion: ${(bioregion || 'Not assigned').slice(0, 48).padEnd(48)}║
-║  Guardian:  ${(guardian || 'None (not a ward)').slice(0, 48).padEnd(48)}║
-║  Status:    ${'Prepared (ready for on-chain mint)'.padEnd(48)}║
+║  Policy:    ${policyId.slice(0, 48).padEnd(48)}║
+║  Asset:     ${(policyId + assetNameHex).slice(0, 48).padEnd(48)}║
+║  Tx:        ${txHash.slice(0, 48).padEnd(48)}║
+║  Status:    ${'✅ On-chain!'.padEnd(48)}║
 ╚═══════════════════════════════════════════════════════════════╝
 
-pNFT saved to deployment.json
-
-To mint on-chain:
-  1. Ensure pnft policy reference script is deployed
-  2. Build minting transaction with datum
-  3. Submit and wait for confirmation
+🔗 View on Cardanoscan:
+   https://${CONFIG.network}.cardanoscan.io/transaction/${txHash}
 
 `);
 }

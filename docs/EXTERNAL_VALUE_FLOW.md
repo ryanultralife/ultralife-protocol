@@ -94,17 +94,17 @@ ULTRA ────────────────────────�
 │                     ULTRALIFE TREASURY                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  ULTRA RESERVES                                                  │
-│  ├── Development Pool: XXX billion (for sales)                  │
-│  ├── Ecosystem Fund: XXX billion (grants, partnerships)         │
-│  ├── UBI Reserve: XXX billion (distribution)                    │
+│  ULTRA RESERVES (200 billion total supply)                      │
+│  ├── Development Pool: 40 billion (20%, for sales)              │
+│  ├── Ecosystem Fund: 20 billion (10%, grants, partnerships)     │
+│  ├── UBI Reserve: 100 billion (50%, distribution over 50 years) │
 │  └── Returned tokens: Accumulates from exits/burns              │
 │                                                                  │
 │  EXTERNAL RESERVES (ADA/BTC)                                    │
-│  ├── Fee Subsidy Pool: XXX ADA (pays L1 fees)                  │
-│  ├── Liquidity Reserve: XXX ADA + XXX BTC (for exits)          │
-│  ├── Development Fund: XXX ADA (operational costs)              │
-│  └── Emergency Reserve: XXX ADA (minimum maintained)            │
+│  ├── Fee Subsidy Pool: 100,000 ADA (pays L1 fees)              │
+│  ├── Liquidity Reserve: 500,000 ADA + 5 BTC (for exits)        │
+│  ├── Development Fund: 50,000 ADA (operational costs)           │
+│  └── Emergency Reserve: 25,000 ADA (minimum maintained)         │
 │                                                                  │
 ├─────────────────────────────────────────────────────────────────┤
 │  RATE MECHANISM                                                  │
@@ -330,15 +330,15 @@ Monthly Accruals:
 ├── 2020-02: 250,000,000 ULTRA @ $0.0001
 ├── ...
 ├── 2025-01: 20,833,333 ULTRA @ $0.0012
-└── Running Total: XXX ULTRA
+└── Running Total: 42,500,000,000 ULTRA (~$10k/mo × 60 months, price-adjusted)
 
 Withdrawals:
 ├── 2024-03: 1,500,000,000 ULTRA → 15,000 ADA
 ├── 2024-06: 2,000,000,000 ULTRA → 18,000 ADA
 ├── ...
-└── Total Withdrawn: XXX ULTRA → XXX ADA
+└── Total Withdrawn: 5,000,000,000 ULTRA → 45,000 ADA
 
-Remaining Balance: XXX ULTRA
+Remaining Balance: 37,500,000,000 ULTRA
 Vesting: 100% vested (earned through work)
 ```
 

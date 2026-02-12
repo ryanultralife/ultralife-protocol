@@ -31,7 +31,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // =============================================================================
 
 const CONFIG = {
-  network: process.env.NETWORK || 'preview',
+  network: process.env.NETWORK || 'preprod',
   blockfrostKey: process.env.BLOCKFROST_API_KEY,
   walletMnemonic: process.env.WALLET_SEED_PHRASE,
   deploymentPath: path.join(__dirname, 'deployment.json'),

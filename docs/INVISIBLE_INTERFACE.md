@@ -243,14 +243,117 @@ The LLM interface makes this possible by:
 
 ---
 
+## Digital Asset Twins: Everything On-Chain
+
+### No Scanning Required
+
+Every physical asset — land, buildings, vehicles, equipment — has a complete digital record on the blockchain:
+
+```
+TRADITIONAL:
+Product → QR Code → Scan → Database Lookup → Show History
+
+ULTRALIFE:
+Asset → Already on ledger → Query directly → Complete history
+         ↑
+    No scanning needed.
+    The ledger IS the record.
+    Just ask.
+```
+
+**"Show me the service history for my truck"**
+→ LLM queries ledger for asset ID
+→ Returns ALL past services, repairs, impacts
+→ Who did the work, when, verified how
+→ No app, no scan, no lookup — it's all there
+
+### Every Asset Has:
+
+1. **Identity** — Unique on-chain record linked to owner's pNFT
+2. **Attributes** — All physical specs stored innately (size, type, model, location)
+3. **Service History** — Every service performed, by whom, verified how
+4. **Impact Record** — Environmental footprint through its lifecycle
+5. **Automation Endpoints** — IoT controls accessible from same interface
+
+```
+LAND PARCEL:
+├── Owner: farmer_maria.pnft
+├── Location: coordinates + bioregion
+├── Area: 47 hectares
+├── Zoning: Agricultural
+├── Service History:
+│   ├── Soil test (2024-03): +12% organic matter
+│   ├── Cover crop planting (2024-04): -2.4 tons CO2
+│   └── Irrigation repair (2024-06): José, verified
+└── Automations:
+    ├── Irrigation: on/off, schedule, zone control
+    ├── Weather station: readings every 15min
+    └── Gate: open/close, access log
+
+VEHICLE:
+├── Owner: collective_transport.pnft
+├── VIN hash: verified manufacturer record
+├── Make/Model: 2022 Electric Van
+├── Service History:
+│   ├── Tire rotation (47,000 km)
+│   ├── Brake service (52,000 km)
+│   └── Annual inspection (passed)
+└── Automations:
+    ├── Location: GPS tracking
+    ├── Charge level: current %
+    └── Lock: remote lock/unlock
+
+BUILDING:
+├── Owner: workshop_coop.pnft
+├── Type: Workshop/Storage
+├── Area: 400 sqm, 2 floors
+├── Service History:
+│   ├── Roof repair (2023-11)
+│   ├── Solar installation (2024-02): +8.5kW
+│   └── HVAC maintenance (2024-05)
+└── Automations:
+    ├── Lights: zone control
+    ├── HVAC: temperature, schedule
+    ├── Solar: production monitoring
+    └── Access: door locks, entry log
+```
+
+### Automation Control: Same Interface
+
+The LLM that helps you trade and transact is the same one that controls your automations:
+
+```
+"Turn off the irrigation in the south field"
+→ LLM verifies you own the land pNFT
+→ LLM finds irrigation automation endpoint
+→ Sends command through MCP
+→ Records action on-chain (with any impact)
+→ "Done. Irrigation off. Saved 450 gallons today."
+
+"Lock all the workshop doors and arm the alarm"
+→ Verifies ownership
+→ Sends commands to lock + alarm endpoints
+→ Records in building's activity log
+→ "Locked. Alarm armed. I'll notify you of any alerts."
+
+"What's the temperature in the cold storage?"
+→ Queries sensor reading from asset
+→ "Currently 4°C. Within range. Last 24 hours: min 3°C, max 5°C."
+```
+
+**One interface. Everything you own. Complete history. Full control.**
+
+---
+
 ## Practical Reality
 
 ### What Exists Now
 
-- MCP tools for blockchain interaction (33 tools)
+- MCP tools for blockchain interaction (33+ tools)
 - Masumi protocol for LLM-Cardano bridge
 - Any MCP-capable LLM can interface
 - Voice, text, any modality
+- Digital asset twins with automation control
 
 ### What Users Experience
 
