@@ -1,0 +1,45 @@
+{
+  "timestamp": "2026-02-03T23:29:23.773Z",
+  "network": "preprod",
+  "phases": {
+    "1": {
+      "name": "Foundation",
+      "tests": {
+        "Wallet has sufficient balance": {
+          "status": "passed",
+          "duration": 343,
+          "result": {
+            "balance": 9986.380774
+          }
+        },
+        "Deployment record exists": {
+          "status": "passed",
+          "duration": 0,
+          "result": {
+            "validators": 0
+          }
+        },
+        "Genesis validator recorded": {
+          "status": "failed",
+          "duration": 0,
+          "error": "Genesis validator not found in deployment"
+        },
+        "pNFT policy recorded": {
+          "status": "failed",
+          "duration": 0,
+          "error": "pNFT mint policy not found in deployment"
+        },
+        "Treasury validator recorded": {
+          "status": "failed",
+          "duration": 0,
+          "error": "Treasury validator not found in deployment"
+        }
+      }
+    }
+  },
+  "summary": {
+    "passed": 2,
+    "failed": 3,
+    "skipped": 0
+  }
+}
