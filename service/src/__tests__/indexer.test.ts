@@ -4,15 +4,15 @@
  * Tests for the chain indexer with mocked Blockfrost API.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 
 // Mock Blockfrost
-vi.mock('@blockfrost/blockfrost-js', () => {
+jest.mock('@blockfrost/blockfrost-js', () => {
   return {
-    BlockFrostAPI: vi.fn().mockImplementation(() => ({
-      addressesUtxos: vi.fn().mockResolvedValue([]),
-      assetsAddresses: vi.fn().mockResolvedValue([]),
-      assetsPolicyByIdAll: vi.fn().mockResolvedValue([]),
+    BlockFrostAPI: jest.fn().mockImplementation(() => ({
+      addressesUtxos: jest.fn().mockResolvedValue([]),
+      assetsAddresses: jest.fn().mockResolvedValue([]),
+      assetsPolicyByIdAll: jest.fn().mockResolvedValue([]),
     })),
   };
 });

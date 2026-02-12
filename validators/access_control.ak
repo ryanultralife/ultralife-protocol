@@ -254,43 +254,165 @@ fn has_valid_grant_output(
 }
 
 /// Parse raw datum as grant datum
+/// Uses Aiken's `if/is` pattern matching to safely attempt parsing
 fn parse_grant_datum(data: Data) -> Option<AccessGrantDatum> {
-  // In production, use proper CBOR deserialization
-  // This is a placeholder that would be replaced with actual parsing
-  None
+  if data is datum: AccessGrantDatum {
+    Some(datum)
+  } else {
+    None
+  }
 }
 
 /// Parse raw datum as registry datum
+/// Uses Aiken's `if/is` pattern matching to safely attempt parsing
 fn parse_registry_datum(data: Data) -> Option<ContentRegistryDatum> {
-  // In production, use proper CBOR deserialization
-  None
+  if data is datum: ContentRegistryDatum {
+    Some(datum)
+  } else {
+    None
+  }
 }
 
 // =============================================================================
 // TESTS
 // =============================================================================
 
-test grantor_can_revoke() {
-  // Test that only grantor can revoke access
-  True
+test grant_expiry_hours_calculates_correctly() {
+  // Test 8-hour grant expiry calculation
+  let start_slot = 1000
+  let hours = 8
+  let expected_expiry = start_slot + hours * slots_per_hour
+
+  when calculate_expiry(Hours { hours: hours }, start_slot, slots_per_hour) is {
+    Some(expiry) -> expiry == expected_expiry
+    None -> False
+  }
 }
 
-test grantee_can_record_view() {
-  // Test that grantee can record views
-  True
+test permanent_grant_has_no_expiry() {
+  // Test that permanent grants don't expire
+  let start_slot = 1000
+
+  calculate_expiry(Permanent, start_slot, slots_per_hour) == None
 }
 
-test expired_grant_invalid() {
-  // Test that expired grants are not valid
-  True
+test valid_grant_passes_check() {
+  // Test that a valid, unexpired grant passes validation
+  let grant = AccessGrant {
+    grant_id: "test_grant_001",
+    content_hash: "content_hash_abc",
+    grantee_pnft: "grantee_pnft_001",
+    grantor_pnft: "grantor_pnft_001",
+    duration: Permanent,
+    granted_at: 1000,
+    expires_at: None,
+    access_level: ViewOnly,
+    revoked: False,
+    view_count: 0,
+    max_views: None,
+    work_agreement_id: None,
+  }
+
+  // Check at slot 5000 - should still be valid
+  is_grant_valid(grant, 5000)
 }
 
-test max_views_enforced() {
-  // Test that view limit is enforced
-  True
+test revoked_grant_fails_check() {
+  // Test that a revoked grant fails validation
+  let grant = AccessGrant {
+    grant_id: "test_grant_002",
+    content_hash: "content_hash_abc",
+    grantee_pnft: "grantee_pnft_001",
+    grantor_pnft: "grantor_pnft_001",
+    duration: Permanent,
+    granted_at: 1000,
+    expires_at: None,
+    access_level: ViewOnly,
+    revoked: True,  // Revoked!
+    view_count: 0,
+    max_views: None,
+    work_agreement_id: None,
+  }
+
+  // Should fail validation because it's revoked
+  !is_grant_valid(grant, 5000)
 }
 
-test owner_always_has_access() {
-  // Test that content owner always has access
-  True
+test expired_grant_fails_check() {
+  // Test that an expired grant fails validation
+  let grant = AccessGrant {
+    grant_id: "test_grant_003",
+    content_hash: "content_hash_abc",
+    grantee_pnft: "grantee_pnft_001",
+    grantor_pnft: "grantor_pnft_001",
+    duration: Hours { hours: 8 },
+    granted_at: 1000,
+    expires_at: Some(2000),  // Expires at slot 2000
+    access_level: ViewOnly,
+    revoked: False,
+    view_count: 0,
+    max_views: None,
+    work_agreement_id: None,
+  }
+
+  // Check at slot 5000 - should be expired
+  !is_grant_valid(grant, 5000)
+}
+
+test max_views_exceeded_fails_check() {
+  // Test that exceeding max views fails validation
+  let grant = AccessGrant {
+    grant_id: "test_grant_004",
+    content_hash: "content_hash_abc",
+    grantee_pnft: "grantee_pnft_001",
+    grantor_pnft: "grantor_pnft_001",
+    duration: Permanent,
+    granted_at: 1000,
+    expires_at: None,
+    access_level: ViewOnly,
+    revoked: False,
+    view_count: 5,    // Already viewed 5 times
+    max_views: Some(5),  // Max 5 views
+    work_agreement_id: None,
+  }
+
+  // Should fail because max views reached
+  !is_grant_valid(grant, 5000)
+}
+
+test owner_can_grant_own_content() {
+  // Test that content owner can grant access
+  let owner = "owner_pnft_001"
+  let content = ContentReference {
+    content_hash: "hash_001",
+    content_type: Document,
+    size_bytes: 1024,
+    storage_network: IPFS,
+    encrypted: False,
+    owner_pnft: owner,
+    registered_at: 1000,
+    linked_asset: None,
+    linked_agreement: None,
+  }
+
+  can_grant_access(content, owner)
+}
+
+test non_owner_cannot_grant() {
+  // Test that non-owner cannot grant access
+  let owner = "owner_pnft_001"
+  let non_owner = "other_pnft_002"
+  let content = ContentReference {
+    content_hash: "hash_001",
+    content_type: Document,
+    size_bytes: 1024,
+    storage_network: IPFS,
+    encrypted: False,
+    owner_pnft: owner,
+    registered_at: 1000,
+    linked_asset: None,
+    linked_agreement: None,
+  }
+
+  !can_grant_access(content, non_owner)
 }

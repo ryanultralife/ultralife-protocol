@@ -4,45 +4,45 @@
  * Tests for MCP tool handlers with mocked indexer and builder.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 
 // Mock dependencies
-vi.mock('@blockfrost/blockfrost-js', () => ({
-  BlockFrostAPI: vi.fn().mockImplementation(() => ({
-    addressesUtxos: vi.fn().mockResolvedValue([]),
-    assetsAddresses: vi.fn().mockResolvedValue([]),
-    assetsPolicyByIdAll: vi.fn().mockResolvedValue([]),
+jest.mock('@blockfrost/blockfrost-js', () => ({
+  BlockFrostAPI: jest.fn().mockImplementation(() => ({
+    addressesUtxos: jest.fn().mockResolvedValue([]),
+    assetsAddresses: jest.fn().mockResolvedValue([]),
+    assetsPolicyByIdAll: jest.fn().mockResolvedValue([]),
   })),
 }));
 
-vi.mock('lucid-cardano', () => ({
+jest.mock('lucid-cardano', () => ({
   Lucid: {
-    new: vi.fn().mockResolvedValue({
-      newTx: vi.fn().mockReturnThis(),
-      complete: vi.fn().mockResolvedValue({
-        sign: vi.fn().mockReturnThis(),
-        complete: vi.fn().mockResolvedValue({
-          submit: vi.fn().mockResolvedValue('mock_tx_hash'),
+    new: jest.fn().mockResolvedValue({
+      newTx: jest.fn().mockReturnThis(),
+      complete: jest.fn().mockResolvedValue({
+        sign: jest.fn().mockReturnThis(),
+        complete: jest.fn().mockResolvedValue({
+          submit: jest.fn().mockResolvedValue('mock_tx_hash'),
         }),
       }),
     }),
   },
-  Blockfrost: vi.fn(),
+  Blockfrost: jest.fn(),
   Data: {
-    to: vi.fn().mockReturnValue('mock_datum'),
-    Enum: vi.fn(),
-    Object: vi.fn(),
-    Bytes: vi.fn(),
-    Integer: vi.fn(),
-    Array: vi.fn(),
-    Nullable: vi.fn(),
-    Boolean: vi.fn(),
-    Literal: vi.fn(),
+    to: jest.fn().mockReturnValue('mock_datum'),
+    Enum: jest.fn(),
+    Object: jest.fn(),
+    Bytes: jest.fn(),
+    Integer: jest.fn(),
+    Array: jest.fn(),
+    Nullable: jest.fn(),
+    Boolean: jest.fn(),
+    Literal: jest.fn(),
   },
-  fromText: vi.fn((s) => s),
-  toHex: vi.fn((s) => s.toString('hex')),
-  fromHex: vi.fn((s) => Buffer.from(s, 'hex')),
-  Constr: vi.fn(),
+  fromText: jest.fn((s: string) => s),
+  toHex: jest.fn((s: { toString(encoding: string): string }) => s.toString('hex')),
+  fromHex: jest.fn((s: string) => Buffer.from(s, 'hex')),
+  Constr: jest.fn(),
 }));
 
 // Test helper to simulate MCP tool call
