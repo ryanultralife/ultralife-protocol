@@ -4,7 +4,7 @@
  * Tests for the simulation indexer that reads from deployment.json.
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll } from '@jest/globals';
 import { createLocalIndexer, SimulationIndexer } from '../indexer/index-local.js';
 
 describe('SimulationIndexer', () => {

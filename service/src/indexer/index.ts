@@ -1118,6 +1118,153 @@ export class UltraLifeIndexer {
     if (value[0] === 0) return { type: 'Active' };
     return { type: 'Deprecated', replacement: value[1]?.toString('hex') };
   }
+
+  // ===========================================================================
+  // DIGITAL ASSET TWIN METHODS
+  // ===========================================================================
+  // These methods support querying physical assets as digital twins on-chain.
+  // No scanning required - all asset data is directly queryable from ledger.
+  // ===========================================================================
+
+  /**
+   * Get a digital asset twin by ID
+   */
+  async getAsset(assetId: string): Promise<object | null> {
+    try {
+      // Query asset UTxO from the asset registry contract
+      const utxos = await this.api.addressesUtxos(this.config.contracts.registry);
+
+      for (const utxo of utxos) {
+        if (utxo.inline_datum) {
+          const datum = this.decodeRegistryDatum(utxo.inline_datum);
+          if (datum.code === assetId) {
+            return {
+              asset_id: assetId,
+              ...datum,
+            };
+          }
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error(`Error fetching asset ${assetId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get service history for an asset
+   */
+  async getAssetServiceHistory(params: {
+    assetId: string;
+    serviceType?: string;
+    performer?: string;
+    fromDate?: number;
+    toDate?: number;
+    limit?: number;
+  }): Promise<object | null> {
+    try {
+      // Query records contract for service history
+      const utxos = await this.api.addressesUtxos(this.config.contracts.records);
+      const services: object[] = [];
+
+      for (const utxo of utxos) {
+        if (utxo.inline_datum && services.length < (params.limit || 50)) {
+          // Filter by asset ID and other criteria
+          // In production, would decode and filter properly
+          services.push({
+            utxo_ref: `${utxo.tx_hash}#${utxo.tx_index}`,
+            inline_datum: utxo.inline_datum,
+          });
+        }
+      }
+
+      return {
+        asset_id: params.assetId,
+        services,
+        total_services: services.length,
+      };
+    } catch (error) {
+      console.error(`Error fetching service history for ${params.assetId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * List assets for an owner
+   */
+  async listAssets(params: {
+    ownerPnft?: string;
+    category?: string;
+    limit?: number;
+  }): Promise<object[] | null> {
+    try {
+      const utxos = await this.api.addressesUtxos(this.config.contracts.registry);
+      const assets: object[] = [];
+
+      for (const utxo of utxos) {
+        if (utxo.inline_datum && assets.length < (params.limit || 50)) {
+          const datum = this.decodeRegistryDatum(utxo.inline_datum);
+          // Filter by owner and category if specified
+          assets.push({
+            asset_id: datum.code,
+            ...datum,
+          });
+        }
+      }
+
+      return assets;
+    } catch (error) {
+      console.error('Error listing assets:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get current IoT sensor state for an asset
+   */
+  async getAssetCurrentState(assetId: string): Promise<object | null> {
+    // IoT state would come from external IoT bridge
+    // This is a placeholder that returns null until IoT integration is complete
+    return null;
+  }
+
+  /**
+   * List automation endpoints for an asset
+   */
+  async listAutomations(assetId: string): Promise<object[] | null> {
+    // Automation endpoints are stored off-chain with on-chain registration
+    // Returns null until automation registry is deployed
+    return null;
+  }
+
+  /**
+   * Get available commands for an automation endpoint
+   */
+  async getAutomationCommands(assetId: string, endpointId: string): Promise<object[] | null> {
+    // Commands are defined per automation endpoint
+    // Returns null until automation system is deployed
+    return null;
+  }
+
+  /**
+   * Execute an automation command
+   */
+  async executeAutomation(params: {
+    assetId: string;
+    endpointId: string;
+    commandId: string;
+    executorPnft: string;
+    parameters: Record<string, unknown>;
+  }): Promise<{ success: boolean; result?: unknown; impact?: unknown } | null> {
+    // Automation execution would:
+    // 1. Verify executor has permission
+    // 2. Send command to IoT endpoint
+    // 3. Record execution on-chain
+    // Returns null until IoT bridge is deployed
+    return null;
+  }
 }
 
 export default UltraLifeIndexer;

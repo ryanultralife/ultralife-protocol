@@ -36,7 +36,7 @@ import {
   calculateExpiry,
   isGrantValid,
   GRANT_DURATIONS,
-} from '../types';
+} from '../types/index.js';
 
 // =============================================================================
 // CONTENT REGISTRY - Track registered content and grants
