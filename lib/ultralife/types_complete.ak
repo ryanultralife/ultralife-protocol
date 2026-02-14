@@ -18,8 +18,8 @@
 // =============================================================================
 
 use aiken/collection/list
-use aiken/crypto.{VerificationKeyHash, Blake2b_256, Hash}
-use cardano/assets.{PolicyId, AssetName}
+use aiken/crypto.{Blake2b_256, Hash, VerificationKeyHash}
+use cardano/assets.{AssetName, PolicyId}
 
 // =============================================================================
 // PART 1: LAND & RESOURCE RIGHTS
@@ -263,69 +263,37 @@ pub type LaborRecord {
 pub type LaborType {
   // === LAND-BASED LABOR ===
   /// Working with soil, plants, animals
-  Agriculture {
-    subtype: AgricultureType,
-  }
+  Agriculture { subtype: AgricultureType }
   /// Forest management, timber, restoration
-  Forestry {
-    subtype: ForestryType,
-  }
+  Forestry { subtype: ForestryType }
   /// Water system management
-  WaterManagement {
-    subtype: WaterWorkType,
-  }
+  WaterManagement { subtype: WaterWorkType }
   /// Wildlife and habitat management
-  Conservation {
-    subtype: ConservationType,
-  }
-  
+  Conservation { subtype: ConservationType }
   // === CONSTRUCTION & INFRASTRUCTURE ===
   /// Building structures
-  Construction {
-    subtype: ConstructionType,
-  }
+  Construction { subtype: ConstructionType }
   /// Maintaining infrastructure
-  Maintenance {
-    subtype: MaintenanceType,
-  }
-  
+  Maintenance { subtype: MaintenanceType }
   // === KNOWLEDGE & SERVICE ===
   /// Teaching, training, mentoring
-  Education {
-    subtype: EducationType,
-  }
+  Education { subtype: EducationType }
   /// Health and wellness services
-  Healthcare {
-    subtype: HealthcareType,
-  }
+  Healthcare { subtype: HealthcareType }
   /// Administrative and organizational
-  Administration {
-    subtype: AdminType,
-  }
+  Administration { subtype: AdminType }
   /// Research and development
-  Research {
-    subtype: ResearchType,
-  }
-  
+  Research { subtype: ResearchType }
   // === CARE WORK ===
   /// Childcare, eldercare, community care
-  CareWork {
-    subtype: CareType,
-  }
+  CareWork { subtype: CareType }
   /// Food preparation and service
-  FoodService {
-    subtype: FoodServiceType,
-  }
-  
+  FoodService { subtype: FoodServiceType }
   // === CREATIVE & CULTURAL ===
   /// Art, music, cultural production
-  Cultural {
-    subtype: CulturalType,
-  }
+  Cultural { subtype: CulturalType }
   /// Traditional knowledge keeping
-  TraditionalKnowledge {
-    subtype: TEKType,
-  }
+  TraditionalKnowledge { subtype: TEKType }
 }
 
 /// Agriculture subtypes
@@ -503,69 +471,34 @@ pub type ResourceRecord {
 pub type ResourceType {
   // === BIOLOGICAL ===
   /// Food crops
-  FoodCrop {
-    crop_type: ByteArray,
-    organic: Bool,
-  }
+  FoodCrop { crop_type: ByteArray, organic: Bool }
   /// Fiber crops (cotton, hemp, flax)
-  FiberCrop {
-    fiber_type: ByteArray,
-  }
+  FiberCrop { fiber_type: ByteArray }
   /// Timber and wood products
-  Timber {
-    species: ByteArray,
-    certification: Option<ByteArray>,
-  }
+  Timber { species: ByteArray, certification: Option<ByteArray> }
   /// Animal products
-  AnimalProduct {
-    product_type: ByteArray,
-    animal_welfare: Int,
-  }
+  AnimalProduct { product_type: ByteArray, animal_welfare: Int }
   /// Wild harvested
-  WildHarvested {
-    species: ByteArray,
-    sustainable: Bool,
-  }
-  
+  WildHarvested { species: ByteArray, sustainable: Bool }
   // === GEOLOGICAL ===
   /// Mined minerals
-  Mineral {
-    mineral_type: ByteArray,
-  }
+  Mineral { mineral_type: ByteArray }
   /// Extracted water
-  ExtractedWater {
-    source_type: WaterSource,
-  }
+  ExtractedWater { source_type: WaterSource }
   /// Soil/earth materials
-  SoilMaterial {
-    soil_type: ByteArray,
-  }
-  
+  SoilMaterial { soil_type: ByteArray }
   // === ENERGY ===
   /// Renewable energy
-  RenewableEnergy {
-    source: RenewableSource,
-  }
+  RenewableEnergy { source: RenewableSource }
   /// Stored energy
-  StoredEnergy {
-    storage_type: ByteArray,
-  }
-  
+  StoredEnergy { storage_type: ByteArray }
   // === MANUFACTURED ===
   /// Processed goods
-  ManufacturedGood {
-    product_code: ByteArray,
-    recyclable: Bool,
-  }
+  ManufacturedGood { product_code: ByteArray, recyclable: Bool }
   /// Recycled material
-  RecycledMaterial {
-    original_type: ByteArray,
-    cycles: Int,
-  }
+  RecycledMaterial { original_type: ByteArray, cycles: Int }
   /// Composted material
-  CompostedMaterial {
-    source_type: ByteArray,
-  }
+  CompostedMaterial { source_type: ByteArray }
 }
 
 /// Water source types
@@ -587,8 +520,10 @@ pub type RenewableSource {
   Geothermal
   Biomass
   Tidal
-  Human  // Yes, human power counts
+  Human
 }
+
+// Yes, human power counts
 
 /// Resource lifecycle stages
 pub type LifecycleStage {
@@ -645,14 +580,9 @@ pub type CustodyAction {
   /// Storage
   CustodyStorage
   /// Transportation
-  CustodyTransport {
-    method: TransportMethod,
-    distance_km: Int,
-  }
+  CustodyTransport { method: TransportMethod, distance_km: Int }
   /// Processing/transformation
-  CustodyProcessing {
-    process_type: ByteArray,
-  }
+  CustodyProcessing { process_type: ByteArray }
   /// Retail/distribution
   CustodyDistribution
   /// Consumer use
@@ -697,18 +627,11 @@ pub type TransportMethod {
 pub type EconomicSector {
   // === PRIMARY (Extraction/Growth) ===
   /// Food production
-  FoodProduction {
-    subsector: FoodSubsector,
-  }
+  FoodProduction { subsector: FoodSubsector }
   /// Material extraction
-  MaterialExtraction {
-    subsector: ExtractionSubsector,
-  }
+  MaterialExtraction { subsector: ExtractionSubsector }
   /// Energy generation
-  EnergyGeneration {
-    subsector: EnergySubsector,
-  }
-  
+  EnergyGeneration { subsector: EnergySubsector }
   // === SECONDARY (Transformation) ===
   /// Food processing
   FoodProcessing
@@ -718,17 +641,13 @@ pub type EconomicSector {
   Manufacturing
   /// Construction
   ConstructionSector
-  
   // === TERTIARY (Distribution & Service) ===
   /// Distribution and logistics
   DistributionSector
   /// Retail
   RetailSector
   /// Services
-  ServicesSector {
-    subsector: ServiceSubsector,
-  }
-  
+  ServicesSector { subsector: ServiceSubsector }
   // === QUATERNARY (Knowledge & Care) ===
   /// Education
   EducationSector
@@ -738,7 +657,6 @@ pub type EconomicSector {
   ResearchSector
   /// Governance
   GovernanceSector
-  
   // === QUINARY (Regeneration & Return) ===
   /// Waste processing
   WasteProcessing
@@ -778,7 +696,8 @@ pub type EnergySubsector {
   HydroGeneration
   GeothermalGeneration
   BiomassGeneration
-  FossilExtraction  // Tracked, heavily impacted
+  FossilExtraction
+  // Tracked, heavily impacted
   NuclearGeneration
 }
 
@@ -839,7 +758,6 @@ pub type UBIParameters {
   bioregion: ByteArray,
   /// Current cycle
   cycle: Int,
-  
   // === COST OF LIVING BASKET ===
   /// Average food cost per person per cycle
   food_cost: Int,
@@ -855,7 +773,6 @@ pub type UBIParameters {
   other_essential: Int,
   /// Total basic needs cost
   total_basic_needs: Int,
-  
   // === BIOREGION CAPACITY ===
   /// Natural carrying capacity (sustainable population)
   carrying_capacity: Int,
@@ -865,7 +782,6 @@ pub type UBIParameters {
   population_ratio: Int,
   /// Resource abundance index (0-10000)
   abundance_index: Int,
-  
   // === UBI FORMULA ===
   /// Base UBI amount (tokens per person per cycle)
   base_ubi: Int,
@@ -877,7 +793,6 @@ pub type UBIParameters {
   impact_modifier: Int,
   /// Level bonus (verification level adds bonus)
   level_bonus: Int,
-  
   // === TREASURY CONSTRAINTS ===
   /// Available UBI pool this cycle
   available_pool: Int,
@@ -895,11 +810,9 @@ pub type UBICalculation {
   bioregion: ByteArray,
   /// Cycle
   cycle: Int,
-  
   // === BASE CALCULATION ===
   /// Base amount from parameters
   base_amount: Int,
-  
   // === MODIFIERS APPLIED ===
   /// Health modifier effect (+/-)
   health_effect: Int,
@@ -913,13 +826,11 @@ pub type UBICalculation {
   impact_effect: Int,
   /// Level bonus applied
   level_bonus: Int,
-  
   // === FINAL AMOUNT ===
   /// Calculated amount before constraints
   calculated_amount: Int,
   /// Final amount after treasury constraints
   final_amount: Int,
-  
   // === BREAKDOWN ===
   /// This covers estimated % of basic needs
   basic_needs_coverage: Int,
@@ -933,7 +844,6 @@ pub type CostOfLivingData {
   cycle: Int,
   /// Data source count (transactions analyzed)
   sample_size: Int,
-  
   // === FOOD ===
   /// Median food transaction
   food_median: Int,
@@ -941,7 +851,6 @@ pub type CostOfLivingData {
   food_tx_count: Int,
   /// Food sector volume
   food_volume: Int,
-  
   // === HOUSING ===
   /// Median housing transaction
   housing_median: Int,
@@ -949,7 +858,6 @@ pub type CostOfLivingData {
   housing_tx_count: Int,
   /// Housing sector volume
   housing_volume: Int,
-  
   // === ENERGY ===
   /// Median energy transaction
   energy_median: Int,
@@ -957,7 +865,6 @@ pub type CostOfLivingData {
   energy_tx_count: Int,
   /// Energy sector volume
   energy_volume: Int,
-  
   // === DERIVED METRICS ===
   /// Estimated monthly cost of living
   estimated_monthly_cost: Int,
@@ -1031,26 +938,20 @@ pub type PnftDatum {
   dna_hash: Option<ByteArray>,
   created_at: Int,
   upgraded_at: Option<Int>,
-  
   // Stake portfolio
   stake_portfolio: StakePortfolio,
-  
   // Impact tracking
   lifetime_impact: Int,
   cycle_impact: Int,
   impact_by_category: List<(ImpactCategory, Int)>,
-  
   // Surveyor credentials
   surveyor_certification: Option<SurveyorCert>,
   survey_regions: List<ByteArray>,
-  
   // Land stewardship
   lands_stewarded: List<ByteArray>,
-  
   // Labor history summary
   labor_hours_lifetime: Int,
   labor_sectors: List<EconomicSector>,
-  
   // Resource custody active
   resources_in_custody: List<ByteArray>,
 }
@@ -1116,70 +1017,34 @@ pub type TransactionMeta {
 /// Transaction types
 pub type TransactionType {
   // === LABOR ===
-  Labor {
-    labor_type: LaborType,
-    hours: Int,
-    land_id: Option<ByteArray>,
-  }
-  
+  Labor { labor_type: LaborType, hours: Int, land_id: Option<ByteArray> }
   // === GOODS ===
-  Goods {
-    resource_id: ByteArray,
-    quantity: Int,
-    unit: ByteArray,
-  }
-  
+  Goods { resource_id: ByteArray, quantity: Int, unit: ByteArray }
   // === SERVICES ===
-  Services {
-    service_code: ByteArray,
-  }
-  
+  Services { service_code: ByteArray }
   // === LAND RIGHTS ===
   LandRightTransfer {
     land_id: ByteArray,
     right_type: RightType,
     duration: Option<Int>,
   }
-  
   // === RESOURCE ===
   ResourceTransfer {
     resource_id: ByteArray,
     quantity: Int,
     custody_action: CustodyAction,
   }
-  
   // === FINANCIAL ===
   Gift
-  Investment {
-    terms_hash: ByteArray,
-  }
-  Loan {
-    terms_hash: ByteArray,
-    interest_rate: Int,
-  }
-  
+  Investment { terms_hash: ByteArray }
+  Loan { terms_hash: ByteArray, interest_rate: Int }
   // === REMEDIATION ===
-  Remediation {
-    bond_id: ByteArray,
-    impact_tokens: List<AssetName>,
-  }
-  
+  Remediation { bond_id: ByteArray, impact_tokens: List<AssetName> }
   // === SYSTEM ===
-  UBI {
-    cycle: Int,
-  }
-  GovernanceReward {
-    proposal_id: ByteArray,
-  }
-  StakeReward {
-    pool_id: ByteArray,
-    epoch: Int,
-  }
-  ImpactTrade {
-    impact_token_id: ByteArray,
-    direction: TradeDirection,
-  }
-  
+  UBI { cycle: Int }
+  GovernanceReward { proposal_id: ByteArray }
+  StakeReward { pool_id: ByteArray, epoch: Int }
+  ImpactTrade { impact_token_id: ByteArray, direction: TradeDirection }
   Internal
 }
 
@@ -1215,7 +1080,6 @@ pub type BioregionDatum {
   treasury: ByteArray,
   created_at: Int,
   last_health_update: Int,
-  
   // Stake pool economics
   stake_pools: List<BioregionPool>,
   total_staked: Int,
@@ -1224,7 +1088,6 @@ pub type BioregionDatum {
   current_epoch: Int,
   cumulative_impact: Int,
   tx_velocity: Int,
-  
   // Preservation metrics
   preserved_area: Int,
   active_grants: Int,
@@ -1233,31 +1096,24 @@ pub type BioregionDatum {
   surveys_this_cycle: Int,
   average_ecosystem_health: Int,
   health_trend: HealthTrend,
-  
   // Biodiversity indicators
   documented_species: Int,
   connectivity_score: Int,
   native_ratio: Int,
   restoration_projects: Int,
-  
   // Land registry
   total_land_area: Int,
   lands_registered: Int,
   stewarded_percentage: Int,
-  
   // Economic sectors
   sector_stats: List<SectorStats>,
-  
   // UBI parameters
   ubi_params: UBIParameters,
-  
   // Cost of living
   cost_of_living: CostOfLivingData,
-  
   // Carrying capacity
   carrying_capacity: Int,
   resource_abundance: Int,
-  
   // Traditional territories
   traditional_territories: List<ByteArray>,
   cultural_protocols_required: Bool,
@@ -1291,24 +1147,19 @@ pub type PoolImpactCommitment {
 /// Treasury datum — complete economic hub
 pub type TreasuryDatum {
   bioregion: ByteArray,
-  
   // Token reserves
   token_reserves: Int,
   ada_reserves: Int,
-  
   // Distributed totals
   tokens_distributed: Int,
   ubi_distributed: Int,
   grants_distributed: Int,
   preservation_distributed: Int,
-  
   // Exchange and rates
   exchange_rate: Int,
   pool_reward_share: Int,
-  
   // Governance
   multisig: MultisigConfig,
-  
   // Fund allocations
   ubi_fund: Int,
   impact_fund: Int,
@@ -1316,7 +1167,6 @@ pub type TreasuryDatum {
   survey_fund: Int,
   emergency_fund: Int,
   development_fund: Int,
-  
   // Incoming flows tracking
   incoming_from_transactions: Int,
   incoming_from_remediation: Int,
@@ -1338,7 +1188,8 @@ pub type MultisigConfig {
 pub fn voting_weight(level: VerificationLevel) -> Int {
   when level is {
     Basic -> 0
-    Ward -> 0  // Minors cannot vote
+    Ward -> 0
+    // Minors cannot vote
     Standard -> 1
     Verified -> 2
     Steward -> 3
@@ -1357,10 +1208,14 @@ pub fn can_steward_land(level: VerificationLevel) -> Bool {
 
 /// Calculate net impact
 pub fn calculate_net_impact(impacts: List<Impact>) -> Int {
-  list.foldl(impacts, 0, fn(impact, acc) {
-    let weighted = impact.magnitude * impact.confidence / 100
-    acc + weighted
-  })
+  list.foldl(
+    impacts,
+    0,
+    fn(impact, acc) {
+      let weighted = impact.magnitude * impact.confidence / 100
+      acc + weighted
+    },
+  )
 }
 
 /// Check if impacts require remediation
@@ -1377,27 +1232,29 @@ pub fn calculate_ubi(
 ) -> Int {
   let base = params.base_ubi
   let health_effect = base * params.health_modifier / 10000
-  let participation_effect = base * participation * params.participation_modifier / 1000000
+  let participation_effect =
+    base * participation * params.participation_modifier / 1000000
   let impact_effect = impact * params.impact_modifier / 100
-  let level_bonus = when level is {
-    Basic -> 0
-    Ward -> 0  // Minors get no level bonus
-    Standard -> params.level_bonus
-    Verified -> params.level_bonus * 2
-    Steward -> params.level_bonus * 3
-  }
-  
-  let calculated = base + health_effect + participation_effect + impact_effect + level_bonus
-  
+  let level_bonus =
+    when level is {
+      Basic -> 0
+      Ward -> 0
+      // Minors get no level bonus
+      Standard -> params.level_bonus
+      Verified -> params.level_bonus * 2
+      Steward -> params.level_bonus * 3
+    }
+  let calculated =
+    base + health_effect + participation_effect + impact_effect + level_bonus
   // Apply constraints
-  let constrained = if calculated > params.max_payout {
-    params.max_payout
-  } else if calculated < params.min_guaranteed {
-    params.min_guaranteed
-  } else {
-    calculated
-  }
-  
+  let constrained =
+    if calculated > params.max_payout {
+      params.max_payout
+    } else if calculated < params.min_guaranteed {
+      params.min_guaranteed
+    } else {
+      calculated
+    }
   constrained
 }
 
@@ -1406,10 +1263,10 @@ pub fn basic_needs_coverage(ubi_amount: Int, basic_needs: Int) -> Int {
   if basic_needs > 0 {
     ubi_amount * 10000 / basic_needs
   } else {
-    10000  // 100% if no needs calculated
+    10000
   }
+  // 100% if no needs calculated
 }
-
 // =============================================================================
 // END OF COMPLETE INTEGRATED TYPE SYSTEM
 // =============================================================================

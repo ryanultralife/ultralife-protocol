@@ -13,12 +13,14 @@
 use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use aiken/interval.{Finite}
-use cardano/assets.{PolicyId, AssetName, Value, quantity_of, flatten}
-use cardano/transaction.{Transaction, Input, Output, OutputReference, InlineDatum, Mint}
+use cardano/assets.{AssetName, PolicyId, Value, flatten, quantity_of}
+use cardano/transaction.{
+  InlineDatum, Input, Mint, Output, OutputReference, Transaction,
+}
 use ultralife/types.{
-  PnftDatum, BioregionDatum, VerificationLevel, Verified, Steward,
-  ImpactCategory, CarbonImpact, WaterImpact, BiodiversityImpact, SoilImpact,
-  AirImpact, WasteImpact, EnergyImpact, LandUseImpact,
+  AirImpact, BiodiversityImpact, BioregionDatum, CarbonImpact, EnergyImpact,
+  ImpactCategory, LandUseImpact, PnftDatum, SoilImpact, Steward,
+  VerificationLevel, Verified, WasteImpact, WaterImpact,
 }
 
 /// Result of finding an issuer pNFT
@@ -64,22 +66,12 @@ pub type ImpactRedeemer {
     magnitude: Int,
     evidence_hash: ByteArray,
   }
-  
   /// Retire impact token (used for offset)
-  RetireImpact {
-    reason: ByteArray,
-  }
-  
+  RetireImpact { reason: ByteArray }
   /// Transfer impact token
-  TransferImpact {
-    recipient: AssetName,
-  }
-  
+  TransferImpact { recipient: AssetName }
   /// Verify impact (add attestation)
-  AttestImpact {
-    attestor: AssetName,
-    attestation: ByteArray,
-  }
+  AttestImpact { attestor: AssetName, attestation: ByteArray }
 }
 
 // =============================================================================
@@ -108,16 +100,25 @@ pub type ImpactConfig {
 validator impact_policy(config: ImpactConfig) {
   mint(redeemer: ImpactRedeemer, policy_id: PolicyId, tx: Transaction) {
     when redeemer is {
-      MintImpact { bioregion, category, magnitude, evidence_hash } -> {
-        validate_mint_impact(tx, policy_id, bioregion, category, magnitude, evidence_hash, config)
-      }
-      
-      RetireImpact { reason } -> {
+      MintImpact { bioregion, category, magnitude, evidence_hash } ->
+        validate_mint_impact(
+          tx,
+          policy_id,
+          bioregion,
+          category,
+          magnitude,
+          evidence_hash,
+          config,
+        )
+      RetireImpact { reason } ->
         validate_retire_impact(tx, policy_id, reason, config)
-      }
-      
-      _ -> False  // Transfer and attest don't mint/burn
+      _ -> False
     }
+    // Transfer and attest don't mint/burn
+  }
+
+  else(_) {
+    fail
   }
 }
 
@@ -138,46 +139,49 @@ fn validate_mint_impact(
   let issuer = find_issuer_pnft(tx, bioregion, config.pnft_policy)
   expect Some(issuer_data) = issuer
   expect issuer_data.level == Verified || issuer_data.level == Steward
-  
   // 2. Issuer must sign
   let issuer_signed = list.has(tx.extra_signatories, issuer_data.owner)
-  
   // 3. Magnitude must be valid (1-1000)
   let magnitude_valid = magnitude > 0 && magnitude <= 1000
-  
   // 4. Evidence must be provided
   let has_evidence = evidence_hash != ""
-  
   // 5. Bioregion must exist
-  let bioregion_valid = verify_bioregion_exists(tx.reference_inputs, bioregion, config.bioregion_policy)
-  
+  let bioregion_valid =
+    verify_bioregion_exists(
+      tx.reference_inputs,
+      bioregion,
+      config.bioregion_policy,
+    )
   // 6. High magnitude requires attestations
-  let attestation_ok = if magnitude > config.high_magnitude_threshold {
-    verify_attestations(tx, config.required_attestations, config.pnft_policy)
-  } else {
-    True
-  }
-  
+  let attestation_ok =
+    if magnitude > config.high_magnitude_threshold {
+      verify_attestations(tx, config.required_attestations, config.pnft_policy)
+    } else {
+      True
+    }
   // 7. Fee must be paid (5 tokens to bioregion treasury)
-  let fee_paid = verify_impact_fee(tx.outputs, bioregion, config.token_policy, config.token_name)
-  
+  let fee_paid =
+    verify_impact_fee(
+      tx.outputs,
+      bioregion,
+      config.token_policy,
+      config.token_name,
+    )
   // 8. Must mint exactly 1 impact token
   let mint_correct = verify_single_impact_mint(tx.mint, policy_id)
-  
   // 9. Output datum must be correct
-  let datum_correct = verify_impact_datum(
-    tx.outputs,
-    policy_id,
-    bioregion,
-    category,
-    magnitude,
-    evidence_hash,
-    issuer_data.pnft,
-    tx,
-  )
-  
-  issuer_signed && magnitude_valid && has_evidence && bioregion_valid &&
-  attestation_ok && fee_paid && mint_correct && datum_correct
+  let datum_correct =
+    verify_impact_datum(
+      tx.outputs,
+      policy_id,
+      bioregion,
+      category,
+      magnitude,
+      evidence_hash,
+      issuer_data.pnft,
+      tx,
+    )
+  issuer_signed && magnitude_valid && has_evidence && bioregion_valid && attestation_ok && fee_paid && mint_correct && datum_correct
 }
 
 // =============================================================================
@@ -192,13 +196,10 @@ fn validate_retire_impact(
 ) -> Bool {
   // 1. Must burn exactly 1 impact token
   let burn_correct = verify_single_impact_burn(tx.mint, policy_id)
-  
   // 2. Owner must sign (find in inputs)
   let owner_signed = verify_impact_owner_signed(tx, policy_id)
-  
   // 3. Reason must be provided
   let has_reason = reason != ""
-  
   burn_correct && owner_signed && has_reason
 }
 
@@ -214,23 +215,20 @@ validator impact(config: ImpactConfig) {
     tx: Transaction,
   ) {
     expect Some(d) = datum
-    
     when redeemer is {
-      TransferImpact { recipient } -> {
+      TransferImpact { recipient } ->
         validate_transfer(tx, d, recipient, config)
-      }
-      
-      AttestImpact { attestor, attestation } -> {
+      AttestImpact { attestor, attestation } ->
         validate_attest(tx, d, attestor, attestation, config)
-      }
-      
-      RetireImpact { .. } -> {
+      RetireImpact { .. } ->
         // Handled by minting policy (burn)
         True
-      }
-      
       _ -> False
     }
+  }
+
+  else(_) {
+    fail
   }
 }
 
@@ -241,17 +239,14 @@ fn validate_transfer(
   config: ImpactConfig,
 ) -> Bool {
   // 1. Current owner must sign
-  let owner_signed = verify_current_owner_signed(tx, datum.issuer, config.pnft_policy)
-  
+  let owner_signed =
+    verify_current_owner_signed(tx, datum.issuer, config.pnft_policy)
   // 2. Recipient must have pNFT
   let recipient_valid = verify_recipient_pnft(tx, recipient, config.pnft_policy)
-  
   // 3. Token not expired
   let not_expired = verify_not_expired(tx, datum.expires_at)
-  
   // 4. Datum preserved (or updated with new owner context)
   let datum_preserved = verify_datum_preserved(tx.outputs, datum)
-  
   owner_signed && recipient_valid && not_expired && datum_preserved
 }
 
@@ -263,17 +258,15 @@ fn validate_attest(
   config: ImpactConfig,
 ) -> Bool {
   // 1. Attestor must be Verified+ in same bioregion
-  let attestor_valid = verify_attestor_pnft(tx, attestor, datum.bioregion, config.pnft_policy)
-  
+  let attestor_valid =
+    verify_attestor_pnft(tx, attestor, datum.bioregion, config.pnft_policy)
   // 2. Attestor must sign
-  let attestor_signed = verify_pnft_owner_signed(tx, attestor, config.pnft_policy)
-  
+  let attestor_signed =
+    verify_pnft_owner_signed(tx, attestor, config.pnft_policy)
   // 3. Attestor must not have already attested
   let not_duplicate = !list.has(datum.attestations, attestation)
-  
   // 4. Datum updated with new attestation
   let datum_updated = verify_attestation_added(tx.outputs, datum, attestation)
-  
   attestor_valid && attestor_signed && not_duplicate && datum_updated
 }
 
@@ -286,19 +279,28 @@ fn find_issuer_pnft(
   bioregion: ByteArray,
   pnft_policy: PolicyId,
 ) -> Option<IssuerPnftInfo> {
-  list.find_map(tx.reference_inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect datum: PnftDatum = data
-        if datum.bioregion == Some(bioregion) {
-          Some(IssuerPnftInfo { pnft: datum.pnft_id, owner: datum.owner, level: datum.level })
-        } else {
-          None
+  list.find_map(
+    tx.reference_inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect datum: PnftDatum = data
+          if datum.bioregion == Some(bioregion) {
+            Some(
+              IssuerPnftInfo {
+                pnft: datum.pnft_id,
+                owner: datum.owner,
+                level: datum.level,
+              },
+            )
+          } else {
+            None
+          }
         }
+        _ -> None
       }
-      _ -> None
-    }
-  })
+    },
+  )
 }
 
 fn verify_bioregion_exists(
@@ -306,15 +308,18 @@ fn verify_bioregion_exists(
   bioregion: ByteArray,
   policy: PolicyId,
 ) -> Bool {
-  list.any(reference_inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect datum: BioregionDatum = data
-        datum.bioregion_id == bioregion
+  list.any(
+    reference_inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect datum: BioregionDatum = data
+          datum.bioregion_id == bioregion
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn verify_attestations(
@@ -323,23 +328,36 @@ fn verify_attestations(
   pnft_policy: PolicyId,
 ) -> Bool {
   // Count pNFT holders who signed (attestors)
-  let attestor_count = list.foldl(tx.reference_inputs, 0, fn(input, acc) {
-    let has_pnft = list.any(flatten(input.output.value), fn(asset) {
-      let (p, _, qty) = asset
-      p == pnft_policy && qty > 0
-    })
-    if has_pnft {
-      when input.output.datum is {
-        InlineDatum(data) -> {
-          expect datum: PnftDatum = data
-          if list.has(tx.extra_signatories, datum.owner) { acc + 1 } else { acc }
+  let attestor_count =
+    list.foldl(
+      tx.reference_inputs,
+      0,
+      fn(input, acc) {
+        let has_pnft =
+          list.any(
+            flatten(input.output.value),
+            fn(asset) {
+              let (p, _, qty) = asset
+              p == pnft_policy && qty > 0
+            },
+          )
+        if has_pnft {
+          when input.output.datum is {
+            InlineDatum(data) -> {
+              expect datum: PnftDatum = data
+              if list.has(tx.extra_signatories, datum.owner) {
+                acc + 1
+              } else {
+                acc
+              }
+            }
+            _ -> acc
+          }
+        } else {
+          acc
         }
-        _ -> acc
-      }
-    } else {
-      acc
-    }
-  })
+      },
+    )
   attestor_count >= required
 }
 
@@ -351,23 +369,37 @@ fn verify_impact_fee(
 ) -> Bool {
   // 5 tokens to bioregion treasury
   let fee_amount = 5
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect datum: BioregionDatum = data
-        datum.bioregion_id == bioregion &&
-        quantity_of(output.value, policy, name) >= fee_amount
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect datum: BioregionDatum = data
+          datum.bioregion_id == bioregion && quantity_of(
+            output.value,
+            policy,
+            name,
+          ) >= fee_amount
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn verify_single_impact_mint(mint: Value, policy: PolicyId) -> Bool {
-  let policy_tokens = list.filter_map(flatten(mint), fn(asset) {
-    let (p, name, qty) = asset
-    if p == policy { Some((name, qty)) } else { None }
-  })
+  let policy_tokens =
+    list.filter_map(
+      flatten(mint),
+      fn(asset) {
+        let (p, name, qty) = asset
+        if p == policy {
+          Some((name, qty))
+        } else {
+          None
+        }
+      },
+    )
   when policy_tokens is {
     [(_, qty)] -> qty == 1
     _ -> False
@@ -375,10 +407,18 @@ fn verify_single_impact_mint(mint: Value, policy: PolicyId) -> Bool {
 }
 
 fn verify_single_impact_burn(mint: Value, policy: PolicyId) -> Bool {
-  let policy_tokens = list.filter_map(flatten(mint), fn(asset) {
-    let (p, name, qty) = asset
-    if p == policy { Some((name, qty)) } else { None }
-  })
+  let policy_tokens =
+    list.filter_map(
+      flatten(mint),
+      fn(asset) {
+        let (p, name, qty) = asset
+        if p == policy {
+          Some((name, qty))
+        } else {
+          None
+        }
+      },
+    )
   when policy_tokens is {
     [(_, qty)] -> qty == -1
     _ -> False
@@ -395,71 +435,85 @@ fn verify_impact_datum(
   issuer: AssetName,
   tx: Transaction,
 ) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect datum: ImpactDatum = data
-        datum.bioregion == bioregion &&
-        datum.category == category &&
-        datum.magnitude == magnitude &&
-        datum.evidence_hash == evidence &&
-        datum.issuer == issuer
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect datum: ImpactDatum = data
+          datum.bioregion == bioregion && datum.category == category && datum.magnitude == magnitude && datum.evidence_hash == evidence && datum.issuer == issuer
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn verify_impact_owner_signed(tx: Transaction, policy: PolicyId) -> Bool {
   // Impact token owner must have signed
   // Find the impact token in inputs and verify the holder (issuer's pNFT owner) signed
-  list.any(tx.inputs, fn(input) {
-    let has_impact = list.any(flatten(input.output.value), fn(asset) {
-      let (p, _, qty) = asset
-      p == policy && qty > 0
-    })
-    if has_impact {
-      when input.output.datum is {
-        InlineDatum(data) -> {
-          expect datum: ImpactDatum = data
-          // Find the issuer's pNFT in reference inputs to get owner
-          let issuer_pnft = list.find_map(tx.reference_inputs, fn(ref_input) {
-            when ref_input.output.datum is {
-              InlineDatum(ref_data) -> {
-                expect pnft_datum: PnftDatum = ref_data
-                if pnft_datum.pnft_id == datum.issuer {
-                  Some(pnft_datum.owner)
-                } else {
-                  None
-                }
-              }
-              _ -> None
-            }
-          })
-          // Verify the issuer's owner signed the transaction
-          when issuer_pnft is {
-            Some(owner) -> list.has(tx.extra_signatories, owner)
-            None -> {
-              // Fallback: check if any signer owns the pNFT in inputs
-              list.any(tx.inputs, fn(pnft_input) {
-                when pnft_input.output.datum is {
-                  InlineDatum(pnft_data) -> {
-                    expect pnft_datum: PnftDatum = pnft_data
-                    pnft_datum.pnft_id == datum.issuer &&
-                    list.has(tx.extra_signatories, pnft_datum.owner)
+  list.any(
+    tx.inputs,
+    fn(input) {
+      let has_impact =
+        list.any(
+          flatten(input.output.value),
+          fn(asset) {
+            let (p, _, qty) = asset
+            p == policy && qty > 0
+          },
+        )
+      if has_impact {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: ImpactDatum = data
+            // Find the issuer's pNFT in reference inputs to get owner
+            let issuer_pnft =
+              list.find_map(
+                tx.reference_inputs,
+                fn(ref_input) {
+                  when ref_input.output.datum is {
+                    InlineDatum(ref_data) -> {
+                      expect pnft_datum: PnftDatum = ref_data
+                      if pnft_datum.pnft_id == datum.issuer {
+                        Some(pnft_datum.owner)
+                      } else {
+                        None
+                      }
+                    }
+                    _ -> None
                   }
-                  _ -> False
-                }
-              })
+                },
+              )
+            // Verify the issuer's owner signed the transaction
+            when issuer_pnft is {
+              Some(owner) -> list.has(tx.extra_signatories, owner)
+              None ->
+                // Fallback: check if any signer owns the pNFT in inputs
+                list.any(
+                  tx.inputs,
+                  fn(pnft_input) {
+                    when pnft_input.output.datum is {
+                      InlineDatum(pnft_data) -> {
+                        expect pnft_datum: PnftDatum = pnft_data
+                        pnft_datum.pnft_id == datum.issuer && list.has(
+                          tx.extra_signatories,
+                          pnft_datum.owner,
+                        )
+                      }
+                      _ -> False
+                    }
+                  },
+                )
             }
           }
+          _ -> False
         }
-        _ -> False
+      } else {
+        False
       }
-    } else {
-      False
-    }
-  })
+    },
+  )
 }
 
 fn verify_current_owner_signed(
@@ -467,23 +521,30 @@ fn verify_current_owner_signed(
   issuer: AssetName,
   pnft_policy: PolicyId,
 ) -> Bool {
-  list.any(tx.reference_inputs, fn(input) {
-    let has_pnft = list.any(flatten(input.output.value), fn(asset) {
-      let (p, name, qty) = asset
-      p == pnft_policy && name == issuer && qty > 0
-    })
-    if has_pnft {
-      when input.output.datum is {
-        InlineDatum(data) -> {
-          expect datum: PnftDatum = data
-          list.has(tx.extra_signatories, datum.owner)
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      let has_pnft =
+        list.any(
+          flatten(input.output.value),
+          fn(asset) {
+            let (p, name, qty) = asset
+            p == pnft_policy && name == issuer && qty > 0
+          },
+        )
+      if has_pnft {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            list.has(tx.extra_signatories, datum.owner)
+          }
+          _ -> False
         }
-        _ -> False
+      } else {
+        False
       }
-    } else {
-      False
-    }
-  })
+    },
+  )
 }
 
 fn verify_recipient_pnft(
@@ -492,40 +553,47 @@ fn verify_recipient_pnft(
   pnft_policy: PolicyId,
 ) -> Bool {
   // Verify recipient has a pNFT
-  list.any(tx.reference_inputs, fn(input) {
-    list.any(flatten(input.output.value), fn(asset) {
-      let (p, name, qty) = asset
-      p == pnft_policy && name == recipient && qty > 0
-    })
-  })
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      list.any(
+        flatten(input.output.value),
+        fn(asset) {
+          let (p, name, qty) = asset
+          p == pnft_policy && name == recipient && qty > 0
+        },
+      )
+    },
+  )
 }
 
 fn verify_not_expired(tx: Transaction, expires: Option<Int>) -> Bool {
   when expires is {
     None -> True
     Some(deadline) -> {
-      let current = when tx.validity_range.lower_bound.bound_type is {
-        Finite(slot) -> slot
-        _ -> 0
-      }
+      let current =
+        when tx.validity_range.lower_bound.bound_type is {
+          Finite(slot) -> slot
+          _ -> 0
+        }
       current < deadline
     }
   }
 }
 
 fn verify_datum_preserved(outputs: List<Output>, datum: ImpactDatum) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect new_datum: ImpactDatum = data
-        new_datum.bioregion == datum.bioregion &&
-        new_datum.category == datum.category &&
-        new_datum.magnitude == datum.magnitude &&
-        new_datum.evidence_hash == datum.evidence_hash
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect new_datum: ImpactDatum = data
+          new_datum.bioregion == datum.bioregion && new_datum.category == datum.category && new_datum.magnitude == datum.magnitude && new_datum.evidence_hash == datum.evidence_hash
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn verify_attestor_pnft(
@@ -535,24 +603,32 @@ fn verify_attestor_pnft(
   pnft_policy: PolicyId,
 ) -> Bool {
   // Attestor must have pNFT in same bioregion, Verified+
-  list.any(tx.reference_inputs, fn(input) {
-    let has_pnft = list.any(flatten(input.output.value), fn(asset) {
-      let (p, name, qty) = asset
-      p == pnft_policy && name == attestor && qty > 0
-    })
-    if has_pnft {
-      when input.output.datum is {
-        InlineDatum(data) -> {
-          expect datum: PnftDatum = data
-          datum.bioregion == Some(bioregion) &&
-          (datum.level == Verified || datum.level == Steward)
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      let has_pnft =
+        list.any(
+          flatten(input.output.value),
+          fn(asset) {
+            let (p, name, qty) = asset
+            p == pnft_policy && name == attestor && qty > 0
+          },
+        )
+      if has_pnft {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            datum.bioregion == Some(bioregion) && (
+              datum.level == Verified || datum.level == Steward
+            )
+          }
+          _ -> False
         }
-        _ -> False
+      } else {
+        False
       }
-    } else {
-      False
-    }
-  })
+    },
+  )
 }
 
 fn verify_pnft_owner_signed(
@@ -560,23 +636,30 @@ fn verify_pnft_owner_signed(
   pnft: AssetName,
   policy: PolicyId,
 ) -> Bool {
-  list.any(tx.reference_inputs, fn(input) {
-    let has_pnft = list.any(flatten(input.output.value), fn(asset) {
-      let (p, name, qty) = asset
-      p == policy && name == pnft && qty > 0
-    })
-    if has_pnft {
-      when input.output.datum is {
-        InlineDatum(data) -> {
-          expect datum: PnftDatum = data
-          list.has(tx.extra_signatories, datum.owner)
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      let has_pnft =
+        list.any(
+          flatten(input.output.value),
+          fn(asset) {
+            let (p, name, qty) = asset
+            p == policy && name == pnft && qty > 0
+          },
+        )
+      if has_pnft {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            list.has(tx.extra_signatories, datum.owner)
+          }
+          _ -> False
         }
-        _ -> False
+      } else {
+        False
       }
-    } else {
-      False
-    }
-  })
+    },
+  )
 }
 
 fn verify_attestation_added(
@@ -584,20 +667,22 @@ fn verify_attestation_added(
   old_datum: ImpactDatum,
   attestation: ByteArray,
 ) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect new_datum: ImpactDatum = data
-        // Core fields preserved, attestation added
-        new_datum.bioregion == old_datum.bioregion &&
-        new_datum.magnitude == old_datum.magnitude &&
-        list.length(new_datum.attestations) == list.length(old_datum.attestations) + 1
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect new_datum: ImpactDatum = data
+          // Core fields preserved, attestation added
+          new_datum.bioregion == old_datum.bioregion && new_datum.magnitude == old_datum.magnitude && list.length(
+            new_datum.attestations,
+          ) == list.length(old_datum.attestations) + 1
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
-
 // =============================================================================
 // DOCUMENTATION
 // =============================================================================

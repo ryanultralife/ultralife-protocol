@@ -5,7 +5,7 @@
 // Always succeeds (for testnet only!)
 // =============================================================================
 
-use cardano/transaction.{Transaction, placeholder}
+use cardano/transaction.{Transaction}
 
 /// Simple spend validator that always succeeds
 /// For testnet deployment testing only

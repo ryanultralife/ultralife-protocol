@@ -11,7 +11,7 @@
 // =============================================================================
 
 use aiken/crypto.{VerificationKeyHash}
-use cardano/assets.{PolicyId, AssetName}
+use cardano/assets.{AssetName, PolicyId}
 
 // =============================================================================
 // UNIVERSAL OFFERING
@@ -55,7 +55,11 @@ pub type CategoryRef {
 
 pub type WhatOffered {
   /// Physical thing
-  Thing { description_hash: ByteArray, quantity: Option<Int>, unit: Option<ByteArray> }
+  Thing {
+    description_hash: ByteArray,
+    quantity: Option<Int>,
+    unit: Option<ByteArray>,
+  }
   /// Work/capability
   Work { description_hash: ByteArray, duration: Option<Int> }
   /// Access to asset
@@ -149,7 +153,8 @@ pub type Budget {
 }
 
 pub type Requirement {
-  MinVerification { level: Int }  // 1=Standard, 2=Verified, 3=Steward
+  MinVerification { level: Int }
+  // 1=Standard, 2=Verified, 3=Steward
   Credential { credential_hash: ByteArray }
   Residency { bioregion: ByteArray }
   MinEfficiency { compound: ByteArray, max_rating: Int }
@@ -336,33 +341,27 @@ pub type StakeStatus {
 pub type BioregionIndex {
   bioregion: ByteArray,
   cycle: Int,
-  
   /// Resource health (each 0-10000)
   water_index: IndexValue,
   land_index: IndexValue,
   air_index: IndexValue,
   energy_index: IndexValue,
-  
   /// Human wellbeing (each 0-10000)
   health_index: IndexValue,
   education_index: IndexValue,
   housing_index: IndexValue,
   food_security_index: IndexValue,
   care_availability_index: IndexValue,
-  
   /// Economic activity
   offerings_active: Int,
   needs_active: Int,
   agreements_completed: Int,
   value_transacted: Int,
   care_hours: Int,
-  
   /// Compound balances
   compound_balances: List<CompoundBalance>,
-  
   /// Overall health
   health_score: Int,
-  
   /// Last updated
   updated_at: Int,
 }
@@ -408,11 +407,16 @@ pub type RegistryStatus {
 
 /// Verification levels
 pub type VerificationLevel {
-  Basic      // Wallet only
-  Standard   // DNA verified
-  Verified   // + bioregion residency
-  Steward    // + community endorsement
+  Basic
+  // Wallet only
+  Standard
+  // DNA verified
+  Verified
+  // + bioregion residency
+  Steward
 }
+
+// + community endorsement
 
 /// pNFT datum
 pub type PnftDatum {
@@ -442,7 +446,6 @@ pub type Collective {
   treasury: ByteArray,
   bioregion: ByteArray,
 }
-
 // =============================================================================
 // THAT'S IT
 // =============================================================================

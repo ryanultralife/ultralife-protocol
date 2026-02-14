@@ -10,10 +10,14 @@
 
 use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
-use cardano/assets.{PolicyId, AssetName, quantity_of, flatten}
 use cardano/address.{Script}
-use cardano/transaction.{Transaction, Input, Output, OutputReference, InlineDatum}
-use ultralife/types.{PnftDatum, VerificationLevel, Basic, Ward, Standard, Verified, Steward}
+use cardano/assets.{AssetName, PolicyId, flatten, quantity_of}
+use cardano/transaction.{
+  InlineDatum, Input, Output, OutputReference, Transaction,
+}
+use ultralife/types.{
+  Basic, PnftDatum, Standard, Steward, VerificationLevel, Verified, Ward,
+}
 
 // =============================================================================
 // TYPE DEFINITIONS FOR INLINE STRUCTS
@@ -57,9 +61,7 @@ pub type ClaimRecord {
 
 pub type GrantsRedeemer {
   /// Claim signup grant (upon DNA verification)
-  ClaimGrant {
-    pnft: AssetName,
-  }
+  ClaimGrant { pnft: AssetName }
 }
 
 // =============================================================================
@@ -89,12 +91,13 @@ validator grants(config: GrantsConfig) {
     tx: Transaction,
   ) {
     expect Some(d) = datum
-    
     when redeemer is {
-      ClaimGrant { pnft } -> {
-        validate_claim(tx, d, pnft, config)
-      }
+      ClaimGrant { pnft } -> validate_claim(tx, d, pnft, config)
     }
+  }
+
+  else(_) {
+    fail
   }
 }
 
@@ -106,34 +109,29 @@ fn validate_claim(
 ) -> Bool {
   // 1. Pool must have tokens remaining
   let has_tokens = datum.tokens_remaining >= grant_amount
-  
   // 2. pNFT must be Standard level (just verified DNA)
   let pnft_valid = verify_standard_pnft(tx, pnft, config.pnft_policy)
-  
   // 3. pNFT owner must sign
   let owner_signed = verify_pnft_owner_signed(tx, pnft, config.pnft_policy)
-  
   // 4. Must not have claimed before (no existing claim record)
-  let not_claimed = verify_no_prior_claim(tx.reference_inputs, pnft, config.claim_records)
-  
+  let not_claimed =
+    verify_no_prior_claim(tx.reference_inputs, pnft, config.claim_records)
   // 5. Tokens must go to pNFT owner
-  let tokens_sent = verify_tokens_to_owner(
-    tx.outputs,
-    config.token_policy,
-    config.token_name,
-    grant_amount,
-    pnft,
-    config.pnft_policy,
-  )
-  
+  let tokens_sent =
+    verify_tokens_to_owner(
+      tx.outputs,
+      config.token_policy,
+      config.token_name,
+      grant_amount,
+      pnft,
+      config.pnft_policy,
+    )
   // 6. Claim record must be created
-  let record_created = verify_claim_record(tx.outputs, pnft, config.claim_records)
-  
+  let record_created =
+    verify_claim_record(tx.outputs, pnft, config.claim_records)
   // 7. Datum must be updated
   let datum_updated = verify_grants_datum(tx.outputs, datum)
-  
-  has_tokens && pnft_valid && owner_signed && not_claimed && 
-  tokens_sent && record_created && datum_updated
+  has_tokens && pnft_valid && owner_signed && not_claimed && tokens_sent && record_created && datum_updated
 }
 
 // =============================================================================
@@ -146,15 +144,18 @@ fn verify_standard_pnft(
   pnft_policy: PolicyId,
 ) -> Bool {
   // Find pNFT in reference inputs, verify level is Standard
-  list.any(tx.reference_inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect datum: PnftDatum = data
-        datum.level == Standard
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect datum: PnftDatum = data
+          datum.level == Standard
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn verify_pnft_owner_signed(
@@ -163,15 +164,18 @@ fn verify_pnft_owner_signed(
   pnft_policy: PolicyId,
 ) -> Bool {
   // Get owner from pNFT datum, check if signed
-  list.any(tx.reference_inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect datum: PnftDatum = data
-        list.has(tx.extra_signatories, datum.owner)
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect datum: PnftDatum = data
+          list.has(tx.extra_signatories, datum.owner)
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn verify_no_prior_claim(
@@ -180,22 +184,26 @@ fn verify_no_prior_claim(
   claim_records: ByteArray,
 ) -> Bool {
   // No existing claim record for this pNFT
-  !list.any(reference_inputs, fn(input) {
-    when input.output.address.payment_credential is {
-      Script(hash) -> if hash == claim_records {
-        when input.output.datum is {
-          InlineDatum(data) -> {
-            expect record: PnftClaimRecord = data
-            record.pnft == pnft
+  !list.any(
+    reference_inputs,
+    fn(input) {
+      when input.output.address.payment_credential is {
+        Script(hash) ->
+          if hash == claim_records {
+            when input.output.datum is {
+              InlineDatum(data) -> {
+                expect record: PnftClaimRecord = data
+                record.pnft == pnft
+              }
+              _ -> False
+            }
+          } else {
+            False
           }
-          _ -> False
-        }
-      } else {
-        False
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn verify_tokens_to_owner(
@@ -207,9 +215,12 @@ fn verify_tokens_to_owner(
   pnft_policy: PolicyId,
 ) -> Bool {
   // Verify grant tokens sent to an output (owner lookup from pNFT)
-  let total = list.foldl(outputs, 0, fn(output, acc) {
-    acc + quantity_of(output.value, policy, name)
-  })
+  let total =
+    list.foldl(
+      outputs,
+      0,
+      fn(output, acc) { acc + quantity_of(output.value, policy, name) },
+    )
   total >= amount
 }
 
@@ -219,40 +230,42 @@ fn verify_claim_record(
   claim_records: ByteArray,
 ) -> Bool {
   // Verify output to claim records with proper datum
-  list.any(outputs, fn(output) {
-    when output.address.payment_credential is {
-      Script(hash) -> if hash == claim_records {
-        when output.datum is {
-          InlineDatum(data) -> {
-            expect record: PnftClaimRecord = data
-            record.pnft == pnft
+  list.any(
+    outputs,
+    fn(output) {
+      when output.address.payment_credential is {
+        Script(hash) ->
+          if hash == claim_records {
+            when output.datum is {
+              InlineDatum(data) -> {
+                expect record: PnftClaimRecord = data
+                record.pnft == pnft
+              }
+              _ -> False
+            }
+          } else {
+            False
           }
-          _ -> False
+        _ -> False
+      }
+    },
+  )
+}
+
+fn verify_grants_datum(outputs: List<Output>, old_datum: GrantsDatum) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect new_datum: GrantsDatum = data
+          new_datum.tokens_remaining == old_datum.tokens_remaining - grant_amount && new_datum.grants_issued == old_datum.grants_issued + 1
         }
-      } else {
-        False
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
-
-fn verify_grants_datum(
-  outputs: List<Output>,
-  old_datum: GrantsDatum,
-) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect new_datum: GrantsDatum = data
-        new_datum.tokens_remaining == old_datum.tokens_remaining - grant_amount &&
-        new_datum.grants_issued == old_datum.grants_issued + 1
-      }
-      _ -> False
-    }
-  })
-}
-
 // =============================================================================
 // DOCUMENTATION
 // =============================================================================

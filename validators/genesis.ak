@@ -29,9 +29,13 @@ use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use aiken/interval.{Finite}
 use cardano/address.{Script}
-use cardano/assets.{PolicyId, AssetName, flatten}
-use cardano/transaction.{Transaction, Input, Output, OutputReference, InlineDatum}
-use ultralife/types.{PnftDatum, VerificationLevel, Basic, Standard, Verified, Steward}
+use cardano/assets.{AssetName, PolicyId, flatten}
+use cardano/transaction.{
+  InlineDatum, Input, Output, OutputReference, Transaction,
+}
+use ultralife/types.{
+  Basic, PnftDatum, Standard, Steward, VerificationLevel, Verified,
+}
 
 /// Oracle attestation for DNA verification
 pub type OracleAttestation {
@@ -96,10 +100,7 @@ pub type GenesisRedeemer {
     founder_attestations: List<VerificationKeyHash>,
   }
   /// Founder upgrades their OWN pNFT to Standard (self-verify during genesis)
-  FounderSelfVerify {
-    pnft: AssetName,
-    dna_hash: ByteArray,
-  }
+  FounderSelfVerify { pnft: AssetName, dna_hash: ByteArray }
   /// Founder upgrades their OWN pNFT directly to Steward
   FounderBecomeSteward { pnft: AssetName }
   /// Endorse community member as Steward during genesis
@@ -134,7 +135,6 @@ validator genesis(config: GenesisConfig) {
   ) {
     expect Some(d) = datum
     let slot = get_slot(tx)
-    
     when redeemer is {
       // =================================================================
       // FOUNDER SELF-VERIFICATION
@@ -143,22 +143,24 @@ validator genesis(config: GenesisConfig) {
       // =================================================================
       FounderSelfVerify { pnft, dna_hash } -> {
         expect d.genesis_active && slot < config.genesis_end_slot
-        
         // The signer must be a founding oracle
-        let signer_is_founder = list.any(config.founding_oracles, fn(f) {
-          list.has(tx.extra_signatories, f)
-        })
-        
+        let signer_is_founder =
+          list.any(
+            config.founding_oracles,
+            fn(f) { list.has(tx.extra_signatories, f) },
+          )
         // The pNFT must belong to the signer (founder verifying THEIR OWN)
-        let pnft_belongs_to_signer = verify_pnft_owner_signed(tx, pnft, config.pnft_policy)
-        
-        signer_is_founder &&
-        pnft_belongs_to_signer &&
-        verify_basic_pnft(tx, pnft, config.pnft_policy) &&
-        verify_dna_unique(tx, dna_hash) &&
-        verify_datum_verification(tx.outputs, d)
+        let pnft_belongs_to_signer =
+          verify_pnft_owner_signed(tx, pnft, config.pnft_policy)
+        signer_is_founder && pnft_belongs_to_signer && verify_basic_pnft(
+          tx,
+          pnft,
+          config.pnft_policy,
+        ) && verify_dna_unique(tx, dna_hash) && verify_datum_verification(
+          tx.outputs,
+          d,
+        )
       }
-      
       // =================================================================
       // FOUNDER BECOMES STEWARD
       // Founders can upgrade directly to Steward (skip Verified)
@@ -166,120 +168,150 @@ validator genesis(config: GenesisConfig) {
       // =================================================================
       FounderBecomeSteward { pnft } -> {
         expect d.genesis_active
-        
         // The signer must be a founding steward
-        let signer_is_founder = list.any(config.founding_stewards, fn(f) {
-          list.has(tx.extra_signatories, f)
-        })
-        
+        let signer_is_founder =
+          list.any(
+            config.founding_stewards,
+            fn(f) { list.has(tx.extra_signatories, f) },
+          )
         // The pNFT must belong to the signer AND be Standard level
         // (must have done DNA verification first)
-        let pnft_is_standard = verify_standard_pnft(tx, pnft, config.pnft_policy)
-        let pnft_belongs_to_signer = verify_pnft_owner_signed(tx, pnft, config.pnft_policy)
-        
+        let pnft_is_standard =
+          verify_standard_pnft(tx, pnft, config.pnft_policy)
+        let pnft_belongs_to_signer =
+          verify_pnft_owner_signed(tx, pnft, config.pnft_policy)
         signer_is_founder && pnft_is_standard && pnft_belongs_to_signer
-        // Note: pNFT contract must also check genesis datum to allow this upgrade
       }
-      
+      // Note: pNFT contract must also check genesis datum to allow this upgrade
       // =================================================================
       // GENESIS DNA VERIFICATION (for non-founders)
       // Multiple founders attest to someone else's DNA
       // =================================================================
       GenesisVerifyDNA { pnft, dna_hash, founder_attestations } -> {
         expect d.genesis_active && slot < config.genesis_end_slot
-        
         // Count valid founder signatures
-        let valid = list.length(list.filter(founder_attestations, fn(f) {
-          list.has(config.founding_oracles, f) &&
-          list.has(tx.extra_signatories, f)
-        }))
-        
+        let valid =
+          list.length(
+            list.filter(
+              founder_attestations,
+              fn(f) {
+                list.has(config.founding_oracles, f) && list.has(
+                  tx.extra_signatories,
+                  f,
+                )
+              },
+            ),
+          )
         // Must meet threshold
-        valid >= config.genesis_oracle_threshold &&
-        verify_basic_pnft(tx, pnft, config.pnft_policy) &&
-        verify_dna_unique(tx, dna_hash) &&
-        verify_datum_verification(tx.outputs, d)
+        valid >= config.genesis_oracle_threshold && verify_basic_pnft(
+          tx,
+          pnft,
+          config.pnft_policy,
+        ) && verify_dna_unique(tx, dna_hash) && verify_datum_verification(
+          tx.outputs,
+          d,
+        )
       }
-      
       // =================================================================
       // GENESIS STEWARD ENDORSEMENT (for non-founders)
       // Founders can endorse community members as Stewards
       // =================================================================
       GenesisEndorseSteward { pnft, founder_endorsements } -> {
         expect d.genesis_active
-        
-        let valid = list.length(list.filter(founder_endorsements, fn(f) {
-          list.has(config.founding_stewards, f) &&
-          list.has(tx.extra_signatories, f)
-        }))
-        
+        let valid =
+          list.length(
+            list.filter(
+              founder_endorsements,
+              fn(f) {
+                list.has(config.founding_stewards, f) && list.has(
+                  tx.extra_signatories,
+                  f,
+                )
+              },
+            ),
+          )
         // Need 2+ founder endorsements
-        valid >= 2 &&
-        verify_verified_pnft(tx, pnft, config.pnft_policy) &&
-        verify_datum_steward(tx.outputs, d)
+        valid >= 2 && verify_verified_pnft(tx, pnft, config.pnft_policy) && verify_datum_steward(
+          tx.outputs,
+          d,
+        )
       }
-      
       // =================================================================
       // ORACLE REGISTRATION
       // =================================================================
-      RegisterOracle { partner_id, signing_key, metadata_hash } -> {
+      RegisterOracle { partner_id, signing_key, metadata_hash } ->
         if d.genesis_active {
           // During genesis: 2+ founders
-          let founder_count = list.length(list.filter(
-            config.founding_stewards,
-            fn(f) { list.has(tx.extra_signatories, f) }
-          ))
+          let founder_count =
+            list.length(
+              list.filter(
+                config.founding_stewards,
+                fn(f) { list.has(tx.extra_signatories, f) },
+              ),
+            )
           founder_count >= 2
         } else {
           // After genesis: governance approval
           verify_governance_approval(tx, partner_id)
-        } &&
-        !list.any(d.registered_oracles, fn(o) { o.partner_id == partner_id }) &&
-        verify_oracle_registration(tx.outputs, d, partner_id, signing_key, metadata_hash, slot)
-      }
-      
+        } && !list.any(
+          d.registered_oracles,
+          fn(o) { o.partner_id == partner_id },
+        ) && verify_oracle_registration(
+          tx.outputs,
+          d,
+          partner_id,
+          signing_key,
+          metadata_hash,
+          slot,
+        )
       // =================================================================
       // ORACLE DEACTIVATION
       // =================================================================
-      DeactivateOracle { partner_id } -> {
-        list.any(d.registered_oracles, fn(o) { o.partner_id == partner_id && o.active }) &&
-        (if d.genesis_active {
-          list.length(list.filter(config.founding_stewards, fn(f) {
-            list.has(tx.extra_signatories, f)
-          })) >= 2
+      DeactivateOracle { partner_id } ->
+        list.any(
+          d.registered_oracles,
+          fn(o) { o.partner_id == partner_id && o.active },
+        ) && if d.genesis_active {
+          list.length(
+            list.filter(
+              config.founding_stewards,
+              fn(f) { list.has(tx.extra_signatories, f) },
+            ),
+          ) >= 2
         } else {
-          verify_governance_approval(tx, partner_id) ||
-          verify_steward_multisig(tx, 3, config.pnft_policy)
-        }) &&
-        verify_oracle_deactivation(tx.outputs, d, partner_id)
-      }
-      
+          verify_governance_approval(tx, partner_id) || verify_steward_multisig(
+            tx,
+            3,
+            config.pnft_policy,
+          )
+        } && verify_oracle_deactivation(tx.outputs, d, partner_id)
       // =================================================================
       // RECORD BIOREGION (called by bioregion contract)
       // =================================================================
-      RecordBioregion -> {
+      RecordBioregion ->
         // Bioregion contract calls this to increment counter
         // Must verify bioregion contract is in transaction
-        verify_bioregion_contract_present(tx, config) &&
-        verify_datum_bioregion(tx.outputs, d)
-      }
-      
+        verify_bioregion_contract_present(tx, config) && verify_datum_bioregion(
+          tx.outputs,
+          d,
+        )
       // =================================================================
       // END GENESIS
       // =================================================================
       EndGenesis -> {
         expect d.genesis_active
-        
         let time_ended = slot >= config.genesis_end_slot
-        let thresholds_met = 
-          d.stewards_created >= config.steward_threshold &&
-          list.length(d.registered_oracles) >= 3 &&
-          d.bioregions_created >= 1
-        
-        (time_ended || thresholds_met) &&
-        verify_genesis_ended(tx.outputs, d)
+        let thresholds_met =
+          d.stewards_created >= config.steward_threshold && list.length(
+            d.registered_oracles,
+          ) >= 3 && d.bioregions_created >= 1
+        ( time_ended || thresholds_met ) && verify_genesis_ended(tx.outputs, d)
       }
     }
+  }
+
+  else(_) {
+    fail
   }
 }
 
@@ -296,11 +328,20 @@ pub fn verify_dna_post_genesis(
 ) -> Bool {
   expect !genesis_datum.genesis_active
 
-  let valid = list.length(list.filter(oracle_attestations, fn(att) {
-    list.any(genesis_datum.registered_oracles, fn(o) {
-      o.partner_id == att.oracle_id && o.active && o.signing_key == att.signing_key
-    })
-  }))
+  let valid =
+    list.length(
+      list.filter(
+        oracle_attestations,
+        fn(att) {
+          list.any(
+            genesis_datum.registered_oracles,
+            fn(o) {
+              o.partner_id == att.oracle_id && o.active && o.signing_key == att.signing_key
+            },
+          )
+        },
+      ),
+    )
 
   valid >= required
 }
@@ -318,228 +359,320 @@ fn get_slot(tx: Transaction) -> Int {
 
 /// Verify Basic level pNFT exists and is valid
 fn verify_basic_pnft(tx: Transaction, pnft: AssetName, policy: PolicyId) -> Bool {
-  list.any(tx.reference_inputs, fn(input) {
-    let has_pnft = list.any(flatten(input.output.value), fn(asset) {
-      let (p, name, qty) = asset
-      p == policy && name == pnft && qty > 0
-    })
-    if has_pnft {
-      when input.output.datum is {
-        InlineDatum(data) -> {
-          expect datum: PnftDatum = data
-          datum.level == Basic
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      let has_pnft =
+        list.any(
+          flatten(input.output.value),
+          fn(asset) {
+            let (p, name, qty) = asset
+            p == policy && name == pnft && qty > 0
+          },
+        )
+      if has_pnft {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            datum.level == Basic
+          }
+          _ -> False
         }
-        _ -> False
+      } else {
+        False
       }
-    } else {
-      False
-    }
-  })
+    },
+  )
 }
 
 /// Verify Standard level pNFT exists and is valid
-fn verify_standard_pnft(tx: Transaction, pnft: AssetName, policy: PolicyId) -> Bool {
-  list.any(tx.reference_inputs, fn(input) {
-    let has_pnft = list.any(flatten(input.output.value), fn(asset) {
-      let (p, name, qty) = asset
-      p == policy && name == pnft && qty > 0
-    })
-    if has_pnft {
-      when input.output.datum is {
-        InlineDatum(data) -> {
-          expect datum: PnftDatum = data
-          datum.level == Standard || datum.level == Verified || datum.level == Steward
+fn verify_standard_pnft(
+  tx: Transaction,
+  pnft: AssetName,
+  policy: PolicyId,
+) -> Bool {
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      let has_pnft =
+        list.any(
+          flatten(input.output.value),
+          fn(asset) {
+            let (p, name, qty) = asset
+            p == policy && name == pnft && qty > 0
+          },
+        )
+      if has_pnft {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            datum.level == Standard || datum.level == Verified || datum.level == Steward
+          }
+          _ -> False
         }
-        _ -> False
+      } else {
+        False
       }
-    } else {
-      False
-    }
-  })
+    },
+  )
 }
 
 /// Verify Verified level pNFT exists and is valid  
-fn verify_verified_pnft(tx: Transaction, pnft: AssetName, policy: PolicyId) -> Bool {
-  list.any(tx.reference_inputs, fn(input) {
-    let has_pnft = list.any(flatten(input.output.value), fn(asset) {
-      let (p, name, qty) = asset
-      p == policy && name == pnft && qty > 0
-    })
-    if has_pnft {
-      when input.output.datum is {
-        InlineDatum(data) -> {
-          expect datum: PnftDatum = data
-          datum.level == Verified || datum.level == Steward
+fn verify_verified_pnft(
+  tx: Transaction,
+  pnft: AssetName,
+  policy: PolicyId,
+) -> Bool {
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      let has_pnft =
+        list.any(
+          flatten(input.output.value),
+          fn(asset) {
+            let (p, name, qty) = asset
+            p == policy && name == pnft && qty > 0
+          },
+        )
+      if has_pnft {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            datum.level == Verified || datum.level == Steward
+          }
+          _ -> False
         }
-        _ -> False
+      } else {
+        False
       }
-    } else {
-      False
-    }
-  })
+    },
+  )
 }
 
 /// Verify DNA hash is unique (not used by another pNFT)
 fn verify_dna_unique(tx: Transaction, hash: ByteArray) -> Bool {
   // Check no other pNFT in reference inputs has this DNA hash
-  !list.any(tx.reference_inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect datum: PnftDatum = data
-        datum.dna_hash == Some(hash)
-      }
-      _ -> False
-    }
-  })
-}
-
-/// Verify pNFT owner signed the transaction
-fn verify_pnft_owner_signed(tx: Transaction, pnft: AssetName, policy: PolicyId) -> Bool {
-  list.any(tx.reference_inputs, fn(input) {
-    let has_pnft = list.any(flatten(input.output.value), fn(asset) {
-      let (p, name, qty) = asset
-      p == policy && name == pnft && qty > 0
-    })
-    if has_pnft {
+  !list.any(
+    tx.reference_inputs,
+    fn(input) {
       when input.output.datum is {
         InlineDatum(data) -> {
           expect datum: PnftDatum = data
-          list.has(tx.extra_signatories, datum.owner)
+          datum.dna_hash == Some(hash)
         }
         _ -> False
       }
-    } else {
-      False
-    }
-  })
+    },
+  )
+}
+
+/// Verify pNFT owner signed the transaction
+fn verify_pnft_owner_signed(
+  tx: Transaction,
+  pnft: AssetName,
+  policy: PolicyId,
+) -> Bool {
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      let has_pnft =
+        list.any(
+          flatten(input.output.value),
+          fn(asset) {
+            let (p, name, qty) = asset
+            p == policy && name == pnft && qty > 0
+          },
+        )
+      if has_pnft {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            list.has(tx.extra_signatories, datum.owner)
+          }
+          _ -> False
+        }
+      } else {
+        False
+      }
+    },
+  )
 }
 
 /// Verify governance approval (governance contract in reference inputs)
 fn verify_governance_approval(tx: Transaction, subject: ByteArray) -> Bool {
   // Governance approval indicated by presence of governance contract
-  list.any(tx.reference_inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        // Check for governance approval datum
-        True
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) ->
+          // Check for governance approval datum
+          True
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 /// Verify required number of stewards signed
-fn verify_steward_multisig(tx: Transaction, required: Int, policy: PolicyId) -> Bool {
-  let steward_count = list.foldl(tx.reference_inputs, 0, fn(input, acc) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect datum: PnftDatum = data
-        if datum.level == Steward && list.has(tx.extra_signatories, datum.owner) {
-          acc + 1
-        } else {
-          acc
+fn verify_steward_multisig(
+  tx: Transaction,
+  required: Int,
+  policy: PolicyId,
+) -> Bool {
+  let steward_count =
+    list.foldl(
+      tx.reference_inputs,
+      0,
+      fn(input, acc) {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            if datum.level == Steward && list.has(
+              tx.extra_signatories,
+              datum.owner,
+            ) {
+              acc + 1
+            } else {
+              acc
+            }
+          }
+          _ -> acc
         }
-      }
-      _ -> acc
-    }
-  })
+      },
+    )
   steward_count >= required
 }
 
 /// Verify bioregion contract is present in transaction
-fn verify_bioregion_contract_present(tx: Transaction, config: GenesisConfig) -> Bool {
-  list.any(tx.reference_inputs, fn(input) {
-    when input.output.address.payment_credential is {
-      Script(hash) -> True  // Would check against config.bioregion_policy
-      _ -> False
-    }
-  })
+fn verify_bioregion_contract_present(
+  tx: Transaction,
+  config: GenesisConfig,
+) -> Bool {
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      when input.output.address.payment_credential is {
+        Script(hash) -> True
+        // Would check against config.bioregion_policy
+        _ -> False
+      }
+    },
+  )
 }
 
 fn verify_datum_verification(outputs: List<Output>, old: GenesisDatum) -> Bool {
-  list.any(outputs, fn(o) {
-    when o.datum is {
-      InlineDatum(data) -> {
-        expect new: GenesisDatum = data
-        new.verifications_completed == old.verifications_completed + 1
+  list.any(
+    outputs,
+    fn(o) {
+      when o.datum is {
+        InlineDatum(data) -> {
+          expect new: GenesisDatum = data
+          new.verifications_completed == old.verifications_completed + 1
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn verify_datum_steward(outputs: List<Output>, old: GenesisDatum) -> Bool {
-  list.any(outputs, fn(o) {
-    when o.datum is {
-      InlineDatum(data) -> {
-        expect new: GenesisDatum = data
-        new.stewards_created == old.stewards_created + 1
+  list.any(
+    outputs,
+    fn(o) {
+      when o.datum is {
+        InlineDatum(data) -> {
+          expect new: GenesisDatum = data
+          new.stewards_created == old.stewards_created + 1
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 /// Verify oracle registration in outputs
-fn verify_oracle_registration(outputs: List<Output>, old: GenesisDatum, id: ByteArray, key: VerificationKeyHash, meta: ByteArray, slot: Int) -> Bool {
-  list.any(outputs, fn(o) {
-    when o.datum is {
-      InlineDatum(data) -> {
-        expect new: GenesisDatum = data
-        // Check oracle added to list
-        list.any(new.registered_oracles, fn(oracle) {
-          oracle.partner_id == id &&
-          oracle.signing_key == key &&
-          oracle.metadata_hash == meta &&
-          oracle.registered_at == slot &&
-          oracle.active == True
-        })
+fn verify_oracle_registration(
+  outputs: List<Output>,
+  old: GenesisDatum,
+  id: ByteArray,
+  key: VerificationKeyHash,
+  meta: ByteArray,
+  slot: Int,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(o) {
+      when o.datum is {
+        InlineDatum(data) -> {
+          expect new: GenesisDatum = data
+          // Check oracle added to list
+          list.any(
+            new.registered_oracles,
+            fn(oracle) {
+              oracle.partner_id == id && oracle.signing_key == key && oracle.metadata_hash == meta && oracle.registered_at == slot && oracle.active == True
+            },
+          )
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 /// Verify oracle deactivation in outputs
-fn verify_oracle_deactivation(outputs: List<Output>, old: GenesisDatum, id: ByteArray) -> Bool {
-  list.any(outputs, fn(o) {
-    when o.datum is {
-      InlineDatum(data) -> {
-        expect new: GenesisDatum = data
-        // Check oracle marked inactive
-        list.any(new.registered_oracles, fn(oracle) {
-          oracle.partner_id == id && oracle.active == False
-        })
+fn verify_oracle_deactivation(
+  outputs: List<Output>,
+  old: GenesisDatum,
+  id: ByteArray,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(o) {
+      when o.datum is {
+        InlineDatum(data) -> {
+          expect new: GenesisDatum = data
+          // Check oracle marked inactive
+          list.any(
+            new.registered_oracles,
+            fn(oracle) { oracle.partner_id == id && oracle.active == False },
+          )
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn verify_datum_bioregion(outputs: List<Output>, old: GenesisDatum) -> Bool {
-  list.any(outputs, fn(o) {
-    when o.datum is {
-      InlineDatum(data) -> {
-        expect new: GenesisDatum = data
-        new.bioregions_created == old.bioregions_created + 1
+  list.any(
+    outputs,
+    fn(o) {
+      when o.datum is {
+        InlineDatum(data) -> {
+          expect new: GenesisDatum = data
+          new.bioregions_created == old.bioregions_created + 1
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn verify_genesis_ended(outputs: List<Output>, old: GenesisDatum) -> Bool {
-  list.any(outputs, fn(o) {
-    when o.datum is {
-      InlineDatum(data) -> {
-        expect new: GenesisDatum = data
-        new.genesis_active == False
+  list.any(
+    outputs,
+    fn(o) {
+      when o.datum is {
+        InlineDatum(data) -> {
+          expect new: GenesisDatum = data
+          new.genesis_active == False
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
-
 // =============================================================================
 // BOOTSTRAP SEQUENCE
 // =============================================================================

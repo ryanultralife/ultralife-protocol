@@ -1,3 +1,4 @@
+use aiken/collection/list
 // =============================================================================
 // UltraLife Protocol — Token Validator Rule Tests
 // =============================================================================
@@ -8,11 +9,10 @@
 // =============================================================================
 
 use ultralife/types.{
-  VerificationLevel, Basic, Standard, Verified, Steward,
-  TransactionType, Labor, Goods, Services, Gift, UBI, GovernanceReward, Internal,
-  ImpactClass, Positive, Neutral, Negative,
-  RemediationType, Immediate, Bonded, Offset,
-  can_transact, tx_type_code, impact_sign, impact_magnitude,
+  Basic, Bonded, Gift, Goods, GovernanceReward, Immediate, ImpactClass, Internal,
+  Labor, Negative, Neutral, Offset, Positive, RemediationType, Services,
+  Standard, Steward, TransactionType, UBI, VerificationLevel, Verified,
+  can_transact, impact_magnitude, impact_sign, tx_type_code,
 }
 
 // =============================================================================
@@ -54,10 +54,9 @@ test rule2_steward_can_transact() {
 
 test rule2_transact_levels_ordered() {
   // All levels that can transact have higher capability than Basic
-  !can_transact(Basic) &&
-  can_transact(Standard) &&
-  can_transact(Verified) &&
-  can_transact(Steward)
+  !can_transact(Basic) && can_transact(Standard) && can_transact(Verified) && can_transact(
+    Steward,
+  )
 }
 
 // =============================================================================
@@ -76,7 +75,8 @@ test rule3_basic_no_bioregion_required() {
 test rule3_standard_requires_bioregion() {
   // Standard can transact but validator enforces bioregion
   let level = Standard
-  can_transact(level)  // Passes Rule 2
+  can_transact(level)
+  // Passes Rule 2
   // Rule 3 enforced by: expect Some(sender_bioregion) = sender.bioregion
 }
 
@@ -93,12 +93,8 @@ test rule4_signature_required() {
   let has_alice = list.has(signers, "alice")
   let has_bob = list.has(signers, "bob")
   let has_dave = list.has(signers, "dave")
-  
   has_alice && has_bob && !has_dave
 }
-
-// Using builtin for testing
-use aiken/collection/list
 
 // =============================================================================
 // RULE 5: ALL RECIPIENTS MUST HAVE pNFTs
@@ -129,19 +125,20 @@ test rule6_labor_valid_without_hours() {
 }
 
 test rule6_goods_requires_quantity() {
-  let goods = Goods { product_code: "0x0301", quantity: 10, unit_code: "0x0601" }
+  let goods =
+    Goods { product_code: "0x0301", quantity: 10, unit_code: "0x0601" }
   tx_type_code(goods) == 2
 }
 
 test rule6_all_types_have_codes() {
   // Every transaction type maps to a unique code
-  tx_type_code(Labor { work_code: "", hours: None }) == 1 &&
-  tx_type_code(Goods { product_code: "", quantity: 1, unit_code: "" }) == 2 &&
-  tx_type_code(Services { service_code: "" }) == 3 &&
-  tx_type_code(Gift) == 4 &&
-  tx_type_code(UBI { cycle: 0 }) == 7 &&
-  tx_type_code(GovernanceReward { proposal_id: "" }) == 8 &&
-  tx_type_code(Internal) == 9
+  tx_type_code(Labor { work_code: "", hours: None }) == 1 && tx_type_code(
+    Goods { product_code: "", quantity: 1, unit_code: "" },
+  ) == 2 && tx_type_code(Services { service_code: "" }) == 3 && tx_type_code(
+    Gift,
+  ) == 4 && tx_type_code(UBI { cycle: 0 }) == 7 && tx_type_code(
+    GovernanceReward { proposal_id: "" },
+  ) == 8 && tx_type_code(Internal) == 9
 }
 
 // =============================================================================
@@ -149,7 +146,8 @@ test rule6_all_types_have_codes() {
 // =============================================================================
 
 test rule7_positive_no_remediation() {
-  let positive = Positive { impact_code: "0x0500", magnitude: 500, unit_code: None }
+  let positive =
+    Positive { impact_code: "0x0500", magnitude: 500, unit_code: None }
   impact_sign(positive) == 1
   // No remediation required for positive impact
 }
@@ -161,33 +159,36 @@ test rule7_neutral_no_remediation() {
 }
 
 test rule7_negative_requires_immediate_remediation() {
-  let negative = Negative {
-    impact_code: "0x0550",
-    magnitude: 200,
-    unit_code: None,
-    remediation: Immediate { output_index: 0 }
-  }
+  let negative =
+    Negative {
+      impact_code: "0x0550",
+      magnitude: 200,
+      unit_code: None,
+      remediation: Immediate { output_index: 0 },
+    }
   impact_sign(negative) == -1
   // Remediation is specified in the impact itself
 }
 
 test rule7_negative_requires_bonded_remediation() {
-  let negative = Negative {
-    impact_code: "0x0550",
-    magnitude: 500,
-    unit_code: None,
-    remediation: Bonded { bond_id: "bond123", deadline: 1000000 }
-  }
+  let negative =
+    Negative {
+      impact_code: "0x0550",
+      magnitude: 500,
+      unit_code: None,
+      remediation: Bonded { bond_id: "bond123", deadline: 1000000 },
+    }
   impact_sign(negative) == -1
 }
 
 test rule7_negative_requires_offset_remediation() {
-  let negative = Negative {
-    impact_code: "0x0550",
-    magnitude: 100,
-    unit_code: None,
-    remediation: Offset { amount: 100 }
-  }
+  let negative =
+    Negative {
+      impact_code: "0x0550",
+      magnitude: 100,
+      unit_code: None,
+      remediation: Offset { amount: 100 },
+    }
   impact_sign(negative) == -1
 }
 
@@ -196,7 +197,6 @@ test rule7_all_remediation_types() {
   let imm = Immediate { output_index: 2 }
   let bond = Bonded { bond_id: "test", deadline: 500000 }
   let off = Offset { amount: 50 }
-  
   // All are valid RemediationType variants
   True
 }
@@ -214,15 +214,16 @@ test rule8_record_tracks_sender() {
 test rule8_record_tracks_impact() {
   // Record includes impact sign and magnitude
   let positive = Positive { impact_code: "", magnitude: 500, unit_code: None }
-  let negative = Negative { 
-    impact_code: "", 
-    magnitude: 300, 
-    unit_code: None,
-    remediation: Immediate { output_index: 0 }
-  }
-  
-  impact_sign(positive) == 1 && impact_magnitude(positive) == 500 &&
-  impact_sign(negative) == -1 && impact_magnitude(negative) == 300
+  let negative =
+    Negative {
+      impact_code: "",
+      magnitude: 300,
+      unit_code: None,
+      remediation: Immediate { output_index: 0 },
+    }
+  impact_sign(positive) == 1 && impact_magnitude(positive) == 500 && impact_sign(
+    negative,
+  ) == -1 && impact_magnitude(negative) == 300
 }
 
 // =============================================================================

@@ -15,9 +15,8 @@ use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use cardano/assets.{AssetName}
 use ultralife/types.{
-  VerificationLevel, Basic, Ward, Standard, Verified, Steward,
-  CompoundBalance, MassUnit, Grams,
-  can_transact,
+  Basic, CompoundBalance, Grams, MassUnit, Standard, Steward, VerificationLevel,
+  Verified, Ward, can_transact,
 }
 
 // =============================================================================
@@ -82,11 +81,7 @@ fn mock_pnft_name(seed: Int) -> AssetName {
 }
 
 fn mock_compound_balance(compound: ByteArray, qty: Int) -> CompoundBalance {
-  CompoundBalance {
-    compound: compound,
-    quantity: qty,
-    unit: Grams,
-  }
+  CompoundBalance { compound, quantity: qty, unit: Grams }
 }
 
 fn mock_product_listing(
@@ -97,10 +92,10 @@ fn mock_product_listing(
 ) -> ListingDatum {
   ListingDatum {
     listing_id: #"6c697374696e67303031",
-    seller: seller,
+    seller,
     listing_type: Product {
       product_code: #"70726f64303031",
-      quantity: quantity,
+      quantity,
       impact_disclosure: impacts,
     },
     price: Fixed { amount: price },
@@ -114,7 +109,7 @@ fn mock_product_listing(
 fn mock_service_listing(seller: AssetName, price: Int) -> ListingDatum {
   ListingDatum {
     listing_id: #"6c697374696e67303032",
-    seller: seller,
+    seller,
     listing_type: Service { service_code: #"737276303031" },
     price: Fixed { amount: price },
     bioregion: #"62696f726567696f6e31",
@@ -257,13 +252,15 @@ fn has_impact_disclosure(listing: ListingDatum) -> Bool {
 }
 
 fn total_impact_magnitude(impacts: List<CompoundBalance>) -> Int {
-  list.foldl(impacts, 0, fn(impact, acc) {
-    acc + abs(impact.quantity)
-  })
+  list.foldl(impacts, 0, fn(impact, acc) { acc + abs(impact.quantity) })
 }
 
 fn abs(x: Int) -> Int {
-  if x < 0 { -x } else { x }
+  if x < 0 {
+    -x
+  } else {
+    x
+  }
 }
 
 test product_with_empty_impact_disclosure_valid() {
@@ -287,10 +284,8 @@ test service_always_valid_for_impact() {
 }
 
 test total_impact_calculation() {
-  let impacts = [
-    mock_compound_balance(#"0101", 500),
-    mock_compound_balance(#"0102", -200),
-  ]
+  let impacts =
+    [mock_compound_balance(#"0101", 500), mock_compound_balance(#"0102", -200)]
   total_impact_magnitude(impacts) == 700
 }
 
@@ -310,12 +305,14 @@ fn validate_listing_creation(
   listing_fee_paid: Bool,
 ) -> Bool {
   let seller_valid = can_sell(seller_level)
-  let price_valid = when price is {
-    Fixed { amount } -> is_valid_fixed_price(amount)
-    Range { min, max } -> is_valid_price_range(min, max)
-    SlidingScale { base, discount_bps } -> is_valid_sliding_scale(base, discount_bps)
-    Free -> True
-  }
+  let price_valid =
+    when price is {
+      Fixed { amount } -> is_valid_fixed_price(amount)
+      Range { min, max } -> is_valid_price_range(min, max)
+      SlidingScale { base, discount_bps } ->
+        is_valid_sliding_scale(base, discount_bps)
+      Free -> True
+    }
   let quantity_valid = quantity > 0
   seller_valid && price_valid && quantity_valid && listing_fee_paid
 }
@@ -363,10 +360,11 @@ fn validate_purchase(
   let buyer_valid = can_transact(buyer_level)
   let status_valid = can_purchase(listing_status)
   let payment_valid = payment_amount >= price
-  let not_expired = when expires_at is {
-    Some(expiry) -> current_slot <= expiry
-    None -> True
-  }
+  let not_expired =
+    when expires_at is {
+      Some(expiry) -> current_slot <= expiry
+      None -> True
+    }
   buyer_valid && status_valid && payment_valid && not_expired
 }
 
@@ -412,16 +410,13 @@ fn validate_listing_update(
   new_price: Option<Int>,
   new_quantity: Option<Int>,
 ) -> Bool {
-  caller_is_seller &&
-  can_purchase(listing_status) &&
-  (when new_price is {
+  caller_is_seller && can_purchase(listing_status) && when new_price is {
     Some(p) -> p > 0
     None -> True
-  }) &&
-  (when new_quantity is {
+  } && when new_quantity is {
     Some(q) -> q > 0
     None -> True
-  })
+  }
 }
 
 test seller_can_update_listing() {
@@ -433,7 +428,12 @@ test non_seller_cannot_update_listing() {
 }
 
 test cannot_update_sold_listing() {
-  !validate_listing_update(True, ListingSold { buyer: mock_pnft_name(1), sold_at: 5000 }, Some(150), Some(5))
+  !validate_listing_update(
+    True,
+    ListingSold { buyer: mock_pnft_name(1), sold_at: 5000 },
+    Some(150),
+    Some(5),
+  )
 }
 
 test update_with_invalid_price_fails() {
@@ -452,9 +452,11 @@ test partial_update_valid() {
 // LISTING CANCELLATION TESTS
 // =============================================================================
 
-fn validate_cancellation(caller_is_seller: Bool, listing_status: ListingStatus) -> Bool {
-  caller_is_seller &&
-  when listing_status is {
+fn validate_cancellation(
+  caller_is_seller: Bool,
+  listing_status: ListingStatus,
+) -> Bool {
+  caller_is_seller && when listing_status is {
     ListingActive -> True
     ListingPaused -> True
     _ -> False
@@ -474,7 +476,10 @@ test non_seller_cannot_cancel() {
 }
 
 test cannot_cancel_sold_listing() {
-  !validate_cancellation(True, ListingSold { buyer: mock_pnft_name(1), sold_at: 5000 })
+  !validate_cancellation(
+    True,
+    ListingSold { buyer: mock_pnft_name(1), sold_at: 5000 },
+  )
 }
 
 test cannot_cancel_expired_listing() {
@@ -516,9 +521,7 @@ fn validate_mark_sold(
   listing_status: ListingStatus,
   payment_verified: Bool,
 ) -> Bool {
-  (caller == seller || caller == buyer) &&
-  can_purchase(listing_status) &&
-  payment_verified
+  ( caller == seller || caller == buyer ) && can_purchase(listing_status) && payment_verified
 }
 
 test seller_can_mark_sold() {
@@ -559,27 +562,23 @@ test listing_expiry_one_slot_after_invalid() {
 }
 
 test multiple_impacts_accumulate() {
-  let impacts = [
-    mock_compound_balance(#"0101", 100),
-    mock_compound_balance(#"0102", 200),
-    mock_compound_balance(#"0103", 300),
-  ]
+  let impacts =
+    [
+      mock_compound_balance(#"0101", 100),
+      mock_compound_balance(#"0102", 200),
+      mock_compound_balance(#"0103", 300),
+    ]
   total_impact_magnitude(impacts) == 600
 }
 
 test negative_and_positive_impacts_both_counted() {
-  let impacts = [
-    mock_compound_balance(#"0101", 100),
-    mock_compound_balance(#"0105", -50),
-  ]
+  let impacts =
+    [mock_compound_balance(#"0101", 100), mock_compound_balance(#"0105", -50)]
   total_impact_magnitude(impacts) == 150
 }
 
 test listing_data_preserved_on_update() {
   let seller = mock_pnft_name(1)
   let listing = mock_product_listing(seller, 100, 10, [])
-  listing.listing_id == #"6c697374696e67303031" &&
-  listing.seller == seller &&
-  listing.bioregion == #"62696f726567696f6e31" &&
-  listing.created_at == 1000
+  listing.listing_id == #"6c697374696e67303031" && listing.seller == seller && listing.bioregion == #"62696f726567696f6e31" && listing.created_at == 1000
 }

@@ -12,9 +12,8 @@ use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use cardano/assets.{AssetName}
 use ultralife/types.{
-  VerificationLevel, Basic, Ward, Standard, Verified, Steward,
-  PnftDatum,
-  voting_weight, can_transact, can_propose,
+  Basic, PnftDatum, Standard, Steward, VerificationLevel, Verified, Ward,
+  can_propose, can_transact, voting_weight,
 }
 
 // =============================================================================
@@ -45,7 +44,7 @@ fn mock_pnft_name(seed: Int) -> AssetName {
 fn mock_basic_pnft(owner: VerificationKeyHash) -> PnftDatum {
   PnftDatum {
     pnft_id: #"0001",
-    owner: owner,
+    owner,
     level: Basic,
     bioregion: None,
     dna_hash: None,
@@ -62,7 +61,7 @@ fn mock_basic_pnft(owner: VerificationKeyHash) -> PnftDatum {
 fn mock_ward_pnft(owner: VerificationKeyHash, guardian: AssetName) -> PnftDatum {
   PnftDatum {
     pnft_id: #"0002",
-    owner: owner,
+    owner,
     level: Ward,
     bioregion: None,
     dna_hash: None,
@@ -79,7 +78,7 @@ fn mock_ward_pnft(owner: VerificationKeyHash, guardian: AssetName) -> PnftDatum 
 fn mock_standard_pnft(owner: VerificationKeyHash) -> PnftDatum {
   PnftDatum {
     pnft_id: #"0003",
-    owner: owner,
+    owner,
     level: Standard,
     bioregion: None,
     dna_hash: Some(#"646e61313233"),
@@ -93,10 +92,13 @@ fn mock_standard_pnft(owner: VerificationKeyHash) -> PnftDatum {
 }
 
 /// Create a mock pNFT datum at Verified level
-fn mock_verified_pnft(owner: VerificationKeyHash, bioregion: ByteArray) -> PnftDatum {
+fn mock_verified_pnft(
+  owner: VerificationKeyHash,
+  bioregion: ByteArray,
+) -> PnftDatum {
   PnftDatum {
     pnft_id: #"0004",
-    owner: owner,
+    owner,
     level: Verified,
     bioregion: Some(bioregion),
     dna_hash: Some(#"646e61343536"),
@@ -110,10 +112,13 @@ fn mock_verified_pnft(owner: VerificationKeyHash, bioregion: ByteArray) -> PnftD
 }
 
 /// Create a mock pNFT datum at Steward level
-fn mock_steward_pnft(owner: VerificationKeyHash, bioregion: ByteArray) -> PnftDatum {
+fn mock_steward_pnft(
+  owner: VerificationKeyHash,
+  bioregion: ByteArray,
+) -> PnftDatum {
   PnftDatum {
     pnft_id: #"0005",
-    owner: owner,
+    owner,
     level: Steward,
     bioregion: Some(bioregion),
     dna_hash: Some(#"646e61373839"),
@@ -202,7 +207,10 @@ test steward_can_propose() {
 // LEVEL TRANSITION VALIDATION TESTS
 // =============================================================================
 
-fn is_valid_level_transition(from: VerificationLevel, to: VerificationLevel) -> Bool {
+fn is_valid_level_transition(
+  from: VerificationLevel,
+  to: VerificationLevel,
+) -> Bool {
   when (from, to) is {
     (Basic, Standard) -> True
     (Ward, Standard) -> True
@@ -257,36 +265,23 @@ test transition_ward_to_verified_invalid() {
 // =============================================================================
 
 fn is_valid_basic_datum(datum: PnftDatum) -> Bool {
-  datum.level == Basic &&
-  datum.bioregion == None &&
-  datum.dna_hash == None &&
-  datum.guardian == None &&
-  datum.ward_since == None
+  datum.level == Basic && datum.bioregion == None && datum.dna_hash == None && datum.guardian == None && datum.ward_since == None
 }
 
 fn is_valid_ward_datum(datum: PnftDatum) -> Bool {
-  datum.level == Ward &&
-  datum.guardian != None &&
-  datum.ward_since != None &&
-  datum.dna_hash == None
+  datum.level == Ward && datum.guardian != None && datum.ward_since != None && datum.dna_hash == None
 }
 
 fn is_valid_standard_datum(datum: PnftDatum) -> Bool {
-  datum.level == Standard &&
-  datum.dna_hash != None &&
-  datum.guardian == None
+  datum.level == Standard && datum.dna_hash != None && datum.guardian == None
 }
 
 fn is_valid_verified_datum(datum: PnftDatum) -> Bool {
-  datum.level == Verified &&
-  datum.dna_hash != None &&
-  datum.bioregion != None
+  datum.level == Verified && datum.dna_hash != None && datum.bioregion != None
 }
 
 fn is_valid_steward_datum(datum: PnftDatum) -> Bool {
-  datum.level == Steward &&
-  datum.dna_hash != None &&
-  datum.bioregion != None
+  datum.level == Steward && datum.dna_hash != None && datum.bioregion != None
 }
 
 test basic_datum_valid() {
@@ -297,13 +292,15 @@ test basic_datum_valid() {
 
 test basic_datum_with_bioregion_invalid() {
   let owner = mock_vkh(1)
-  let datum = PnftDatum { ..mock_basic_pnft(owner), bioregion: Some(#"62696f31") }
+  let datum =
+    PnftDatum { ..mock_basic_pnft(owner), bioregion: Some(#"62696f31") }
   !is_valid_basic_datum(datum)
 }
 
 test basic_datum_with_dna_invalid() {
   let owner = mock_vkh(1)
-  let datum = PnftDatum { ..mock_basic_pnft(owner), dna_hash: Some(#"646e6131") }
+  let datum =
+    PnftDatum { ..mock_basic_pnft(owner), dna_hash: Some(#"646e6131") }
   !is_valid_basic_datum(datum)
 }
 
@@ -343,7 +340,8 @@ test standard_datum_without_dna_invalid() {
 test standard_datum_with_guardian_invalid() {
   let owner = mock_vkh(1)
   let guardian = mock_pnft_name(2)
-  let datum = PnftDatum { ..mock_standard_pnft(owner), guardian: Some(guardian) }
+  let datum =
+    PnftDatum { ..mock_standard_pnft(owner), guardian: Some(guardian) }
   !is_valid_standard_datum(datum)
 }
 
@@ -355,7 +353,8 @@ test verified_datum_valid() {
 
 test verified_datum_without_bioregion_invalid() {
   let owner = mock_vkh(1)
-  let datum = PnftDatum { ..mock_verified_pnft(owner, #"62696f31"), bioregion: None }
+  let datum =
+    PnftDatum { ..mock_verified_pnft(owner, #"62696f31"), bioregion: None }
   !is_valid_verified_datum(datum)
 }
 
@@ -367,7 +366,8 @@ test steward_datum_valid() {
 
 test steward_datum_without_bioregion_invalid() {
   let owner = mock_vkh(1)
-  let datum = PnftDatum { ..mock_steward_pnft(owner, #"62696f31"), bioregion: None }
+  let datum =
+    PnftDatum { ..mock_steward_pnft(owner, #"62696f31"), bioregion: None }
   !is_valid_steward_datum(datum)
 }
 
@@ -375,7 +375,10 @@ test steward_datum_without_bioregion_invalid() {
 // OWNER SIGNATURE VALIDATION TESTS
 // =============================================================================
 
-fn owner_signed(datum: PnftDatum, signatories: List<VerificationKeyHash>) -> Bool {
+fn owner_signed(
+  datum: PnftDatum,
+  signatories: List<VerificationKeyHash>,
+) -> Bool {
   list.has(signatories, datum.owner)
 }
 
@@ -421,12 +424,13 @@ fn guardian_must_sign_for_ward(
 ) -> Bool {
   when ward_datum.guardian is {
     Some(_guardian_pnft) -> {
-      let guardian_level_valid = when guardian_datum.level is {
-        Standard -> True
-        Verified -> True
-        Steward -> True
-        _ -> False
-      }
+      let guardian_level_valid =
+        when guardian_datum.level is {
+          Standard -> True
+          Verified -> True
+          Steward -> True
+          _ -> False
+        }
       let guardian_signed = list.has(signatories, guardian_datum.owner)
       guardian_level_valid && guardian_signed
     }
@@ -478,7 +482,8 @@ test ward_without_guardian_fails() {
   let ward_owner = mock_vkh(1)
   let guardian_owner = mock_vkh(2)
   let guardian_pnft = mock_pnft_name(2)
-  let ward_datum = PnftDatum { ..mock_ward_pnft(ward_owner, guardian_pnft), guardian: None }
+  let ward_datum =
+    PnftDatum { ..mock_ward_pnft(ward_owner, guardian_pnft), guardian: None }
   let guardian_datum = mock_standard_pnft(guardian_owner)
   let signatories = [guardian_owner]
   !guardian_must_sign_for_ward(ward_datum, guardian_datum, signatories)
@@ -493,24 +498,22 @@ fn validate_basic_to_standard_upgrade(
   new_datum: PnftDatum,
   dna_hash: ByteArray,
 ) -> Bool {
-  old_datum.level == Basic &&
-  new_datum.level == Standard &&
-  old_datum.owner == new_datum.owner &&
-  old_datum.pnft_id == new_datum.pnft_id &&
-  new_datum.dna_hash == Some(dna_hash) &&
-  old_datum.created_at == new_datum.created_at
+  old_datum.level == Basic && new_datum.level == Standard && old_datum.owner == new_datum.owner && old_datum.pnft_id == new_datum.pnft_id && new_datum.dna_hash == Some(
+    dna_hash,
+  ) && old_datum.created_at == new_datum.created_at
 }
 
 test basic_to_standard_upgrade_valid() {
   let owner = mock_vkh(1)
   let old_datum = mock_basic_pnft(owner)
   let dna_hash = #"646e615f766572696669636174696f6e5f68617368"
-  let new_datum = PnftDatum {
-    ..old_datum,
-    level: Standard,
-    dna_hash: Some(dna_hash),
-    upgraded_at: Some(5000),
-  }
+  let new_datum =
+    PnftDatum {
+      ..old_datum,
+      level: Standard,
+      dna_hash: Some(dna_hash),
+      upgraded_at: Some(5000),
+    }
   validate_basic_to_standard_upgrade(old_datum, new_datum, dna_hash)
 }
 
@@ -519,12 +522,13 @@ test basic_to_standard_fails_with_wrong_dna() {
   let old_datum = mock_basic_pnft(owner)
   let dna_hash = #"646e615f766572696669636174696f6e5f68617368"
   let wrong_dna = #"77726f6e675f646e615f68617368"
-  let new_datum = PnftDatum {
-    ..old_datum,
-    level: Standard,
-    dna_hash: Some(wrong_dna),
-    upgraded_at: Some(5000),
-  }
+  let new_datum =
+    PnftDatum {
+      ..old_datum,
+      level: Standard,
+      dna_hash: Some(wrong_dna),
+      upgraded_at: Some(5000),
+    }
   !validate_basic_to_standard_upgrade(old_datum, new_datum, dna_hash)
 }
 
@@ -533,13 +537,14 @@ test basic_to_standard_fails_with_owner_change() {
   let new_owner = mock_vkh(2)
   let old_datum = mock_basic_pnft(owner)
   let dna_hash = #"646e615f766572696669636174696f6e5f68617368"
-  let new_datum = PnftDatum {
-    ..old_datum,
-    owner: new_owner,
-    level: Standard,
-    dna_hash: Some(dna_hash),
-    upgraded_at: Some(5000),
-  }
+  let new_datum =
+    PnftDatum {
+      ..old_datum,
+      owner: new_owner,
+      level: Standard,
+      dna_hash: Some(dna_hash),
+      upgraded_at: Some(5000),
+    }
   !validate_basic_to_standard_upgrade(old_datum, new_datum, dna_hash)
 }
 
@@ -547,13 +552,14 @@ test basic_to_standard_fails_with_pnft_id_change() {
   let owner = mock_vkh(1)
   let old_datum = mock_basic_pnft(owner)
   let dna_hash = #"646e615f766572696669636174696f6e5f68617368"
-  let new_datum = PnftDatum {
-    ..old_datum,
-    pnft_id: #"6469666665726574696400",
-    level: Standard,
-    dna_hash: Some(dna_hash),
-    upgraded_at: Some(5000),
-  }
+  let new_datum =
+    PnftDatum {
+      ..old_datum,
+      pnft_id: #"6469666665726574696400",
+      level: Standard,
+      dna_hash: Some(dna_hash),
+      upgraded_at: Some(5000),
+    }
   !validate_basic_to_standard_upgrade(old_datum, new_datum, dna_hash)
 }
 
@@ -562,11 +568,9 @@ fn validate_ward_to_standard_upgrade(
   new_datum: PnftDatum,
   dna_hash: ByteArray,
 ) -> Bool {
-  old_datum.level == Ward &&
-  new_datum.level == Standard &&
-  old_datum.owner == new_datum.owner &&
-  new_datum.dna_hash == Some(dna_hash) &&
-  new_datum.guardian == None
+  old_datum.level == Ward && new_datum.level == Standard && old_datum.owner == new_datum.owner && new_datum.dna_hash == Some(
+    dna_hash,
+  ) && new_datum.guardian == None
 }
 
 test ward_to_standard_upgrade_valid() {
@@ -574,13 +578,14 @@ test ward_to_standard_upgrade_valid() {
   let guardian_pnft = mock_pnft_name(2)
   let old_datum = mock_ward_pnft(owner, guardian_pnft)
   let dna_hash = #"646e615f766572696669636174696f6e5f68617368"
-  let new_datum = PnftDatum {
-    ..old_datum,
-    level: Standard,
-    dna_hash: Some(dna_hash),
-    guardian: None,
-    upgraded_at: Some(5000),
-  }
+  let new_datum =
+    PnftDatum {
+      ..old_datum,
+      level: Standard,
+      dna_hash: Some(dna_hash),
+      guardian: None,
+      upgraded_at: Some(5000),
+    }
   validate_ward_to_standard_upgrade(old_datum, new_datum, dna_hash)
 }
 
@@ -589,12 +594,13 @@ test ward_to_standard_fails_if_guardian_not_removed() {
   let guardian_pnft = mock_pnft_name(2)
   let old_datum = mock_ward_pnft(owner, guardian_pnft)
   let dna_hash = #"646e615f766572696669636174696f6e5f68617368"
-  let new_datum = PnftDatum {
-    ..old_datum,
-    level: Standard,
-    dna_hash: Some(dna_hash),
-    upgraded_at: Some(5000),
-  }
+  let new_datum =
+    PnftDatum {
+      ..old_datum,
+      level: Standard,
+      dna_hash: Some(dna_hash),
+      upgraded_at: Some(5000),
+    }
   !validate_ward_to_standard_upgrade(old_datum, new_datum, dna_hash)
 }
 
@@ -603,8 +609,10 @@ test ward_to_standard_fails_if_guardian_not_removed() {
 // =============================================================================
 
 fn verify_single_mint(mint_amounts: List<(AssetName, Int)>) -> Bool {
-  list.length(mint_amounts) == 1 &&
-  list.all(mint_amounts, fn(pair) { pair.2nd == 1 })
+  list.length(mint_amounts) == 1 && list.all(
+    mint_amounts,
+    fn(pair) { pair.2nd == 1 },
+  )
 }
 
 test single_mint_valid() {
@@ -637,8 +645,10 @@ test single_mint_fails_with_empty_list() {
 // =============================================================================
 
 fn verify_single_burn(mint_amounts: List<(AssetName, Int)>) -> Bool {
-  list.length(mint_amounts) == 1 &&
-  list.all(mint_amounts, fn(pair) { pair.2nd == -1 })
+  list.length(mint_amounts) == 1 && list.all(
+    mint_amounts,
+    fn(pair) { pair.2nd == -1 },
+  )
 }
 
 test single_burn_valid() {
@@ -660,7 +670,10 @@ test single_burn_fails_with_multiple_tokens() {
 // ORACLE ATTESTATION VALIDATION TESTS
 // =============================================================================
 
-fn verify_attestation_threshold(attestation_count: Int, required_threshold: Int) -> Bool {
+fn verify_attestation_threshold(
+  attestation_count: Int,
+  required_threshold: Int,
+) -> Bool {
   attestation_count >= required_threshold
 }
 
@@ -710,7 +723,10 @@ test dna_unique_with_empty_list() {
 // SPENDING VALIDATOR REDEEMER TESTS
 // =============================================================================
 
-fn is_valid_spend_redeemer(current_level: VerificationLevel, redeemer_type: Int) -> Bool {
+fn is_valid_spend_redeemer(
+  current_level: VerificationLevel,
+  redeemer_type: Int,
+) -> Bool {
   when (current_level, redeemer_type) is {
     (Basic, 1) -> True
     (Ward, 2) -> True
@@ -751,11 +767,13 @@ test verified_can_upgrade_to_steward() {
 }
 
 test any_level_can_burn() {
-  is_valid_spend_redeemer(Basic, 6) &&
-  is_valid_spend_redeemer(Ward, 6) &&
-  is_valid_spend_redeemer(Standard, 6) &&
-  is_valid_spend_redeemer(Verified, 6) &&
-  is_valid_spend_redeemer(Steward, 6)
+  is_valid_spend_redeemer(Basic, 6) && is_valid_spend_redeemer(Ward, 6) && is_valid_spend_redeemer(
+    Standard,
+    6,
+  ) && is_valid_spend_redeemer(Verified, 6) && is_valid_spend_redeemer(
+    Steward,
+    6,
+  )
 }
 
 // =============================================================================
@@ -763,9 +781,9 @@ test any_level_can_burn() {
 // =============================================================================
 
 test verification_level_ordering() {
-  voting_weight(Basic) < voting_weight(Standard) &&
-  voting_weight(Standard) < voting_weight(Verified) &&
-  voting_weight(Verified) < voting_weight(Steward)
+  voting_weight(Basic) < voting_weight(Standard) && voting_weight(Standard) < voting_weight(
+    Verified,
+  ) && voting_weight(Verified) < voting_weight(Steward)
 }
 
 test ward_and_basic_have_same_voting_weight() {
@@ -773,8 +791,9 @@ test ward_and_basic_have_same_voting_weight() {
 }
 
 test transaction_capability_matches_voting_ability() {
-  !can_transact(Basic) && voting_weight(Basic) == 0 &&
-  can_transact(Standard) && voting_weight(Standard) > 0 &&
-  can_transact(Verified) && voting_weight(Verified) > 0 &&
-  can_transact(Steward) && voting_weight(Steward) > 0
+  !can_transact(Basic) && voting_weight(Basic) == 0 && can_transact(Standard) && voting_weight(
+    Standard,
+  ) > 0 && can_transact(Verified) && voting_weight(Verified) > 0 && can_transact(
+    Steward,
+  ) && voting_weight(Steward) > 0
 }

@@ -21,12 +21,14 @@
 
 use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
-use cardano/assets.{PolicyId, AssetName, Value, quantity_of}
-use cardano/transaction.{Transaction, Input, Output, OutputReference, InlineDatum}
+use cardano/assets.{AssetName, PolicyId, Value, quantity_of}
+use cardano/transaction.{
+  InlineDatum, Input, Output, OutputReference, Transaction,
+}
 use ultralife/types.{
-  PnftDatum, VerificationLevel, Standard, Verified, Steward,
-  CompoundFlow, CompoundCode, MassUnit, MeasurementMethod,
-  ActivityImpact, AssetActivityRecord, can_transact,
+  ActivityImpact, AssetActivityRecord, CompoundCode, CompoundFlow, MassUnit,
+  MeasurementMethod, PnftDatum, Standard, Steward, VerificationLevel, Verified,
+  can_transact,
 }
 
 // =============================================================================
@@ -239,16 +241,13 @@ pub type EscrowStatus {
   /// Work in progress
   WorkStarted { start_time: Int }
   /// Work submitted, pending verification
-  WorkSubmitted { 
+  WorkSubmitted {
     submission_time: Int,
     evidence_hash: ByteArray,
     actual_impacts: List<CompoundFlow>,
   }
   /// Verified, ready for release
-  Verified { 
-    verifier: AssetName,
-    verification_time: Int,
-  }
+  Verified { verifier: AssetName, verification_time: Int }
   /// Released to worker
   Released { release_time: Int }
   /// Refunded to requester
@@ -281,12 +280,11 @@ pub type WorkAuctionRedeemer {
   /// Cancel request (only if no accepted bid)
   CancelRequest { reason: ByteArray }
   /// Update request (only if Open)
-  UpdateRequest { 
+  UpdateRequest {
     new_specifications: Option<ByteArray>,
     new_budget_max: Option<Int>,
     new_deadline: Option<Int>,
   }
-  
   // === Bid Management ===
   /// Submit bid on request
   SubmitBid {
@@ -307,7 +305,6 @@ pub type WorkAuctionRedeemer {
   }
   /// Reject bid (requester only)
   RejectBid { bid_id: ByteArray, reason: Option<ByteArray> }
-  
   // === Work Execution ===
   /// Start work (worker only, after bid accepted)
   StartWork { escrow_id: ByteArray }
@@ -318,25 +315,17 @@ pub type WorkAuctionRedeemer {
     actual_impacts: List<CompoundFlow>,
   }
   /// Verify work (authorized verifiers only)
-  VerifyWork {
-    escrow_id: ByteArray,
-    verification_result: VerificationResult,
-  }
-  
+  VerifyWork { escrow_id: ByteArray, verification_result: VerificationResult }
   // === Payment ===
   /// Release payment (after verification)
   ReleasePayment { escrow_id: ByteArray }
   /// Request refund (if deadline passed, work not completed)
   RequestRefund { escrow_id: ByteArray, reason: ByteArray }
-  
   // === Disputes ===
   /// Initiate dispute
   InitiateDispute { escrow_id: ByteArray, reason: ByteArray }
   /// Resolve dispute (governance only)
-  ResolveDispute { 
-    dispute_id: ByteArray,
-    resolution: DisputeResolution,
-  }
+  ResolveDispute { dispute_id: ByteArray, resolution: DisputeResolution }
 }
 
 /// Result of work verification
@@ -396,73 +385,90 @@ validator work_auction(config: WorkAuctionConfig) {
   ) {
     when redeemer is {
       // === Request Management ===
-      CreateRequest { work_type, specifications_hash, expected_impacts, budget_min, budget_max, required_certifications, bid_deadline, work_deadline } -> {
+      CreateRequest {
+        work_type,
+        specifications_hash,
+        expected_impacts,
+        budget_min,
+        budget_max,
+        required_certifications,
+        bid_deadline,
+        work_deadline,
+        ..
+      } ->
         validate_create_request(
-          tx, work_type, specifications_hash, expected_impacts,
-          budget_min, budget_max, required_certifications,
-          bid_deadline, work_deadline, config
+          tx,
+          work_type,
+          specifications_hash,
+          expected_impacts,
+          budget_min,
+          budget_max,
+          required_certifications,
+          bid_deadline,
+          work_deadline,
+          config,
         )
-      }
-      
-      CancelRequest { reason } -> {
+      CancelRequest { reason } ->
         validate_cancel_request(tx, datum, reason, config)
-      }
-      
-      UpdateRequest { new_specifications, new_budget_max, new_deadline } -> {
-        validate_update_request(tx, datum, new_specifications, new_budget_max, new_deadline, config)
-      }
-      
-      // === Bid Management ===
-      SubmitBid { request_id, bid_amount, estimated_impacts, proposed_completion, methods_hash } -> {
-        validate_submit_bid(
-          tx, request_id, bid_amount, estimated_impacts,
-          proposed_completion, methods_hash, config
+      UpdateRequest { new_specifications, new_budget_max, new_deadline } ->
+        validate_update_request(
+          tx,
+          datum,
+          new_specifications,
+          new_budget_max,
+          new_deadline,
+          config,
         )
-      }
-      
-      WithdrawBid { bid_id } -> {
-        validate_withdraw_bid(tx, datum, bid_id, config)
-      }
-      
-      AcceptBid { bid_id } -> {
-        validate_accept_bid(tx, datum, bid_id, config)
-      }
-      
-      RejectBid { bid_id, reason } -> {
+      // === Bid Management ===
+      SubmitBid {
+        request_id,
+        bid_amount,
+        estimated_impacts,
+        proposed_completion,
+        methods_hash,
+      } ->
+        validate_submit_bid(
+          tx,
+          request_id,
+          bid_amount,
+          estimated_impacts,
+          proposed_completion,
+          methods_hash,
+          config,
+        )
+      WithdrawBid { bid_id } -> validate_withdraw_bid(tx, datum, bid_id, config)
+      AcceptBid { bid_id, .. } -> validate_accept_bid(tx, datum, bid_id, config)
+      RejectBid { bid_id, reason } ->
         validate_reject_bid(tx, datum, bid_id, reason, config)
-      }
-      
       // === Work Execution ===
-      StartWork { escrow_id } -> {
+      StartWork { escrow_id } ->
         validate_start_work(tx, datum, escrow_id, config)
-      }
-      
-      SubmitWork { escrow_id, evidence_hash, actual_impacts } -> {
-        validate_submit_work(tx, datum, escrow_id, evidence_hash, actual_impacts, config)
-      }
-      
-      VerifyWork { escrow_id, verification_result } -> {
+      SubmitWork { escrow_id, evidence_hash, actual_impacts } ->
+        validate_submit_work(
+          tx,
+          datum,
+          escrow_id,
+          evidence_hash,
+          actual_impacts,
+          config,
+        )
+      VerifyWork { escrow_id, verification_result } ->
         validate_verify_work(tx, datum, escrow_id, verification_result, config)
-      }
-      
       // === Payment ===
-      ReleasePayment { escrow_id } -> {
+      ReleasePayment { escrow_id } ->
         validate_release_payment(tx, datum, escrow_id, config)
-      }
-      
-      RequestRefund { escrow_id, reason } -> {
+      RequestRefund { escrow_id, reason } ->
         validate_request_refund(tx, datum, escrow_id, reason, config)
-      }
-      
       // === Disputes ===
-      InitiateDispute { escrow_id, reason } -> {
+      InitiateDispute { escrow_id, reason } ->
         validate_initiate_dispute(tx, datum, escrow_id, reason, config)
-      }
-      
-      ResolveDispute { dispute_id, resolution } -> {
+      ResolveDispute { dispute_id, resolution } ->
         validate_resolve_dispute(tx, datum, dispute_id, resolution, config)
-      }
     }
+  }
+
+  else(_) {
+    fail
   }
 }
 
@@ -493,37 +499,24 @@ fn validate_create_request(
   let requester_pnft = find_signer_pnft(tx, config.pnft_policy)
   expect Some(requester) = requester_pnft
   expect can_transact(requester.level)
-  
   // 2. Requester must own the asset being worked on
   // (Verified via reference input showing ownership)
-  
   // 3. Budget must be valid
   expect budget_min > 0
   expect budget_max >= budget_min
-  
   // 4. Must have at least one expected impact (no neutral work)
   expect list.length(expected_impacts) >= 1
-  
   // 5. Deadlines must be in future and valid
   let current_slot = get_current_slot(tx)
   expect bid_deadline > current_slot + config.min_bid_deadline
   expect work_deadline > bid_deadline
-  
   // 6. Request UTXO must be created with correct datum
   let request_output = find_request_output(tx.outputs, config)
   expect Some(output) = request_output
   expect InlineDatum(data) = output.datum
   expect RequestDatum(request): WorkAuctionDatum = data
-  
   // 7. Verify request fields match
-  request.requester == requester.pnft_id &&
-  request.work_type == work_type &&
-  request.specifications_hash == specifications_hash &&
-  request.budget_min == budget_min &&
-  request.budget_max == budget_max &&
-  request.bid_deadline == bid_deadline &&
-  request.work_deadline == work_deadline &&
-  request.status == Open
+  request.requester == requester.pnft_id && request.work_type == work_type && request.specifications_hash == specifications_hash && request.budget_min == budget_min && request.budget_max == budget_max && request.bid_deadline == bid_deadline && request.work_deadline == work_deadline && request.status == Open
 }
 
 fn validate_cancel_request(
@@ -534,21 +527,22 @@ fn validate_cancel_request(
 ) -> Bool {
   // 1. Must have existing request
   expect Some(RequestDatum(request)) = datum
-  
   // 2. Request must be Open (no accepted bid)
   expect request.status == Open
-  
   // 3. Requester must sign
-  expect list.has(tx.extra_signatories, get_pnft_owner(tx, request.requester, config.pnft_policy))
-  
+  expect
+    list.has(
+      tx.extra_signatories,
+      get_pnft_owner(tx, request.requester, config.pnft_policy),
+    )
   // 4. Output must show cancelled status
   let updated_output = find_request_output(tx.outputs, config)
   expect Some(output) = updated_output
   expect InlineDatum(data) = output.datum
   expect RequestDatum(updated): WorkAuctionDatum = data
-  
-  updated.request_id == request.request_id &&
-  updated.status == Cancelled { reason: reason }
+  updated.request_id == request.request_id && updated.status == Cancelled {
+    reason,
+  }
 }
 
 fn validate_update_request(
@@ -562,15 +556,18 @@ fn validate_update_request(
   // 1. Must have existing Open request
   expect Some(RequestDatum(request)) = datum
   expect request.status == Open
-  
   // 2. Requester must sign
-  expect list.has(tx.extra_signatories, get_pnft_owner(tx, request.requester, config.pnft_policy))
-  
+  expect
+    list.has(
+      tx.extra_signatories,
+      get_pnft_owner(tx, request.requester, config.pnft_policy),
+    )
   // 3. Can only increase budget/deadline, not decrease
-  let budget_valid = when new_budget_max is {
-    Some(new_max) -> new_max >= request.budget_max
-    None -> True
-  }
+  let budget_valid =
+    when new_budget_max is {
+      Some(new_max) -> new_max >= request.budget_max
+      None -> True
+    }
 
   budget_valid
 }
@@ -592,42 +589,30 @@ fn validate_submit_bid(
   let bidder_pnft = find_signer_pnft(tx, config.pnft_policy)
   expect Some(bidder) = bidder_pnft
   expect can_transact(bidder.level)
-  
   // 2. Request must exist and be Open
   let request = find_request_by_id(tx.reference_inputs, request_id, config)
   expect Some(req) = request
   expect req.status == Open
-  
   // 3. Bidder must meet minimum level requirement
   expect meets_level_requirement(bidder.level, req.min_worker_level)
-  
   // 4. Bidder must have required certifications
   // (Verified via pNFT datum or separate credential NFTs)
-  
   // 5. Bid amount must be within budget range
   expect bid_amount >= req.budget_min
   expect bid_amount <= req.budget_max
-  
   // 6. Must have impact estimates (compound-based)
   expect list.length(estimated_impacts) >= 1
-  
   // 7. Proposed completion must be before deadline
   expect proposed_completion <= req.work_deadline
-  
   // 8. Bid deadline not passed
   let current_slot = get_current_slot(tx)
   expect current_slot < req.bid_deadline
-  
   // 9. Bid UTXO must be created
   let bid_output = find_bid_output(tx.outputs, config)
   expect Some(output) = bid_output
   expect InlineDatum(data) = output.datum
   expect BidDatum(bid): WorkAuctionDatum = data
-  
-  bid.request_id == request_id &&
-  bid.bidder == bidder.pnft_id &&
-  bid.bid_amount == bid_amount &&
-  bid.status == Pending
+  bid.request_id == request_id && bid.bidder == bidder.pnft_id && bid.bid_amount == bid_amount && bid.status == Pending
 }
 
 fn validate_accept_bid(
@@ -639,32 +624,27 @@ fn validate_accept_bid(
   // 1. Must have request datum
   expect Some(RequestDatum(request)) = datum
   expect request.status == Open
-  
   // 2. Requester must sign
-  expect list.has(tx.extra_signatories, get_pnft_owner(tx, request.requester, config.pnft_policy))
-  
+  expect
+    list.has(
+      tx.extra_signatories,
+      get_pnft_owner(tx, request.requester, config.pnft_policy),
+    )
   // 3. Bid must exist and be Pending
   let bid = find_bid_by_id(tx.reference_inputs, bid_id, config)
   expect Some(b) = bid
   expect b.status == Pending
   expect b.request_id == request.request_id
-  
   // 4. Requester must fund escrow with bid amount
   let escrow_output = find_escrow_output(tx.outputs, config)
   expect Some(escrow_out) = escrow_output
-  let tokens_in_escrow = quantity_of(escrow_out.value, config.token_policy, config.token_name)
+  let tokens_in_escrow =
+    quantity_of(escrow_out.value, config.token_policy, config.token_name)
   expect tokens_in_escrow >= b.bid_amount
-  
   // 5. Escrow datum must be correct
   expect InlineDatum(data) = escrow_out.datum
   expect EscrowDatum(escrow): WorkAuctionDatum = data
-  
-  escrow.request_id == request.request_id &&
-  escrow.bid_id == bid_id &&
-  escrow.requester == request.requester &&
-  escrow.worker == b.bidder &&
-  escrow.amount == b.bid_amount &&
-  escrow.status == Funded
+  escrow.request_id == request.request_id && escrow.bid_id == bid_id && escrow.requester == request.requester && escrow.worker == b.bidder && escrow.amount == b.bid_amount && escrow.status == Funded
 }
 
 fn validate_withdraw_bid(
@@ -677,10 +657,12 @@ fn validate_withdraw_bid(
   expect Some(BidDatum(bid)) = datum
   expect bid.bid_id == bid_id
   expect bid.status == Pending
-  
   // 2. Bidder must sign
-  expect list.has(tx.extra_signatories, get_pnft_owner(tx, bid.bidder, config.pnft_policy))
-  
+  expect
+    list.has(
+      tx.extra_signatories,
+      get_pnft_owner(tx, bid.bidder, config.pnft_policy),
+    )
   True
 }
 
@@ -709,19 +691,21 @@ fn validate_start_work(
   expect Some(EscrowDatum(escrow)) = datum
   expect escrow.escrow_id == escrow_id
   expect escrow.status == Funded
-  
   // 2. Worker must sign
-  expect list.has(tx.extra_signatories, get_pnft_owner(tx, escrow.worker, config.pnft_policy))
-  
+  expect
+    list.has(
+      tx.extra_signatories,
+      get_pnft_owner(tx, escrow.worker, config.pnft_policy),
+    )
   // 3. Update escrow status to WorkStarted
   let current_slot = get_current_slot(tx)
   let updated_output = find_escrow_output(tx.outputs, config)
   expect Some(output) = updated_output
   expect InlineDatum(data) = output.datum
   expect EscrowDatum(updated): WorkAuctionDatum = data
-  
-  updated.escrow_id == escrow_id &&
-  updated.status == WorkStarted { start_time: current_slot }
+  updated.escrow_id == escrow_id && updated.status == WorkStarted {
+    start_time: current_slot,
+  }
 }
 
 fn validate_submit_work(
@@ -736,27 +720,26 @@ fn validate_submit_work(
   expect Some(EscrowDatum(escrow)) = datum
   expect escrow.escrow_id == escrow_id
   expect WorkStarted { .. } = escrow.status
-  
   // 2. Worker must sign
-  expect list.has(tx.extra_signatories, get_pnft_owner(tx, escrow.worker, config.pnft_policy))
-  
+  expect
+    list.has(
+      tx.extra_signatories,
+      get_pnft_owner(tx, escrow.worker, config.pnft_policy),
+    )
   // 3. Must provide actual impacts (compound flows)
   expect list.length(actual_impacts) >= 1
-  
   // 4. Evidence must be provided
   expect evidence_hash != ""
-  
   // 5. Update escrow status
   let current_slot = get_current_slot(tx)
   let updated_output = find_escrow_output(tx.outputs, config)
   expect Some(output) = updated_output
   expect InlineDatum(data) = output.datum
   expect EscrowDatum(updated): WorkAuctionDatum = data
-  
   updated.status == WorkSubmitted {
     submission_time: current_slot,
-    evidence_hash: evidence_hash,
-    actual_impacts: actual_impacts,
+    evidence_hash,
+    actual_impacts,
   }
 }
 
@@ -770,58 +753,67 @@ fn validate_verify_work(
   // 1. Must have escrow in WorkSubmitted status
   expect Some(EscrowDatum(escrow)) = datum
   expect WorkSubmitted { actual_impacts, evidence_hash, .. } = escrow.status
-  
   // 2. Verifier must be authorized (Steward or designated surveyor)
   let verifier_pnft = find_signer_pnft(tx, config.pnft_policy)
   expect Some(verifier) = verifier_pnft
   expect verifier.level == Steward || is_designated_surveyor(verifier, tx)
-  
   // 3. Determine impacts to record based on verification result
-  let impacts_to_record = when verification_result is {
-    WorkApproved -> actual_impacts
-    WorkApprovedWithAdjustments { adjusted_impacts } -> adjusted_impacts
-    WorkRejected { .. } -> []
-  }
+  let impacts_to_record =
+    when verification_result is {
+      WorkApproved -> actual_impacts
+      WorkApprovedWithAdjustments { adjusted_impacts } -> adjusted_impacts
+      WorkRejected { .. } -> []
+    }
 
   // 4. CRITICAL: Record impacts to asset via asset_impact contract
   // This is what makes the compound flows accumulate on the asset
   // so they can later transfer to the consumer
-  let impacts_recorded = when verification_result is {
-    WorkRejected { .. } -> True  // No impacts to record
-    _ -> {
-      // Create activity record
-      let activity = AssetActivityRecord {
-        activity_type: work_type_to_bytes(escrow.work_type),
-        worker_pnft: escrow.worker,
-        compound_flows: impacts_to_record,
-        evidence: evidence_hash,
-        timestamp: get_current_slot(tx),
-      }
+  let impacts_recorded =
+    when verification_result is {
+      WorkRejected { .. } -> True
+      // No impacts to record
+      _ -> {
+        // Create activity record
+        let activity =
+          AssetActivityRecord {
+            activity_type: work_type_to_bytes(escrow.work_type),
+            worker_pnft: escrow.worker,
+            compound_flows: impacts_to_record,
+            evidence: evidence_hash,
+            timestamp: get_current_slot(tx),
+          }
 
-      // Verify asset_impact contract is called with RecordActivity
-      verify_asset_impact_called(
-        tx,
-        escrow.asset,
-        activity,
-        config.asset_impact_contract
-      )
+        // Verify asset_impact contract is called with RecordActivity
+        verify_asset_impact_called(
+          tx,
+          escrow.asset,
+          activity,
+          config.asset_impact_contract,
+        )
+      }
     }
-  }
 
   // 5. Update escrow status
-  let status_updated = when verification_result is {
-    WorkApproved -> {
-      verify_escrow_updated_to_verified(tx, escrow_id, verifier.pnft_id, config)
+  let status_updated =
+    when verification_result is {
+      WorkApproved ->
+        verify_escrow_updated_to_verified(
+          tx,
+          escrow_id,
+          verifier.pnft_id,
+          config,
+        )
+      WorkApprovedWithAdjustments { .. } ->
+        verify_escrow_updated_to_verified(
+          tx,
+          escrow_id,
+          verifier.pnft_id,
+          config,
+        )
+      WorkRejected { .. } ->
+        // Escrow goes to dispute or refund
+        True
     }
-    WorkApprovedWithAdjustments { .. } -> {
-      verify_escrow_updated_to_verified(tx, escrow_id, verifier.pnft_id, config)
-    }
-    WorkRejected { .. } -> {
-      // Escrow goes to dispute or refund
-      True
-    }
-  }
-  
   impacts_recorded && status_updated
 }
 
@@ -834,16 +826,20 @@ fn verify_asset_impact_called(
 ) -> Bool {
   // Check that transaction includes spending from asset_impact contract
   // with RecordActivity redeemer for this asset
-  list.any(tx.inputs, fn(input) {
-    when get_script_hash_from_input(input) is {
-      Some(hash) -> hash == asset_impact_contract
-      None -> False
-    }
-  })
+  list.any(
+    tx.inputs,
+    fn(input) {
+      when get_script_hash_from_input(input) is {
+        Some(hash) -> hash == asset_impact_contract
+        None -> False
+      }
+    },
+  )
 }
 
 fn get_script_hash_from_input(input: Input) -> Option<ByteArray> {
-  None // Simplified - would extract script hash from input
+  None
+  // Simplified - would extract script hash from input
 }
 
 fn work_type_to_bytes(work_type: WorkType) -> ByteArray {
@@ -874,30 +870,28 @@ fn validate_release_payment(
   // 1. Must have escrow in Verified status
   expect Some(EscrowDatum(escrow)) = datum
   expect Verified { .. } = escrow.status
-  
   // 2. Either requester signs or auto-release after delay
-  let requester_signed = list.has(tx.extra_signatories, get_pnft_owner(tx, escrow.requester, config.pnft_policy))
+  let requester_signed =
+    list.has(
+      tx.extra_signatories,
+      get_pnft_owner(tx, escrow.requester, config.pnft_policy),
+    )
   let auto_release = is_auto_release_time(tx, escrow)
   expect requester_signed || auto_release
-  
   // 3. Payment goes to worker
   let worker_output = find_output_to_pnft(tx.outputs, escrow.worker, config)
   expect Some(w_out) = worker_output
-  let payment_to_worker = quantity_of(w_out.value, config.token_policy, config.token_name)
-  
+  let payment_to_worker =
+    quantity_of(w_out.value, config.token_policy, config.token_name)
   // 4. Calculate platform fee
   let fee = escrow.amount * config.platform_fee_bps / 10000
   let worker_payment = escrow.amount - fee
-  
   // 5. Verify correct amounts
   expect payment_to_worker >= worker_payment
-  
   // 6. Fee goes to treasury
   // (Verified separately)
-  
   // 7. Update worker's efficiency rating
   // (Recorded based on actual vs expected impacts)
-  
   True
 }
 
@@ -910,26 +904,30 @@ fn validate_request_refund(
 ) -> Bool {
   // 1. Must have escrow
   expect Some(EscrowDatum(escrow)) = datum
-  
   // 2. Either: deadline passed and work not submitted, or dispute resolved for requester
   let current_slot = get_current_slot(tx)
   let deadline_passed = current_slot > escrow.deadline
-  let work_not_submitted = when escrow.status is {
-    Funded -> True
-    WorkStarted { .. } -> True
-    _ -> False
-  }
-  
-  expect (deadline_passed && work_not_submitted) || is_dispute_resolved_for_requester(escrow)
-  
+  let work_not_submitted =
+    when escrow.status is {
+      Funded -> True
+      WorkStarted { .. } -> True
+      _ -> False
+    }
+  expect
+    deadline_passed && work_not_submitted || is_dispute_resolved_for_requester(
+      escrow,
+    )
   // 3. Requester must sign
-  expect list.has(tx.extra_signatories, get_pnft_owner(tx, escrow.requester, config.pnft_policy))
-  
+  expect
+    list.has(
+      tx.extra_signatories,
+      get_pnft_owner(tx, escrow.requester, config.pnft_policy),
+    )
   // 4. Funds return to requester
-  let requester_output = find_output_to_pnft(tx.outputs, escrow.requester, config)
+  let requester_output =
+    find_output_to_pnft(tx.outputs, escrow.requester, config)
   expect Some(r_out) = requester_output
   let refund = quantity_of(r_out.value, config.token_policy, config.token_name)
-  
   refund >= escrow.amount
 }
 
@@ -946,12 +944,17 @@ fn validate_initiate_dispute(
 ) -> Bool {
   // Either party can initiate dispute
   expect Some(EscrowDatum(escrow)) = datum
-  
-  let requester_signed = list.has(tx.extra_signatories, get_pnft_owner(tx, escrow.requester, config.pnft_policy))
-  let worker_signed = list.has(tx.extra_signatories, get_pnft_owner(tx, escrow.worker, config.pnft_policy))
-  
+  let requester_signed =
+    list.has(
+      tx.extra_signatories,
+      get_pnft_owner(tx, escrow.requester, config.pnft_policy),
+    )
+  let worker_signed =
+    list.has(
+      tx.extra_signatories,
+      get_pnft_owner(tx, escrow.worker, config.pnft_policy),
+    )
   expect requester_signed || worker_signed
-  
   // Update status to InDispute
   True
 }
@@ -966,20 +969,18 @@ fn validate_resolve_dispute(
   // Only governance contract can resolve disputes
   let from_governance = verify_from_governance(tx, config.governance_contract)
   expect from_governance
-  
   // Execute resolution
   when resolution is {
-    PayWorker -> {
+    PayWorker ->
       // Full payment to worker
       True
-    }
-    RefundRequester -> {
+    RefundRequester ->
       // Full refund to requester
       True
-    }
     Split { worker_share, requester_share } -> {
       // Split according to resolution
-      expect worker_share + requester_share == 10000 // Basis points
+      expect worker_share + requester_share == 10000
+      // Basis points
       True
     }
   }
@@ -991,9 +992,16 @@ fn validate_resolve_dispute(
 
 fn find_signer_pnft(tx: Transaction, pnft_policy: PolicyId) -> Option<PnftData> {
   // Find pNFT owned by a signer
-  list.find_map(tx.reference_inputs, fn(input) {
-    extract_pnft_if_owned_by_signer(input.output, pnft_policy, tx.extra_signatories)
-  })
+  list.find_map(
+    tx.reference_inputs,
+    fn(input) {
+      extract_pnft_if_owned_by_signer(
+        input.output,
+        pnft_policy,
+        tx.extra_signatories,
+      )
+    },
+  )
 }
 
 type PnftData {
@@ -1011,32 +1019,57 @@ fn extract_pnft_if_owned_by_signer(
   None
 }
 
-fn get_pnft_owner(tx: Transaction, pnft_id: AssetName, pnft_policy: PolicyId) -> VerificationKeyHash {
+fn get_pnft_owner(
+  tx: Transaction,
+  pnft_id: AssetName,
+  pnft_policy: PolicyId,
+) -> VerificationKeyHash {
   // Look up owner from pNFT datum
   #""
 }
 
-fn find_request_by_id(inputs: List<Input>, request_id: ByteArray, config: WorkAuctionConfig) -> Option<WorkRequest> {
+fn find_request_by_id(
+  inputs: List<Input>,
+  request_id: ByteArray,
+  config: WorkAuctionConfig,
+) -> Option<WorkRequest> {
   None
 }
 
-fn find_bid_by_id(inputs: List<Input>, bid_id: ByteArray, config: WorkAuctionConfig) -> Option<WorkBid> {
+fn find_bid_by_id(
+  inputs: List<Input>,
+  bid_id: ByteArray,
+  config: WorkAuctionConfig,
+) -> Option<WorkBid> {
   None
 }
 
-fn find_request_output(outputs: List<Output>, config: WorkAuctionConfig) -> Option<Output> {
+fn find_request_output(
+  outputs: List<Output>,
+  config: WorkAuctionConfig,
+) -> Option<Output> {
   None
 }
 
-fn find_bid_output(outputs: List<Output>, config: WorkAuctionConfig) -> Option<Output> {
+fn find_bid_output(
+  outputs: List<Output>,
+  config: WorkAuctionConfig,
+) -> Option<Output> {
   None
 }
 
-fn find_escrow_output(outputs: List<Output>, config: WorkAuctionConfig) -> Option<Output> {
+fn find_escrow_output(
+  outputs: List<Output>,
+  config: WorkAuctionConfig,
+) -> Option<Output> {
   None
 }
 
-fn find_output_to_pnft(outputs: List<Output>, pnft: AssetName, config: WorkAuctionConfig) -> Option<Output> {
+fn find_output_to_pnft(
+  outputs: List<Output>,
+  pnft: AssetName,
+  config: WorkAuctionConfig,
+) -> Option<Output> {
   None
 }
 
@@ -1044,7 +1077,10 @@ fn get_current_slot(tx: Transaction) -> Int {
   0
 }
 
-fn meets_level_requirement(actual: VerificationLevel, required: VerificationLevel) -> Bool {
+fn meets_level_requirement(
+  actual: VerificationLevel,
+  required: VerificationLevel,
+) -> Bool {
   // Check if actual level meets or exceeds required
   True
 }
@@ -1053,7 +1089,12 @@ fn is_designated_surveyor(pnft: PnftData, tx: Transaction) -> Bool {
   False
 }
 
-fn verify_escrow_updated_to_verified(tx: Transaction, escrow_id: ByteArray, verifier: AssetName, config: WorkAuctionConfig) -> Bool {
+fn verify_escrow_updated_to_verified(
+  tx: Transaction,
+  escrow_id: ByteArray,
+  verifier: AssetName,
+  config: WorkAuctionConfig,
+) -> Bool {
   True
 }
 
@@ -1065,6 +1106,9 @@ fn is_dispute_resolved_for_requester(escrow: WorkEscrow) -> Bool {
   False
 }
 
-fn verify_from_governance(tx: Transaction, governance_contract: ByteArray) -> Bool {
+fn verify_from_governance(
+  tx: Transaction,
+  governance_contract: ByteArray,
+) -> Bool {
   False
 }

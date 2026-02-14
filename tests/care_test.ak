@@ -15,8 +15,7 @@ use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use cardano/assets.{AssetName}
 use ultralife/types.{
-  VerificationLevel, Basic, Ward, Standard, Verified, Steward,
-  can_transact,
+  Basic, Standard, Steward, VerificationLevel, Verified, Ward, can_transact,
 }
 
 // =============================================================================
@@ -124,25 +123,25 @@ fn mock_care_record(
 ) -> CareRecord {
   CareRecord {
     record_id: #"6361726530303031",
-    caregiver: caregiver,
-    care_type: care_type,
+    caregiver,
+    care_type,
     recipient: Family { person_pnft: None },
-    hours: hours,
+    hours,
     started_at: 1000,
     ended_at: 5000,
     bioregion: #"62696f726567696f6e31",
     attestations: [],
-    status: status,
+    status,
     credits_earned: 0,
   }
 }
 
-fn mock_attestation(attestor: AssetName, role: AttestorRole, slot: Int) -> CareAttestation {
-  CareAttestation {
-    attestor: attestor,
-    attestor_role: role,
-    attested_at: slot,
-  }
+fn mock_attestation(
+  attestor: AssetName,
+  role: AttestorRole,
+  slot: Int,
+) -> CareAttestation {
+  CareAttestation { attestor, attestor_role: role, attested_at: slot }
 }
 
 // =============================================================================
@@ -245,8 +244,10 @@ fn is_valid_attestor(
   caregiver: AssetName,
   existing_attestations: List<CareAttestation>,
 ) -> Bool {
-  attestor != caregiver &&
-  !list.any(existing_attestations, fn(a) { a.attestor == attestor })
+  attestor != caregiver && !list.any(
+    existing_attestations,
+    fn(a) { a.attestor == attestor },
+  )
 }
 
 test can_attest_pending_record() {
@@ -299,11 +300,17 @@ test different_attestor_can_attest() {
 // ATTESTATION THRESHOLD TESTS
 // =============================================================================
 
-fn has_sufficient_attestations(attestation_count: Int, min_required: Int) -> Bool {
+fn has_sufficient_attestations(
+  attestation_count: Int,
+  min_required: Int,
+) -> Bool {
   attestation_count >= min_required
 }
 
-fn update_status_after_attestation(current_count: Int, min_required: Int) -> CareRecordStatus {
+fn update_status_after_attestation(
+  current_count: Int,
+  min_required: Int,
+) -> CareRecordStatus {
   let new_count = current_count + 1
   if new_count >= min_required {
     Attested { attestation_count: new_count }
@@ -346,26 +353,29 @@ test status_becomes_attested_at_threshold() {
 // =============================================================================
 
 fn calculate_care_credits(care_type: CareType, hours: Int) -> Int {
-  let base_rate = when care_type is {
-    Childcare { age_group } -> when age_group is {
-      Infant -> 15
-      Toddler -> 12
-      Preschool -> 10
-      SchoolAge -> 8
-      Adolescent -> 8
+  let base_rate =
+    when care_type is {
+      Childcare { age_group } ->
+        when age_group is {
+          Infant -> 15
+          Toddler -> 12
+          Preschool -> 10
+          SchoolAge -> 8
+          Adolescent -> 8
+        }
+      ElderCare { care_level } ->
+        when care_level is {
+          Independent -> 8
+          Assisted -> 12
+          FullTime -> 15
+          Medical -> 18
+          Palliative -> 20
+        }
+      DisabilityCare -> 15
+      HealthSupport -> 12
+      Household { .. } -> 8
+      CommunityService { .. } -> 10
     }
-    ElderCare { care_level } -> when care_level is {
-      Independent -> 8
-      Assisted -> 12
-      FullTime -> 15
-      Medical -> 18
-      Palliative -> 20
-    }
-    DisabilityCare -> 15
-    HealthSupport -> 12
-    Household { .. } -> 8
-    CommunityService { .. } -> 10
-  }
   hours * base_rate
 }
 
@@ -408,8 +418,7 @@ fn validate_credit_claim(
   record_caregiver: AssetName,
   status: CareRecordStatus,
 ) -> Bool {
-  claimer == record_caregiver &&
-  when status is {
+  claimer == record_caregiver && when status is {
     Attested { .. } -> True
     _ -> False
   }
@@ -438,7 +447,11 @@ test cannot_claim_already_credited() {
 
 test cannot_claim_disputed_record() {
   let caregiver = mock_pnft_name(1)
-  !validate_credit_claim(caregiver, caregiver, Disputed { reason: #"726561736f6e" })
+  !validate_credit_claim(
+    caregiver,
+    caregiver,
+    Disputed { reason: #"726561736f6e" },
+  )
 }
 
 // =============================================================================
@@ -480,9 +493,9 @@ fn validate_dispute(
   status: CareRecordStatus,
   disputer_level: VerificationLevel,
 ) -> Bool {
-  disputer != caregiver &&
-  can_attest_record(status) &&
-  can_provide_care(disputer_level)
+  disputer != caregiver && can_attest_record(status) && can_provide_care(
+    disputer_level,
+  )
 }
 
 test valid_dispute() {
@@ -499,7 +512,12 @@ test caregiver_cannot_self_dispute() {
 test cannot_dispute_credited_record() {
   let caregiver = mock_pnft_name(1)
   let disputer = mock_pnft_name(2)
-  !validate_dispute(disputer, caregiver, Credited { credited_at: 5000 }, Verified)
+  !validate_dispute(
+    disputer,
+    caregiver,
+    Credited { credited_at: 5000 },
+    Verified,
+  )
 }
 
 test basic_cannot_dispute() {
@@ -518,21 +536,19 @@ fn is_valid_attestor_role(
   attestor_level: VerificationLevel,
 ) -> Bool {
   when role is {
-    Recipient -> {
+    Recipient ->
       when recipient is {
         Family { person_pnft } -> person_pnft != None
         ExtendedFamily { person_pnft } -> person_pnft != None
         Neighbor { pnft } -> pnft != None
         _ -> False
       }
-    }
-    RecipientFamily -> {
+    RecipientFamily ->
       when recipient is {
         Family { .. } -> True
         ExtendedFamily { .. } -> True
         _ -> False
       }
-    }
     NeighborAttestor -> True
     CommunityMember -> True
     HealthProfessional -> attestor_level == Steward
@@ -587,11 +603,12 @@ test multiple_attestations_accumulate() {
   let attestor1 = mock_pnft_name(2)
   let attestor2 = mock_pnft_name(3)
   let attestor3 = mock_pnft_name(4)
-  let attestations = [
-    mock_attestation(attestor1, Recipient, 5000),
-    mock_attestation(attestor2, RecipientFamily, 5100),
-    mock_attestation(attestor3, NeighborAttestor, 5200),
-  ]
+  let attestations =
+    [
+      mock_attestation(attestor1, Recipient, 5000),
+      mock_attestation(attestor2, RecipientFamily, 5100),
+      mock_attestation(attestor3, NeighborAttestor, 5200),
+    ]
   list.length(attestations) == 3
 }
 
@@ -603,14 +620,19 @@ test care_credits_proportional_to_hours() {
 }
 
 test infant_care_highest_childcare_rate() {
-  let infant_credits = calculate_care_credits(Childcare { age_group: Infant }, 1)
-  let toddler_credits = calculate_care_credits(Childcare { age_group: Toddler }, 1)
-  let preschool_credits = calculate_care_credits(Childcare { age_group: Preschool }, 1)
+  let infant_credits =
+    calculate_care_credits(Childcare { age_group: Infant }, 1)
+  let toddler_credits =
+    calculate_care_credits(Childcare { age_group: Toddler }, 1)
+  let preschool_credits =
+    calculate_care_credits(Childcare { age_group: Preschool }, 1)
   infant_credits > toddler_credits && toddler_credits > preschool_credits
 }
 
 test palliative_care_highest_overall_rate() {
-  let palliative_credits = calculate_care_credits(ElderCare { care_level: Palliative }, 1)
-  let infant_credits = calculate_care_credits(Childcare { age_group: Infant }, 1)
+  let palliative_credits =
+    calculate_care_credits(ElderCare { care_level: Palliative }, 1)
+  let infant_credits =
+    calculate_care_credits(Childcare { age_group: Infant }, 1)
   palliative_credits > infant_credits
 }

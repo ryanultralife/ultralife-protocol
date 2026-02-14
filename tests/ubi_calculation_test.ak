@@ -6,18 +6,20 @@
 //
 // =============================================================================
 
-use ultralife/types.{
-  VerificationLevel, Basic, Standard, Verified, Steward,
-}
+use ultralife/types.{Basic, Standard, Steward, VerificationLevel, Verified}
 
 // =============================================================================
 // CLAMP FUNCTION TESTS
 // =============================================================================
 
 fn clamp(value: Int, min: Int, max: Int) -> Int {
-  if value < min { min }
-  else if value > max { max }
-  else { value }
+  if value < min {
+    min
+  } else if value > max {
+    max
+  } else {
+    value
+  }
 }
 
 test clamp_below_min() {
@@ -44,47 +46,53 @@ test clamp_at_max() {
 // UBI FORMULA CALCULATION TESTS
 // =============================================================================
 
-// Constants matching ubi.ak
-const BASE_UBI: Int = 100
-const MIN_MULTIPLIER: Int = 5000   // 50%
-const MAX_MULTIPLIER: Int = 15000  // 150%
-
 /// Simplified UBI calculation for testing
 fn calculate_ubi(
-  health_index: Int,      // 0-10000 (bioregion health)
-  tx_count: Int,          // Transaction count
-  labor_count: Int,       // Labor transactions
-  remediation_count: Int, // Remediation actions
-  net_impact: Int,        // Net impact score
+  health_index: Int,
+  // 0-10000 (bioregion health)
+  tx_count: Int,
+  // Transaction count
+  labor_count: Int,
+  // Labor transactions
+  remediation_count: Int,
+  // Remediation actions
+  net_impact: Int,
+  // Net impact score
   level: VerificationLevel,
 ) -> Int {
+  // Base UBI amount
+  let base_ubi = 100
+
   // Health multiplier: 5000-15000 (50%-150%)
   let health_mult = 5000 + health_index
-  
+
   // Participation multiplier: 8000-12000 (80%-120%)
   let tx_score = tx_count * 100
   let labor_bonus = labor_count * 200
   let remediation_bonus = remediation_count * 500
   let participation_raw = 10000 + tx_score + labor_bonus + remediation_bonus
   let participation_mult = clamp(participation_raw, 8000, 12000)
-  
+
   // Impact multiplier: 7000-13000 (70%-130%)
   let impact_raw = 10000 + net_impact
   let impact_mult = clamp(impact_raw, 7000, 13000)
-  
+
   // Level bonus
-  let level_bonus = when level is {
-    Basic -> 0
-    Standard -> 0
-    Verified -> BASE_UBI / 10   // +10
-    Steward -> BASE_UBI / 5     // +20
-  }
-  
+  let level_bonus =
+    when level is {
+      Basic -> 0
+      Standard -> 0
+      Verified -> base_ubi / 10
+      // +10
+      Steward -> base_ubi / 5
+    }
+
+  // +20
   // Calculate: Base × Health × Participation × Impact + Level_Bonus
-  let base_adjusted = BASE_UBI * health_mult / 10000
+  let base_adjusted = base_ubi * health_mult / 10000
   let with_participation = base_adjusted * participation_mult / 10000
   let with_impact = with_participation * impact_mult / 10000
-  
+
   with_impact + level_bonus
 }
 
@@ -95,42 +103,60 @@ fn calculate_ubi(
 test ubi_baseline_average() {
   // Average case: neutral everything
   // 100 × 1.0 × 1.0 × 1.0 + 0 = 100
-  let result = calculate_ubi(
-    5000,  // 50% health (converts to 10000 multiplier = 100%)
-    0,     // No extra transactions
-    0,     // No labor
-    0,     // No remediation
-    0,     // Neutral impact
-    Standard,
-  )
+  let result =
+    calculate_ubi(
+      5000,
+      // 50% health (converts to 10000 multiplier = 100%)
+      0,
+      // No extra transactions
+      0,
+      // No labor
+      0,
+      // No remediation
+      0,
+      // Neutral impact
+      Standard,
+    )
   result == 100
 }
 
 test ubi_minimum_case() {
   // Worst case: unhealthy bioregion, inactive, negative impact
   // 100 × 0.5 × 0.8 × 0.7 = 28
-  let result = calculate_ubi(
-    0,      // 0% health (converts to 5000 multiplier = 50%)
-    0,      // No transactions (minimum participation = 80%)
-    0,      // No labor
-    0,      // No remediation  
-    -5000,  // Very negative impact (clamped to 70%)
-    Standard,
-  )
+  let result =
+    calculate_ubi(
+      0,
+      // 0% health (converts to 5000 multiplier = 50%)
+      0,
+      // No transactions (minimum participation = 80%)
+      0,
+      // No labor
+      0,
+      // No remediation  
+      -5000,
+      // Very negative impact (clamped to 70%)
+      Standard,
+    )
   result == 28
 }
 
 test ubi_maximum_case_without_steward() {
   // Best case for Verified level
   // 100 × 1.5 × 1.2 × 1.3 + 10 = 244
-  let result = calculate_ubi(
-    10000,  // 100% health (converts to 15000 multiplier = 150%)
-    20,     // High activity (capped at 120%)
-    10,     // Many labor transactions
-    5,      // Some remediation
-    5000,   // Very positive impact (capped at 130%)
-    Verified,
-  )
+  let result =
+    calculate_ubi(
+      10000,
+      // 100% health (converts to 15000 multiplier = 150%)
+      20,
+      // High activity (capped at 120%)
+      10,
+      // Many labor transactions
+      5,
+      // Some remediation
+      5000,
+      // Very positive impact (capped at 130%)
+      Verified,
+    )
   // Allow some rounding variance
   result >= 240 && result <= 250
 }
@@ -138,14 +164,20 @@ test ubi_maximum_case_without_steward() {
 test ubi_maximum_case_steward() {
   // Best case for Steward
   // 100 × 1.5 × 1.2 × 1.3 + 20 = 254
-  let result = calculate_ubi(
-    10000,  // 100% health
-    20,     // High activity
-    10,     // Many labor
-    5,      // Some remediation
-    5000,   // Very positive impact
-    Steward,
-  )
+  let result =
+    calculate_ubi(
+      10000,
+      // 100% health
+      20,
+      // High activity
+      10,
+      // Many labor
+      5,
+      // Some remediation
+      5000,
+      // Very positive impact
+      Steward,
+    )
   result >= 250 && result <= 260
 }
 
@@ -251,7 +283,8 @@ test ubi_level_basic_no_ubi() {
   // Basic level shouldn't receive UBI (handled in validator)
   // But calculation still works, just no bonus
   let result = calculate_ubi(5000, 0, 0, 0, 0, Basic)
-  result == 100  // Same as Standard, no bonus
+  result == 100
+  // Same as Standard, no bonus
 }
 
 test ubi_level_standard_no_bonus() {
@@ -280,28 +313,40 @@ test ubi_level_steward_20_bonus() {
 
 test ubi_all_factors_above_average() {
   // All positive factors compound
-  let result = calculate_ubi(
-    7500,  // 75% health → 125% multiplier
-    10,    // Some activity
-    5,     // Labor bonus
-    2,     // Remediation bonus
-    1500,  // Positive impact
-    Verified,
-  )
+  let result =
+    calculate_ubi(
+      7500,
+      // 75% health → 125% multiplier
+      10,
+      // Some activity
+      5,
+      // Labor bonus
+      2,
+      // Remediation bonus
+      1500,
+      // Positive impact
+      Verified,
+    )
   // Should be significantly above 100
   result > 150
 }
 
 test ubi_all_factors_below_average() {
   // All negative factors compound
-  let result = calculate_ubi(
-    2500,  // 25% health → 75% multiplier
-    0,     // No activity (80% participation)
-    0,     // No labor
-    0,     // No remediation
-    -2000, // Negative impact (80% impact)
-    Standard,
-  )
+  let result =
+    calculate_ubi(
+      2500,
+      // 25% health → 75% multiplier
+      0,
+      // No activity (80% participation)
+      0,
+      // No labor
+      0,
+      // No remediation
+      -2000,
+      // Negative impact (80% impact)
+      Standard,
+    )
   // 100 × 0.75 × 0.8 × 0.8 = 48
   result == 48
 }

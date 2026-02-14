@@ -6,44 +6,50 @@
 
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 
-// Mock dependencies
+// Mock dependencies - using type assertions for Jest ESM compatibility
 jest.mock('@blockfrost/blockfrost-js', () => ({
   BlockFrostAPI: jest.fn().mockImplementation(() => ({
-    addressesUtxos: jest.fn().mockResolvedValue([]),
-    assetsAddresses: jest.fn().mockResolvedValue([]),
-    assetsPolicyByIdAll: jest.fn().mockResolvedValue([]),
+    addressesUtxos: jest.fn<() => Promise<never[]>>().mockResolvedValue([]),
+    assetsAddresses: jest.fn<() => Promise<never[]>>().mockResolvedValue([]),
+    assetsPolicyByIdAll: jest.fn<() => Promise<never[]>>().mockResolvedValue([]),
   })),
 }));
 
-jest.mock('lucid-cardano', () => ({
-  Lucid: {
-    new: jest.fn().mockResolvedValue({
-      newTx: jest.fn().mockReturnThis(),
-      complete: jest.fn().mockResolvedValue({
-        sign: jest.fn().mockReturnThis(),
-        complete: jest.fn().mockResolvedValue({
-          submit: jest.fn().mockResolvedValue('mock_tx_hash'),
-        }),
-      }),
-    }),
-  },
-  Blockfrost: jest.fn(),
-  Data: {
-    to: jest.fn().mockReturnValue('mock_datum'),
-    Enum: jest.fn(),
-    Object: jest.fn(),
-    Bytes: jest.fn(),
-    Integer: jest.fn(),
-    Array: jest.fn(),
-    Nullable: jest.fn(),
-    Boolean: jest.fn(),
-    Literal: jest.fn(),
-  },
-  fromText: jest.fn((s: string) => s),
-  toHex: jest.fn((s: { toString(encoding: string): string }) => s.toString('hex')),
-  fromHex: jest.fn((s: string) => Buffer.from(s, 'hex')),
-  Constr: jest.fn(),
-}));
+jest.mock('lucid-cardano', () => {
+  // Build mock chain from inside out to avoid type inference issues
+  const mockSubmitResult = jest.fn<() => Promise<string>>().mockResolvedValue('mock_tx_hash');
+  const mockCompleteResult = { submit: mockSubmitResult };
+  const mockSignComplete = jest.fn<() => Promise<typeof mockCompleteResult>>().mockResolvedValue(mockCompleteResult);
+  const mockSignResult = { complete: mockSignComplete };
+  const mockSign = jest.fn<() => typeof mockSignResult>().mockReturnValue(mockSignResult);
+  const mockTxCompleteResult = { sign: mockSign, complete: mockSign };
+  const mockTxComplete = jest.fn<() => Promise<typeof mockTxCompleteResult>>().mockResolvedValue(mockTxCompleteResult);
+  const mockNewTxResult = { complete: mockTxComplete };
+  const mockNewTx = jest.fn<() => typeof mockNewTxResult>().mockReturnValue(mockNewTxResult);
+  const mockLucidInstance = { newTx: mockNewTx, complete: mockTxComplete };
+
+  return {
+    Lucid: {
+      new: jest.fn<() => Promise<typeof mockLucidInstance>>().mockResolvedValue(mockLucidInstance),
+    },
+    Blockfrost: jest.fn(),
+    Data: {
+      to: jest.fn<() => string>().mockReturnValue('mock_datum'),
+      Enum: jest.fn(),
+      Object: jest.fn(),
+      Bytes: jest.fn(),
+      Integer: jest.fn(),
+      Array: jest.fn(),
+      Nullable: jest.fn(),
+      Boolean: jest.fn(),
+      Literal: jest.fn(),
+    },
+    fromText: jest.fn((s: string) => s),
+    toHex: jest.fn((s: { toString(encoding: string): string }) => s.toString('hex')),
+    fromHex: jest.fn((s: string) => Buffer.from(s, 'hex')),
+    Constr: jest.fn(),
+  };
+});
 
 // Test helper to simulate MCP tool call
 interface ToolCallResult {

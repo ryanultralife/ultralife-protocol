@@ -23,16 +23,17 @@
 use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use aiken/interval.{Finite}
-use cardano/assets.{PolicyId, AssetName, quantity_of, flatten}
 use cardano/address.{Script, VerificationKey}
-use cardano/transaction.{Transaction, Input, Output, OutputReference, InlineDatum}
-use ultralife/types_v2.{
-  PnftDatum, BioregionDatum, BioregionPool, PoolImpactCommitment,
-  StakeDelegation, PoolRewards,
-  VerificationLevel, Basic, Ward, Standard, Verified, Steward,
-  can_operate_pool, can_endorse_pool,
+use cardano/assets.{AssetName, PolicyId, flatten, quantity_of}
+use cardano/transaction.{
+  InlineDatum, Input, Output, OutputReference, Transaction,
 }
 use ultralife/prc37.{current_cycle}
+use ultralife/types_v2.{
+  Basic, BioregionDatum, BioregionPool, PnftDatum, PoolImpactCommitment,
+  PoolRewards, StakeDelegation, Standard, Steward, VerificationLevel, Verified,
+  Ward, can_endorse_pool, can_operate_pool,
+}
 
 // =============================================================================
 // CONSTANTS
@@ -66,32 +67,17 @@ pub type PoolRedeemer {
     endorsements: List<AssetName>,
   }
   /// Update pool parameters
-  UpdatePool {
-    new_commitment: PoolImpactCommitment,
-    new_margin: Int,
-  }
+  UpdatePool { new_commitment: PoolImpactCommitment, new_margin: Int }
   /// Deregister pool from bioregion
-  DeregisterPool {
-    reason_hash: ByteArray,
-  }
+  DeregisterPool { reason_hash: ByteArray }
   /// Delegate tokens to pool
-  Delegate {
-    amount: Int,
-    lock_epochs: Int,
-  }
+  Delegate { amount: Int, lock_epochs: Int }
   /// Undelegate tokens from pool
-  Undelegate {
-    amount: Int,
-  }
+  Undelegate { amount: Int }
   /// Claim staking rewards
-  ClaimRewards {
-    epoch: Int,
-  }
+  ClaimRewards { epoch: Int }
   /// Distribute epoch rewards (pool operator)
-  DistributeRewards {
-    epoch: Int,
-    total_rewards: Int,
-  }
+  DistributeRewards { epoch: Int, total_rewards: Int }
 }
 
 // =============================================================================
@@ -142,43 +128,46 @@ validator stake_pool(config: StakePoolConfig) {
     tx: Transaction,
   ) {
     expect Some(datum_data) = datum
-    
     when redeemer is {
       RegisterPool { pool_id, commitment, endorsements } -> {
         expect pool_datum: BioregionPool = datum_data
         validate_register_pool(tx, pool_id, commitment, endorsements, config)
       }
-      
       UpdatePool { new_commitment, new_margin } -> {
         expect pool_datum: BioregionPool = datum_data
         validate_update_pool(tx, pool_datum, new_commitment, new_margin, config)
       }
-      
       DeregisterPool { reason_hash } -> {
         expect pool_datum: BioregionPool = datum_data
         validate_deregister_pool(tx, pool_datum, reason_hash, config)
       }
-      
       Delegate { amount, lock_epochs } -> {
         expect delegation_datum: StakeDelegation = datum_data
         validate_delegate(tx, amount, lock_epochs, config)
       }
-      
       Undelegate { amount } -> {
         expect delegation_datum: StakeDelegation = datum_data
         validate_undelegate(tx, delegation_datum, amount, config)
       }
-      
       ClaimRewards { epoch } -> {
         expect delegation_datum: StakeDelegation = datum_data
         validate_claim_rewards(tx, delegation_datum, epoch, config)
       }
-      
       DistributeRewards { epoch, total_rewards } -> {
         expect pool_datum: BioregionPool = datum_data
-        validate_distribute_rewards(tx, pool_datum, epoch, total_rewards, config)
+        validate_distribute_rewards(
+          tx,
+          pool_datum,
+          epoch,
+          total_rewards,
+          config,
+        )
       }
     }
+  }
+
+  else(_) {
+    fail
   }
 }
 
@@ -198,40 +187,42 @@ fn validate_register_pool(
   expect Some(operator) = operator_data
   expect can_operate_pool(operator.level)
   let operator_signed = list.has(tx.extra_signatories, operator.owner)
-  
   // 2. Must have required Steward endorsements
-  let valid_endorsements = verify_endorsements(
-    tx, endorsements, operator.bioregion, config.pnft_policy
-  )
-  
+  let valid_endorsements =
+    verify_endorsements(
+      tx,
+      endorsements,
+      operator.bioregion,
+      config.pnft_policy,
+    )
   // 3. Minimum stake must be locked
-  let stake_locked = verify_stake_locked(
-    tx.outputs, config.token_policy, config.token_name, min_pool_stake
-  )
-  
+  let stake_locked =
+    verify_stake_locked(
+      tx.outputs,
+      config.token_policy,
+      config.token_name,
+      min_pool_stake,
+    )
   // 4. Commitment must meet minimum standards
   let valid_commitment = verify_commitment(commitment)
-  
   // 5. Pool datum must be created correctly
-  let valid_pool_datum = verify_pool_datum_created(
-    tx.outputs,
-    pool_id,
-    operator.pnft,
-    operator.bioregion,
-    commitment
-  )
-  
+  let valid_pool_datum =
+    verify_pool_datum_created(
+      tx.outputs,
+      pool_id,
+      operator.pnft,
+      operator.bioregion,
+      commitment,
+    )
   // 6. Bioregion must be updated to include pool
-  let bioregion_updated = verify_bioregion_pool_added(
-    tx, pool_id, operator.bioregion, config.bioregion_registry
-  )
-  
-  operator_signed &&
-  valid_endorsements &&
-  stake_locked &&
-  valid_commitment &&
-  valid_pool_datum &&
-  bioregion_updated
+  let bioregion_updated =
+    verify_bioregion_pool_added(
+      tx,
+      pool_id,
+      operator.bioregion,
+      config.bioregion_registry,
+    )
+  operator_signed && valid_endorsements && stake_locked && valid_commitment && valid_pool_datum && bioregion_updated
 }
 
 fn verify_endorsements(
@@ -241,16 +232,19 @@ fn verify_endorsements(
   pnft_policy: PolicyId,
 ) -> Bool {
   expect Some(bio) = bioregion
-  
   // Count valid Steward endorsements from same bioregion
-  let valid_count = list.foldl(endorsements, 0, fn(endorser_pnft, acc) {
-    if verify_steward_endorsement(tx, endorser_pnft, bio, pnft_policy) {
-      acc + 1
-    } else {
-      acc
-    }
-  })
-  
+  let valid_count =
+    list.foldl(
+      endorsements,
+      0,
+      fn(endorser_pnft, acc) {
+        if verify_steward_endorsement(tx, endorser_pnft, bio, pnft_policy) {
+          acc + 1
+        } else {
+          acc
+        }
+      },
+    )
   valid_count >= required_endorsements
 }
 
@@ -260,33 +254,39 @@ fn verify_steward_endorsement(
   bioregion: ByteArray,
   pnft_policy: PolicyId,
 ) -> Bool {
-  list.any(tx.reference_inputs, fn(input) {
-    let has_pnft = list.any(flatten(input.output.value), fn(asset) {
-      let (p, name, qty) = asset
-      p == pnft_policy && name == endorser && qty > 0
-    })
-    if has_pnft {
-      when input.output.datum is {
-        InlineDatum(data) -> {
-          expect datum: PnftDatum = data
-          datum.level == Steward &&
-          datum.bioregion == Some(bioregion) &&
-          list.has(tx.extra_signatories, datum.owner)
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      let has_pnft =
+        list.any(
+          flatten(input.output.value),
+          fn(asset) {
+            let (p, name, qty) = asset
+            p == pnft_policy && name == endorser && qty > 0
+          },
+        )
+      if has_pnft {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            datum.level == Steward && datum.bioregion == Some(bioregion) && list.has(
+              tx.extra_signatories,
+              datum.owner,
+            )
+          }
+          _ -> False
         }
-        _ -> False
+      } else {
+        False
       }
-    } else {
-      False
-    }
-  })
+    },
+  )
 }
 
 fn verify_commitment(commitment: PoolImpactCommitment) -> Bool {
   // Treasury contribution must meet minimum
-  commitment.treasury_contribution >= min_treasury_contribution &&
-  // Carbon footprint must be declared (can be 0 for renewable)
-  commitment.carbon_footprint >= 0 &&
-  // Evidence must be provided
+  commitment.treasury_contribution >= min_treasury_contribution && // Carbon footprint must be declared (can be 0 for renewable)
+  commitment.carbon_footprint >= 0 && // Evidence must be provided
   commitment.evidence_hash != ""
 }
 
@@ -298,19 +298,18 @@ fn verify_pool_datum_created(
   commitment: PoolImpactCommitment,
 ) -> Bool {
   expect Some(bio) = bioregion
-  
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect pool: BioregionPool = data
-        pool.pool_id == pool_id &&
-        pool.operator_pnft == operator_pnft &&
-        pool.active == True &&
-        pool.margin <= max_margin
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect pool: BioregionPool = data
+          pool.pool_id == pool_id && pool.operator_pnft == operator_pnft && pool.active == True && pool.margin <= max_margin
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 // =============================================================================
@@ -325,19 +324,15 @@ fn validate_update_pool(
   config: StakePoolConfig,
 ) -> Bool {
   // 1. Operator must sign
-  let operator_signed = verify_operator_signed(tx, pool.operator_pnft, config.pnft_policy)
-  
+  let operator_signed =
+    verify_operator_signed(tx, pool.operator_pnft, config.pnft_policy)
   // 2. New margin must be within bounds
   let valid_margin = new_margin <= max_margin && new_margin >= 0
-  
   // 3. New commitment must be valid
   let valid_commitment = verify_commitment(new_commitment)
-  
   // 4. Pool datum updated correctly
-  let datum_updated = verify_pool_datum_updated(
-    tx.outputs, pool, new_commitment, new_margin
-  )
-  
+  let datum_updated =
+    verify_pool_datum_updated(tx.outputs, pool, new_commitment, new_margin)
   operator_signed && valid_margin && valid_commitment && datum_updated
 }
 
@@ -346,23 +341,30 @@ fn verify_operator_signed(
   operator_pnft: AssetName,
   pnft_policy: PolicyId,
 ) -> Bool {
-  list.any(tx.reference_inputs, fn(input) {
-    let has_pnft = list.any(flatten(input.output.value), fn(asset) {
-      let (p, name, qty) = asset
-      p == pnft_policy && name == operator_pnft && qty > 0
-    })
-    if has_pnft {
-      when input.output.datum is {
-        InlineDatum(data) -> {
-          expect datum: PnftDatum = data
-          list.has(tx.extra_signatories, datum.owner)
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      let has_pnft =
+        list.any(
+          flatten(input.output.value),
+          fn(asset) {
+            let (p, name, qty) = asset
+            p == pnft_policy && name == operator_pnft && qty > 0
+          },
+        )
+      if has_pnft {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            list.has(tx.extra_signatories, datum.owner)
+          }
+          _ -> False
         }
-        _ -> False
+      } else {
+        False
       }
-    } else {
-      False
-    }
-  })
+    },
+  )
 }
 
 fn verify_pool_datum_updated(
@@ -371,17 +373,18 @@ fn verify_pool_datum_updated(
   new_commitment: PoolImpactCommitment,
   new_margin: Int,
 ) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect new_pool: BioregionPool = data
-        new_pool.pool_id == old_pool.pool_id &&
-        new_pool.operator_pnft == old_pool.operator_pnft &&
-        new_pool.margin == new_margin
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect new_pool: BioregionPool = data
+          new_pool.pool_id == old_pool.pool_id && new_pool.operator_pnft == old_pool.operator_pnft && new_pool.margin == new_margin
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 // =============================================================================
@@ -395,21 +398,19 @@ fn validate_deregister_pool(
   config: StakePoolConfig,
 ) -> Bool {
   // 1. Operator signs OR governance approval
-  let authorized = 
-    verify_operator_signed(tx, pool.operator_pnft, config.pnft_policy) ||
-    verify_governance_approval(tx, pool.pool_id, config.governance)
-  
+  let authorized =
+    verify_operator_signed(tx, pool.operator_pnft, config.pnft_policy) || verify_governance_approval(
+      tx,
+      pool.pool_id,
+      config.governance,
+    )
   // 2. All delegations must be returned
   let delegations_cleared = pool.ultralife_stake == 0
-  
   // 3. Pool marked inactive
   let pool_deactivated = verify_pool_deactivated(tx.outputs, pool)
-  
   // 4. Bioregion updated to remove pool
-  let bioregion_updated = verify_bioregion_pool_removed(
-    tx, pool.pool_id, config.bioregion_registry
-  )
-  
+  let bioregion_updated =
+    verify_bioregion_pool_removed(tx, pool.pool_id, config.bioregion_registry)
   authorized && delegations_cleared && pool_deactivated && bioregion_updated
 }
 
@@ -418,30 +419,39 @@ fn verify_governance_approval(
   pool_id: ByteArray,
   governance: ByteArray,
 ) -> Bool {
-  list.any(tx.reference_inputs, fn(input) {
-    when input.output.address.payment_credential is {
-      Script(hash) ->
-        if hash == governance {
-          // Would check for executed proposal targeting this pool
-          True
-        } else {
-          False
-        }
-      _ -> False
-    }
-  })
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      when input.output.address.payment_credential is {
+        Script(hash) ->
+          if hash == governance {
+            // Would check for executed proposal targeting this pool
+            True
+          } else {
+            False
+          }
+        _ -> False
+      }
+    },
+  )
 }
 
-fn verify_pool_deactivated(outputs: List<Output>, old_pool: BioregionPool) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect pool: BioregionPool = data
-        pool.pool_id == old_pool.pool_id && pool.active == False
+fn verify_pool_deactivated(
+  outputs: List<Output>,
+  old_pool: BioregionPool,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect pool: BioregionPool = data
+          pool.pool_id == old_pool.pool_id && pool.active == False
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 // =============================================================================
@@ -456,25 +466,23 @@ fn validate_delegate(
 ) -> Bool {
   // 1. Amount must meet minimum
   let valid_amount = amount >= min_delegation
-  
   // 2. Delegator must have pNFT and sign
   let delegator_data = find_delegator_pnft(tx, config.pnft_policy)
   expect Some(delegator) = delegator_data
   let delegator_signed = list.has(tx.extra_signatories, delegator.owner)
-  
   // 3. Tokens must be transferred to pool
-  let tokens_locked = verify_tokens_to_pool(
-    tx.outputs, config.token_policy, config.token_name, amount
-  )
-  
+  let tokens_locked =
+    verify_tokens_to_pool(
+      tx.outputs,
+      config.token_policy,
+      config.token_name,
+      amount,
+    )
   // 4. Delegation datum created
-  let delegation_created = verify_delegation_created(
-    tx.outputs, delegator.pnft, amount, lock_epochs
-  )
-  
+  let delegation_created =
+    verify_delegation_created(tx.outputs, delegator.pnft, amount, lock_epochs)
   // 5. Pool stake updated
   let pool_updated = verify_pool_stake_increased(tx.outputs, amount)
-  
   valid_amount && delegator_signed && tokens_locked && delegation_created && pool_updated
 }
 
@@ -484,17 +492,18 @@ fn verify_delegation_created(
   amount: Int,
   lock_epochs: Int,
 ) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect delegation: StakeDelegation = data
-        delegation.delegator == delegator &&
-        delegation.amount == amount &&
-        delegation.lock_epochs == lock_epochs
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect delegation: StakeDelegation = data
+          delegation.delegator == delegator && delegation.amount == amount && delegation.lock_epochs == lock_epochs
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 // =============================================================================
@@ -508,27 +517,30 @@ fn validate_undelegate(
   config: StakePoolConfig,
 ) -> Bool {
   let current_slot = get_slot(tx)
-  let current_epoch = current_slot / 432000  // ~5 days per epoch
-  
+  let current_epoch = current_slot / 432000
+  // ~5 days per epoch
   // 1. Lock period must be over
-  let lock_expired = current_epoch >= delegation.start_epoch + delegation.lock_epochs
-  
+  let lock_expired =
+    current_epoch >= delegation.start_epoch + delegation.lock_epochs
   // 2. Delegator must sign
-  let delegator_signed = verify_delegator_signed(tx, delegation.delegator, config.pnft_policy)
-  
+  let delegator_signed =
+    verify_delegator_signed(tx, delegation.delegator, config.pnft_policy)
   // 3. Amount valid (can't undelegate more than delegated)
   let valid_amount = amount <= delegation.amount
-  
   // 4. Tokens returned to delegator
-  let tokens_returned = verify_tokens_to_delegator(
-    tx.outputs, config.token_policy, config.token_name, amount, delegation.delegator, config.pnft_policy
-  )
-  
+  let tokens_returned =
+    verify_tokens_to_delegator(
+      tx.outputs,
+      config.token_policy,
+      config.token_name,
+      amount,
+      delegation.delegator,
+      config.pnft_policy,
+    )
   // 5. Pool stake updated
   let pool_updated = verify_pool_stake_decreased(tx.outputs, amount)
-  
   // 6. Delegation datum updated or removed
-  let delegation_updated = 
+  let delegation_updated =
     if amount == delegation.amount {
       // Full undelegate - datum can be removed
       True
@@ -536,9 +548,7 @@ fn validate_undelegate(
       // Partial - update datum
       verify_delegation_updated(tx.outputs, delegation, amount)
     }
-  
-  lock_expired && delegator_signed && valid_amount && 
-  tokens_returned && pool_updated && delegation_updated
+  lock_expired && delegator_signed && valid_amount && tokens_returned && pool_updated && delegation_updated
 }
 
 fn verify_delegator_signed(
@@ -546,23 +556,30 @@ fn verify_delegator_signed(
   delegator: AssetName,
   pnft_policy: PolicyId,
 ) -> Bool {
-  list.any(tx.reference_inputs, fn(input) {
-    let has_pnft = list.any(flatten(input.output.value), fn(asset) {
-      let (p, name, qty) = asset
-      p == pnft_policy && name == delegator && qty > 0
-    })
-    if has_pnft {
-      when input.output.datum is {
-        InlineDatum(data) -> {
-          expect datum: PnftDatum = data
-          list.has(tx.extra_signatories, datum.owner)
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      let has_pnft =
+        list.any(
+          flatten(input.output.value),
+          fn(asset) {
+            let (p, name, qty) = asset
+            p == pnft_policy && name == delegator && qty > 0
+          },
+        )
+      if has_pnft {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            list.has(tx.extra_signatories, datum.owner)
+          }
+          _ -> False
         }
-        _ -> False
+      } else {
+        False
       }
-    } else {
-      False
-    }
-  })
+    },
+  )
 }
 
 // =============================================================================
@@ -576,28 +593,30 @@ fn validate_claim_rewards(
   config: StakePoolConfig,
 ) -> Bool {
   // 1. Delegator must sign
-  let delegator_signed = verify_delegator_signed(tx, delegation.delegator, config.pnft_policy)
-  
+  let delegator_signed =
+    verify_delegator_signed(tx, delegation.delegator, config.pnft_policy)
   // 2. Rewards must be available for this epoch
-  let rewards_available = verify_rewards_available(tx, delegation.pool_id, epoch)
-  
+  let rewards_available =
+    verify_rewards_available(tx, delegation.pool_id, epoch)
   // 3. Calculate reward amount based on delegation proportion
   let reward_amount = calculate_delegator_reward(tx, delegation, epoch)
-  
   // 4. Tokens sent to delegator
-  let tokens_sent = verify_tokens_to_delegator(
-    tx.outputs, config.token_policy, config.token_name, reward_amount, 
-    delegation.delegator, config.pnft_policy
-  )
-  
+  let tokens_sent =
+    verify_tokens_to_delegator(
+      tx.outputs,
+      config.token_policy,
+      config.token_name,
+      reward_amount,
+      delegation.delegator,
+      config.pnft_policy,
+    )
   // 5. If auto-compound, add to delegation instead
-  let compounded = 
+  let compounded =
     if delegation.auto_compound {
       verify_delegation_increased(tx.outputs, delegation, reward_amount)
     } else {
       tokens_sent
     }
-  
   delegator_signed && rewards_available && compounded
 }
 
@@ -607,13 +626,12 @@ fn calculate_delegator_reward(
   epoch: Int,
 ) -> Int {
   // Find pool rewards for this epoch
-  let pool_rewards = find_pool_rewards(tx.reference_inputs, delegation.pool_id, epoch)
+  let pool_rewards =
+    find_pool_rewards(tx.reference_inputs, delegation.pool_id, epoch)
   expect Some(rewards) = pool_rewards
-  
   // Find total pool stake
   let pool_data = find_pool_data(tx.reference_inputs, delegation.pool_id)
   expect Some(pool) = pool_data
-  
   // Delegator's share = (delegation.amount / pool.ultralife_stake) * rewards.delegator_share
   if pool.ultralife_stake > 0 {
     rewards.delegator_share * delegation.amount / pool.ultralife_stake
@@ -634,27 +652,34 @@ fn validate_distribute_rewards(
   config: StakePoolConfig,
 ) -> Bool {
   // 1. Operator must sign
-  let operator_signed = verify_operator_signed(tx, pool.operator_pnft, config.pnft_policy)
-  
+  let operator_signed =
+    verify_operator_signed(tx, pool.operator_pnft, config.pnft_policy)
   // 2. Calculate splits based on pool parameters
   let operator_share = total_rewards * pool.margin / 10000
-  let treasury_share = total_rewards * pool.impact_commitment.treasury_contribution / 10000
+  let treasury_share =
+    total_rewards * pool.impact_commitment.treasury_contribution / 10000
   let delegator_share = total_rewards - operator_share - treasury_share
-  
   // 3. Treasury receives its share
-  let treasury_paid = verify_treasury_payment(
-    tx.outputs, config.token_policy, config.token_name, treasury_share
-  )
-  
+  let treasury_paid =
+    verify_treasury_payment(
+      tx.outputs,
+      config.token_policy,
+      config.token_name,
+      treasury_share,
+    )
   // 4. Rewards datum created for delegators to claim
-  let rewards_datum_created = verify_rewards_datum(
-    tx.outputs, pool.pool_id, epoch, total_rewards, 
-    operator_share, delegator_share, treasury_share
-  )
-  
+  let rewards_datum_created =
+    verify_rewards_datum(
+      tx.outputs,
+      pool.pool_id,
+      epoch,
+      total_rewards,
+      operator_share,
+      delegator_share,
+      treasury_share,
+    )
   // 5. Apply impact modifier (pools with better impact get bonus)
   // This incentivizes pools to improve their environmental footprint
-  
   operator_signed && treasury_paid && rewards_datum_created
 }
 
@@ -667,20 +692,18 @@ fn verify_rewards_datum(
   delegator_share: Int,
   treasury_share: Int,
 ) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect rewards: PoolRewards = data
-        rewards.pool_id == pool_id &&
-        rewards.epoch == epoch &&
-        rewards.total_rewards == total &&
-        rewards.operator_share == operator_share &&
-        rewards.delegator_share == delegator_share &&
-        rewards.treasury_share == treasury_share
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect rewards: PoolRewards = data
+          rewards.pool_id == pool_id && rewards.epoch == epoch && rewards.total_rewards == total && rewards.operator_share == operator_share && rewards.delegator_share == delegator_share && rewards.treasury_share == treasury_share
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 // =============================================================================
@@ -698,72 +721,101 @@ fn find_operator_pnft(
   tx: Transaction,
   pnft_policy: PolicyId,
 ) -> Option<OperatorInfo> {
-  list.find_map(tx.reference_inputs, fn(input) {
-    let pnfts = list.filter_map(flatten(input.output.value), fn(asset) {
-      let (p, name, qty) = asset
-      if p == pnft_policy && qty > 0 { Some(name) } else { None }
-    })
-    when pnfts is {
-      [name, ..] -> {
-        when input.output.datum is {
-          InlineDatum(data) -> {
-            expect datum: PnftDatum = data
-            if list.has(tx.extra_signatories, datum.owner) {
-              Some(OperatorInfo {
-                pnft: name,
-                owner: datum.owner,
-                level: datum.level,
-                bioregion: datum.bioregion,
-              })
+  list.find_map(
+    tx.reference_inputs,
+    fn(input) {
+      let pnfts =
+        list.filter_map(
+          flatten(input.output.value),
+          fn(asset) {
+            let (p, name, qty) = asset
+            if p == pnft_policy && qty > 0 {
+              Some(name)
             } else {
               None
             }
+          },
+        )
+      when pnfts is {
+        [name, ..] ->
+          when input.output.datum is {
+            InlineDatum(data) -> {
+              expect datum: PnftDatum = data
+              if list.has(tx.extra_signatories, datum.owner) {
+                Some(
+                  OperatorInfo {
+                    pnft: name,
+                    owner: datum.owner,
+                    level: datum.level,
+                    bioregion: datum.bioregion,
+                  },
+                )
+              } else {
+                None
+              }
+            }
+            _ -> None
           }
-          _ -> None
-        }
+        _ -> None
       }
-      _ -> None
-    }
-  })
+    },
+  )
 }
 
 fn find_delegator_pnft(
   tx: Transaction,
   pnft_policy: PolicyId,
 ) -> Option<DelegatorInfo> {
-  list.find_map(tx.reference_inputs, fn(input) {
-    let pnfts = list.filter_map(flatten(input.output.value), fn(asset) {
-      let (p, name, qty) = asset
-      if p == pnft_policy && qty > 0 { Some(name) } else { None }
-    })
-    when pnfts is {
-      [name, ..] -> {
-        when input.output.datum is {
-          InlineDatum(data) -> {
-            expect datum: PnftDatum = data
-            Some(DelegatorInfo { pnft: name, owner: datum.owner })
+  list.find_map(
+    tx.reference_inputs,
+    fn(input) {
+      let pnfts =
+        list.filter_map(
+          flatten(input.output.value),
+          fn(asset) {
+            let (p, name, qty) = asset
+            if p == pnft_policy && qty > 0 {
+              Some(name)
+            } else {
+              None
+            }
+          },
+        )
+      when pnfts is {
+        [name, ..] ->
+          when input.output.datum is {
+            InlineDatum(data) -> {
+              expect datum: PnftDatum = data
+              Some(DelegatorInfo { pnft: name, owner: datum.owner })
+            }
+            _ -> None
           }
-          _ -> None
-        }
+        _ -> None
       }
-      _ -> None
-    }
-  })
+    },
+  )
 }
 
 fn find_pool_data(
   inputs: List<Input>,
   pool_id: ByteArray,
 ) -> Option<BioregionPool> {
-  list.find_map(inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect pool: BioregionPool = data
-        if pool.pool_id == pool_id { Some(pool) } else { None }
+  list.find_map(
+    inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect pool: BioregionPool = data
+          if pool.pool_id == pool_id {
+            Some(pool)
+          } else {
+            None
+          }
+        }
+        _ -> None
       }
-      _ -> None
-    }
-  })
+    },
+  )
 }
 
 fn find_pool_rewards(
@@ -771,19 +823,22 @@ fn find_pool_rewards(
   pool_id: ByteArray,
   epoch: Int,
 ) -> Option<PoolRewards> {
-  list.find_map(inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect rewards: PoolRewards = data
-        if rewards.pool_id == pool_id && rewards.epoch == epoch {
-          Some(rewards)
-        } else {
-          None
+  list.find_map(
+    inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect rewards: PoolRewards = data
+          if rewards.pool_id == pool_id && rewards.epoch == epoch {
+            Some(rewards)
+          } else {
+            None
+          }
         }
+        _ -> None
       }
-      _ -> None
-    }
-  })
+    },
+  )
 }
 
 fn verify_stake_locked(
@@ -792,9 +847,12 @@ fn verify_stake_locked(
   name: AssetName,
   amount: Int,
 ) -> Bool {
-  let total = list.foldl(outputs, 0, fn(output, acc) {
-    acc + quantity_of(output.value, policy, name)
-  })
+  let total =
+    list.foldl(
+      outputs,
+      0,
+      fn(output, acc) { acc + quantity_of(output.value, policy, name) },
+    )
   total >= amount
 }
 
@@ -809,11 +867,13 @@ fn verify_tokens_to_pool(
 
 fn verify_pool_stake_increased(outputs: List<Output>, amount: Int) -> Bool {
   // Pool datum should show increased stake
-  list.length(outputs) > 0  // Verify outputs exist
+  list.length(outputs) > 0
+  // Verify outputs exist
 }
 
 fn verify_pool_stake_decreased(outputs: List<Output>, amount: Int) -> Bool {
-  list.length(outputs) > 0  // Verify outputs exist
+  list.length(outputs) > 0
+  // Verify outputs exist
 }
 
 fn verify_tokens_to_delegator(
@@ -824,9 +884,12 @@ fn verify_tokens_to_delegator(
   delegator: AssetName,
   pnft_policy: PolicyId,
 ) -> Bool {
-  let total = list.foldl(outputs, 0, fn(output, acc) {
-    acc + quantity_of(output.value, policy, name)
-  })
+  let total =
+    list.foldl(
+      outputs,
+      0,
+      fn(output, acc) { acc + quantity_of(output.value, policy, name) },
+    )
   total >= amount
 }
 
@@ -835,16 +898,18 @@ fn verify_delegation_updated(
   old: StakeDelegation,
   withdrawn: Int,
 ) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect new: StakeDelegation = data
-        new.delegator == old.delegator &&
-        new.amount == old.amount - withdrawn
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect new: StakeDelegation = data
+          new.delegator == old.delegator && new.amount == old.amount - withdrawn
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn verify_delegation_increased(
@@ -852,19 +917,25 @@ fn verify_delegation_increased(
   old: StakeDelegation,
   reward: Int,
 ) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect new: StakeDelegation = data
-        new.delegator == old.delegator &&
-        new.amount == old.amount + reward
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect new: StakeDelegation = data
+          new.delegator == old.delegator && new.amount == old.amount + reward
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
-fn verify_rewards_available(tx: Transaction, pool_id: ByteArray, epoch: Int) -> Bool {
+fn verify_rewards_available(
+  tx: Transaction,
+  pool_id: ByteArray,
+  epoch: Int,
+) -> Bool {
   find_pool_rewards(tx.reference_inputs, pool_id, epoch) != None
 }
 
@@ -875,9 +946,12 @@ fn verify_treasury_payment(
   amount: Int,
 ) -> Bool {
   // Treasury output should have this amount
-  let total = list.foldl(outputs, 0, fn(output, acc) {
-    acc + quantity_of(output.value, policy, name)
-  })
+  let total =
+    list.foldl(
+      outputs,
+      0,
+      fn(output, acc) { acc + quantity_of(output.value, policy, name) },
+    )
   total >= amount
 }
 
@@ -888,7 +962,8 @@ fn verify_bioregion_pool_added(
   registry: ByteArray,
 ) -> Bool {
   // Bioregion datum should include new pool
-  list.length(tx.outputs) > 0  // Verify outputs exist
+  list.length(tx.outputs) > 0
+  // Verify outputs exist
 }
 
 fn verify_bioregion_pool_removed(
@@ -896,9 +971,9 @@ fn verify_bioregion_pool_removed(
   pool_id: ByteArray,
   registry: ByteArray,
 ) -> Bool {
-  list.length(tx.outputs) > 0  // Verify outputs exist
+  list.length(tx.outputs) > 0
+  // Verify outputs exist
 }
-
 // =============================================================================
 // DOCUMENTATION
 // =============================================================================

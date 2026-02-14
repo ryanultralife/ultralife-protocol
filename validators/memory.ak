@@ -13,12 +13,15 @@
 use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use aiken/interval.{Finite}
-use cardano/assets.{PolicyId, AssetName, quantity_of}
-use cardano/transaction.{Transaction, Input, Output, OutputReference, InlineDatum}
-use ultralife/types.{
-  PnftDatum, InterpretationDatum, InterpreterType, Individual, Community, Collective,
+use cardano/assets.{AssetName, PolicyId, quantity_of}
+use cardano/transaction.{
+  InlineDatum, Input, Output, OutputReference, Transaction,
 }
-use ultralife/prc37.{current_cycle, calculate_vitality}
+use ultralife/prc37.{calculate_vitality, current_cycle}
+use ultralife/types.{
+  Collective, Community, Individual, InterpretationDatum, InterpreterType,
+  PnftDatum,
+}
 
 /// Resonance threshold for interpretation emergence
 const resonance_threshold = 37
@@ -75,10 +78,18 @@ validator memory(config: MemoryConfig) {
         let fee_ok = verify_fee(tx.outputs, config)
         let slot = get_slot(tx)
         let cycle = current_cycle(slot)
-        let datum_ok = verify_new_datum(tx.outputs, substrate_ref, i.pnft, content_hash, slot, config.initial_vitality, cycle)
+        let datum_ok =
+          verify_new_datum(
+            tx.outputs,
+            substrate_ref,
+            i.pnft,
+            content_hash,
+            slot,
+            config.initial_vitality,
+            cycle,
+          )
         signed && fee_ok && datum_ok
       }
-      
       Resonate { interpretation_id } -> {
         expect Some(d) = datum
         let resonator = find_interpreter(tx, config.pnft_policy)
@@ -92,7 +103,6 @@ validator memory(config: MemoryConfig) {
         let updated = verify_resonance(tx.outputs, d, vitality)
         signed && not_self && vital && updated
       }
-      
       MarkEmergence { interpretation_id } -> {
         expect Some(d) = datum
         let threshold = d.resonance >= resonance_threshold
@@ -100,7 +110,6 @@ validator memory(config: MemoryConfig) {
         let upgraded = verify_upgrade(tx.outputs, d, Community)
         threshold && upgraded
       }
-      
       Archive { interpretation_id } -> {
         expect Some(d) = datum
         let slot = get_slot(tx)
@@ -110,22 +119,32 @@ validator memory(config: MemoryConfig) {
       }
     }
   }
+
+  else(_) {
+    fail
+  }
 }
 
 // =============================================================================
 // HELPERS
 // =============================================================================
 
-fn find_interpreter(tx: Transaction, policy: PolicyId) -> Option<InterpreterInfo> {
-  list.find_map(tx.reference_inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect datum: PnftDatum = data
-        Some(InterpreterInfo { pnft: datum.pnft_id, owner: datum.owner })
+fn find_interpreter(
+  tx: Transaction,
+  policy: PolicyId,
+) -> Option<InterpreterInfo> {
+  list.find_map(
+    tx.reference_inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect datum: PnftDatum = data
+          Some(InterpreterInfo { pnft: datum.pnft_id, owner: datum.owner })
+        }
+        _ -> None
       }
-      _ -> None
-    }
-  })
+    },
+  )
 }
 
 fn get_slot(tx: Transaction) -> Int {
@@ -137,59 +156,80 @@ fn get_slot(tx: Transaction) -> Int {
 
 /// Verify interpretation fee paid
 fn verify_fee(outputs: List<Output>, config: MemoryConfig) -> Bool {
-  list.any(outputs, fn(output) {
-    let fee_amount = quantity_of(output.value, config.token_policy, config.token_name)
-    fee_amount >= 1  // 1 token minimum fee
-  })
+  list.any(
+    outputs,
+    fn(output) {
+      let fee_amount =
+        quantity_of(output.value, config.token_policy, config.token_name)
+      fee_amount >= 1
+    },
+  )
+  // 1 token minimum fee
 }
 
 /// Verify new interpretation datum created
-fn verify_new_datum(outputs: List<Output>, substrate: ByteArray, interpreter_id: ByteArray, content: ByteArray, slot: Int, vitality: Int, cycle: Int) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect datum: InterpretationDatum = data
-        datum.substrate_ref == substrate &&
-        datum.interpreter_id == interpreter_id &&
-        datum.content_hash == content &&
-        datum.created_at == slot &&
-        datum.vitality == vitality &&
-        datum.cycle == cycle
+fn verify_new_datum(
+  outputs: List<Output>,
+  substrate: ByteArray,
+  interpreter_id: ByteArray,
+  content: ByteArray,
+  slot: Int,
+  vitality: Int,
+  cycle: Int,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect datum: InterpretationDatum = data
+          datum.substrate_ref == substrate && datum.interpreter_id == interpreter_id && datum.content_hash == content && datum.created_at == slot && datum.vitality == vitality && datum.cycle == cycle
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 /// Verify resonance increased and vitality updated
-fn verify_resonance(outputs: List<Output>, old: InterpretationDatum, vitality: Int) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect datum: InterpretationDatum = data
-        datum.substrate_ref == old.substrate_ref &&
-        datum.resonance == old.resonance + 1 &&
-        datum.vitality == vitality
+fn verify_resonance(
+  outputs: List<Output>,
+  old: InterpretationDatum,
+  vitality: Int,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect datum: InterpretationDatum = data
+          datum.substrate_ref == old.substrate_ref && datum.resonance == old.resonance + 1 && datum.vitality == vitality
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 /// Verify interpreter type upgraded
-fn verify_upgrade(outputs: List<Output>, old: InterpretationDatum, new_type: InterpreterType) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect datum: InterpretationDatum = data
-        datum.substrate_ref == old.substrate_ref &&
-        datum.interpreter == new_type
+fn verify_upgrade(
+  outputs: List<Output>,
+  old: InterpretationDatum,
+  new_type: InterpreterType,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect datum: InterpretationDatum = data
+          datum.substrate_ref == old.substrate_ref && datum.interpreter == new_type
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
-
 // =============================================================================
 // DOCUMENTATION
 // =============================================================================
