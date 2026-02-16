@@ -133,7 +133,7 @@ export class TouchEngine {
       } else { idx++; }
 
       // Target offset pattern (how far from "intended" target)
-      features[idx++] = this.std(xs.map((x, i) => x - this.mean(xs)));
+      features[idx++] = this.std(xs.map((x) => x - this.mean(xs)));
     }
 
     return features;

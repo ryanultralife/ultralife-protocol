@@ -10,6 +10,8 @@ export default {
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^lucid-cardano$': '<rootDir>/src/__mocks__/lucid-cardano.ts',
+    '^@blockfrost/blockfrost-js$': '<rootDir>/src/__mocks__/blockfrost.ts',
   },
   transform: {
     '^.+\\.ts$': [

@@ -7,6 +7,12 @@
 
 import { EnrollmentData, FeatureVector, PrivacySettings, ConsentTier } from './types';
 
+// Development storage type
+declare global {
+  // eslint-disable-next-line no-var
+  var __ultralife_storage: Record<string, string> | undefined;
+}
+
 // Storage keys
 const KEYS = {
   ENROLLMENT: 'ultralife_enrollment',
@@ -30,10 +36,10 @@ export class SecureStorage {
     // await SecureStore.setItemAsync(KEYS.ENROLLMENT, JSON.stringify(serialized));
     
     // Development fallback
-    if (typeof globalThis.__storage === 'undefined') {
-      globalThis.__storage = {};
+    if (typeof globalThis.__ultralife_storage === 'undefined') {
+      globalThis.__ultralife_storage = {};
     }
-    globalThis.__storage[KEYS.ENROLLMENT] = JSON.stringify(serialized);
+    globalThis.__ultralife_storage[KEYS.ENROLLMENT] = JSON.stringify(serialized);
   }
 
   /**
@@ -44,7 +50,7 @@ export class SecureStorage {
       // TODO: Use expo-secure-store in production
       // const raw = await SecureStore.getItemAsync(KEYS.ENROLLMENT);
       
-      const raw = globalThis.__storage?.[KEYS.ENROLLMENT] ?? null;
+      const raw = globalThis.__ultralife_storage?.[KEYS.ENROLLMENT] ?? null;
       if (!raw) return null;
 
       const parsed = JSON.parse(raw);
@@ -64,8 +70,8 @@ export class SecureStorage {
     // TODO: Use expo-secure-store in production
     // await SecureStore.deleteItemAsync(KEYS.ENROLLMENT);
     
-    if (globalThis.__storage) {
-      delete globalThis.__storage[KEYS.ENROLLMENT];
+    if (globalThis.__ultralife_storage) {
+      delete globalThis.__ultralife_storage[KEYS.ENROLLMENT];
     }
   }
 
@@ -73,15 +79,15 @@ export class SecureStorage {
    * Save encrypted wallet key (encrypted with biometric-derived key)
    */
   async saveEncryptedWallet(encryptedKey: string): Promise<void> {
-    if (typeof globalThis.__storage === 'undefined') globalThis.__storage = {};
-    globalThis.__storage[KEYS.WALLET_ENCRYPTED] = encryptedKey;
+    if (typeof globalThis.__ultralife_storage === 'undefined') globalThis.__ultralife_storage = {};
+    globalThis.__ultralife_storage[KEYS.WALLET_ENCRYPTED] = encryptedKey;
   }
 
   /**
    * Retrieve encrypted wallet key
    */
   async getEncryptedWallet(): Promise<string | null> {
-    return globalThis.__storage?.[KEYS.WALLET_ENCRYPTED] ?? null;
+    return globalThis.__ultralife_storage?.[KEYS.WALLET_ENCRYPTED] ?? null;
   }
 
   /**
@@ -92,8 +98,8 @@ export class SecureStorage {
       ...settings,
       enabledTiers: Array.from(settings.enabledTiers),
     };
-    if (typeof globalThis.__storage === 'undefined') globalThis.__storage = {};
-    globalThis.__storage[KEYS.PRIVACY] = JSON.stringify(serialized);
+    if (typeof globalThis.__ultralife_storage === 'undefined') globalThis.__ultralife_storage = {};
+    globalThis.__ultralife_storage[KEYS.PRIVACY] = JSON.stringify(serialized);
   }
 
   /**
@@ -101,7 +107,7 @@ export class SecureStorage {
    */
   async getPrivacySettings(): Promise<PrivacySettings> {
     try {
-      const raw = globalThis.__storage?.[KEYS.PRIVACY];
+      const raw = globalThis.__ultralife_storage?.[KEYS.PRIVACY];
       if (!raw) return this.defaultPrivacySettings();
       const parsed = JSON.parse(raw);
       return {

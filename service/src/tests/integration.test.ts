@@ -208,12 +208,13 @@ describe('MCP Server Initialization', () => {
 // =============================================================================
 
 describe('Tool Request Handling', () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     const config: LocalModeConfig = {
       deploymentPath,
       protocolSpecPath
     };
     server = new UltraLifeLocalMcpServer(config);
+    await (server as any).handlers.initialize();
   });
 
   describe('Information Tools', () => {

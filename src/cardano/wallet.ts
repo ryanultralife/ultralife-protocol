@@ -8,12 +8,12 @@
  * No seed phrases. No PINs. Your heartbeat signs transactions.
  */
 
-import { AuthLevel, WalletState, TransactionRequest } from '../lib/types';
+import { AuthLevel, WalletState, TransactionRequest, TouchEvent as UltraTouchEvent } from '../lib/types';
 import { IdentityManager } from '../lib/identity';
 import { SecureStorage } from '../lib/storage';
 
-// Minimum auth levels for different operations
-const OPERATION_AUTH_LEVELS: Record<string, AuthLevel> = {
+// Minimum auth levels for different operations — used by getRequiredAuthLevel()
+export const OPERATION_AUTH_LEVELS: Record<string, AuthLevel> = {
   balance_check: 'quick',
   receive: 'quick',
   send_small: 'standard',   // < 100 ADA
@@ -74,7 +74,7 @@ export class Wallet {
     liveData: {
       ppgFrames?: Float64Array[];
       accelData?: Float64Array[];
-      touchEvents?: TouchEvent[];
+      touchEvents?: UltraTouchEvent[];
     },
   ): Promise<{ txHash: string; confidence: number } | { error: string }> {
     // Determine required auth level

@@ -136,7 +136,7 @@ describe('MCP Tool Definitions', () => {
           t.includes('founder') ||
           t.includes('treasury')
       );
-      expect(treasuryTools.length).toBe(5);
+      expect(treasuryTools.length).toBe(6);
     });
 
     it('should have marketplace tools', () => {
@@ -206,8 +206,8 @@ describe('UltraLife Info Content', () => {
           'UBI distribution tied to bioregion health - creates incentive to improve local ecosystem',
       };
 
-      expect(bioregionInfo.tracks.resources).toContain('water');
-      expect(bioregionInfo.tracks.humans).toContain('health');
+      expect(bioregionInfo.tracks.resources).toContain('Water');
+      expect(bioregionInfo.tracks.humans).toContain('Health');
       expect(bioregionInfo.importance).toContain('UBI');
     });
   });

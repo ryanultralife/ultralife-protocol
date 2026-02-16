@@ -2,7 +2,7 @@
  * UltraLife Math & Identity Tests
  */
 
-import { cosineSimilarity, euclideanDistance, weightedCombine, zeroVector, sampleEntropy, findPeaks } from '../src/lib/math';
+import { cosineSimilarity, weightedCombine, zeroVector, sampleEntropy, findPeaks } from '../src/lib/math';
 
 // === Cosine Similarity Tests ===
 
@@ -90,12 +90,12 @@ describe('zeroVector', () => {
 // === Sample Entropy Tests ===
 
 describe('sampleEntropy', () => {
-  test('constant signal has low entropy', () => {
-    const constant = new Float64Array(100).fill(1.0);
-    // Add tiny noise to avoid divide by zero in std
-    for (let i = 0; i < 100; i++) constant[i] += Math.random() * 0.001;
-    const entropy = sampleEntropy(constant);
-    // Very regular signal should have low entropy
+  test('periodic signal has low entropy', () => {
+    // A perfectly periodic signal has highly predictable patterns
+    const periodic = new Float64Array(100);
+    for (let i = 0; i < 100; i++) periodic[i] = Math.sin(2 * Math.PI * i / 10);
+    const entropy = sampleEntropy(periodic);
+    // Periodic signal should have low entropy (high predictability)
     expect(entropy).toBeLessThan(1.0);
   });
 

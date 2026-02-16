@@ -275,10 +275,11 @@ export class LocalModeHandlers {
   }
 
   private getData(): DeploymentData {
-    if (!this.deploymentData) {
-      throw new Error('Deployment data not loaded. Call initialize() first.');
+    this.loadDeploymentData();
+    if (!this.protocolSpec) {
+      this.loadProtocolSpec();
     }
-    return this.deploymentData;
+    return this.deploymentData!;
   }
 
   // ===========================================================================
@@ -289,6 +290,9 @@ export class LocalModeHandlers {
    * get_ultralife_info - Return protocol documentation from protocol-spec.json
    */
   getUltraLifeInfo(topic?: string): object {
+    if (!this.protocolSpec) {
+      this.loadProtocolSpec();
+    }
     const spec = this.protocolSpec;
 
     const info: Record<string, object> = {
