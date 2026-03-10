@@ -65,6 +65,8 @@ Built on Cardano • 34 Aiken Validators • LLM Interface
 | [Oracle Specification](docs/ORACLE_SPECIFICATION.md) | Real-world data feeds |
 | [Deployment](docs/DEPLOYMENT.md) | How to deploy to mainnet |
 | [SPO Quick Brief](docs/SPO_QUICK_BRIEF.md) | For technical testers |
+| [CIP-0113 Integration](docs/CIP0113_INTEGRATION.md) | Programmable token standard alignment |
+| [Rust Node Readiness](docs/RUST_NODE_READINESS.md) | Amaru node, Leios, Peras |
 
 ---
 
@@ -168,7 +170,7 @@ A parallel economy where:
 
 ## License
 
-MIT
+Apache-2.0
 
 ## Author
 

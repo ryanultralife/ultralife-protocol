@@ -308,6 +308,79 @@ When available:
 
 ---
 
+## CIP-0113: Programmable Token Standard
+
+### What It Is
+
+CIP-0113 is the Cardano Foundation's open-source standard for programmable tokens. It allows token issuers to attach modular compliance logic directly to native Cardano assets, with rules automatically enforced every time a token is transferred, minted, or burned.
+
+An on-chain registry enables wallets and dApps to discover which rules apply to any token.
+
+### Why It Matters
+
+- **Standardized compliance logic** reduces per-dApp integration cost
+- **Wallets and dApps** can discover token rules via on-chain registry without custom integration
+- **UltraLife Impact Tokens and Bioregion Tokens** are direct candidates for CIP-0113 wrapping
+
+### Integration Summary
+
+| Token Type | CIP-0113 Status |
+|------------|-----------------|
+| Impact Tokens | Direct candidate |
+| Bioregion Tokens | Strong candidate |
+| ULTRA Token | Strong candidate |
+| pNFT | Not applicable (identity, not tradeable) |
+
+**Cross-reference**: See [CIP-0113 Integration Strategy](CIP0113_INTEGRATION.md) for full integration details.
+
+---
+
+## Amaru: Rust Node Infrastructure
+
+### What It Is
+
+Amaru is an open-source Rust node client for Cardano developed by PRAGMA (Cardano Foundation, Blink Labs, DC Spark, Sundae Labs, TxPipe). It aims to become a full block-producing node with significantly lower resource requirements than the Haskell node.
+
+### Why It Matters
+
+| Area | Impact |
+|------|--------|
+| **SNEV Stakepool** | Lower resource requirements for bioregion deployment |
+| **MCP Integration** | gRPC and utxoRPC interfaces for cleaner LLM-to-chain communication |
+| **Network Diversity** | Multiple implementations reduce single-point-of-failure risk |
+
+### Current Status
+
+- Relay node: Functional
+- Block forging: In development
+- Not actionable for UltraLife today — track progress for future evaluation
+
+**Cross-reference**: See [Rust Node Readiness](RUST_NODE_READINESS.md) for full assessment.
+
+---
+
+## Ouroboros Peras: Faster Finality
+
+### What It Is
+
+Ouroboros Peras is a consensus upgrade that reduces settlement finality from ~20 minutes (probabilistic) to 45-60 seconds (deterministic).
+
+### Why It Matters
+
+| Use Case | Improvement |
+|----------|-------------|
+| Impact Token Settlement | Real-time supply chain tracking |
+| Cross-Bioregion Transfers | Sub-minute settlement |
+| Governance Votes | Faster confirmation |
+
+### Integration
+
+- No contract changes required
+- Complementary to Leios throughput improvements
+- Significant for real-time supply chain Impact Token settlement scenarios
+
+---
+
 ## Summary
 
 | Layer | Technology | UltraLife Use |
@@ -315,6 +388,9 @@ When available:
 | **Privacy** | Starstream | Private txs, selective disclosure |
 | **Local Speed** | Hydra | Bioregion heads, instant local |
 | **Global Scale** | Leios | 10,000+ TPS settlement |
+| **Finality** | Peras | 45-60 second settlement |
+| **Compliance** | CIP-0113 | Programmable token discovery |
+| **Infrastructure** | Amaru | Alternative node, lower resources |
 | **Validation** | UVN | ULTRA-native fee economy |
 | **Consensus** | Cardano L1 | Final truth, UTxO state |
 
