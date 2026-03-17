@@ -1,0 +1,15 @@
+[package]
+name = "UltraLifeVerification"
+version = "0.1.0"
+keywords = ["plutus", "cardano", "formal-verification"]
+leanOptions = [
+  { name = "autoImplicit", value = false }
+]
+
+[[require]]
+name = "Blaster"
+git = "https://github.com/input-output-hk/Lean-blaster"
+rev = "main"
+
+[[lean_lib]]
+name = "Verification"
