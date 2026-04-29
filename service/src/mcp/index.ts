@@ -19,7 +19,8 @@ import {
 
 import { UltraLifeIndexer } from '../indexer/index.js';
 import { UltraLifeTxBuilder } from '../builder/index.js';
-import type { UltraLifeConfig, CategoryRef, WhatOffered, LocationScope, Terms, CompoundFlow } from '../types/index.js';
+import { ComposableTxBuilder, CompositionBundles } from '../builder/composable.js';
+import type { UltraLifeConfig, CategoryRef, WhatOffered, LocationScope, Terms, CompoundFlow, ComposedActionInput } from '../types/index.js';
 
 // =============================================================================
 // PROTOCOL CONTEXT (What the LLM knows about UltraLife)
@@ -615,6 +616,73 @@ const TOOLS: Tool[] = [
       required: ['asset_id', 'service_type', 'performer_pnft', 'description'],
     },
   },
+
+  // === COMPOSED TRANSACTION TOOLS (Fallen Icarus-style bundling) ===
+  {
+    name: 'build_composed_transaction',
+    description: 'Build a transaction with multiple actions bundled together for lower fees. Supports onboarding, marketplace, settlement, and impact bundles.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        actions: {
+          type: 'array',
+          description: 'Array of actions to compose into a single transaction',
+          items: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['mint_pnft', 'create_offering', 'accept_offering', 'transfer', 'claim_ubi', 'record_impact', 'create_bucket', 'fund_bucket', 'spend_bucket', 'create_collective', 'add_collective_member', 'claim_grant'],
+                description: 'Action type',
+              },
+              params: {
+                type: 'object',
+                description: 'Action-specific parameters',
+              },
+            },
+            required: ['type', 'params'],
+          },
+        },
+      },
+      required: ['actions'],
+    },
+  },
+  {
+    name: 'get_composition_bundles',
+    description: 'Get predefined composition bundles for common multi-action patterns',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        bundle_type: {
+          type: 'string',
+          enum: ['onboarding', 'marketplace', 'settlement', 'impact', 'all'],
+          description: 'Type of bundle to get info about',
+        },
+      },
+    },
+  },
+  {
+    name: 'estimate_composed_fees',
+    description: 'Estimate fees for a composed transaction before building',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        actions: {
+          type: 'array',
+          description: 'Array of actions to estimate fees for',
+          items: {
+            type: 'object',
+            properties: {
+              type: { type: 'string' },
+              params: { type: 'object' },
+            },
+            required: ['type', 'params'],
+          },
+        },
+      },
+      required: ['actions'],
+    },
+  },
 ];
 
 // =============================================================================
@@ -625,6 +693,7 @@ export class UltraLifeMcpServer {
   private server: Server;
   private indexer: UltraLifeIndexer;
   private builder: UltraLifeTxBuilder;
+  private composableBuilder: ComposableTxBuilder | null = null;
   private config: UltraLifeConfig;
 
   constructor(config: UltraLifeConfig) {
@@ -828,6 +897,16 @@ export class UltraLifeMcpServer {
 
       case 'build_record_service':
         return this.buildRecordService(args);
+
+      // === COMPOSED TRANSACTIONS ===
+      case 'build_composed_transaction':
+        return this.buildComposedTransaction(args);
+
+      case 'get_composition_bundles':
+        return this.getCompositionBundles(args.bundle_type as string);
+
+      case 'estimate_composed_fees':
+        return this.estimateComposedFees(args);
 
       default:
         throw new Error(`Unknown tool: ${name}`);
@@ -1482,6 +1561,147 @@ export class UltraLifeMcpServer {
       },
       note: 'Service permanently recorded on ledger. Anyone can query asset history - no scanning required.',
       next_step: 'Sign transaction to record service on-chain',
+    };
+  }
+
+  // ===========================================================================
+  // COMPOSED TRANSACTION HANDLERS
+  // ===========================================================================
+
+  private async buildComposedTransaction(args: Record<string, unknown>): Promise<object> {
+    const actions = args.actions as ComposedActionInput[];
+
+    if (!actions || actions.length === 0) {
+      throw new Error('At least one action is required');
+    }
+
+    if (!this.composableBuilder) {
+      this.composableBuilder = new ComposableTxBuilder(this.config, this.indexer);
+      await this.composableBuilder.initialize();
+    }
+
+    // Add each action to the builder
+    for (const action of actions) {
+      switch (action.type) {
+        case 'mint_pnft':
+          this.composableBuilder.addMintPnft(action.params as any);
+          break;
+        case 'create_offering':
+          this.composableBuilder.addCreateOffering(action.params as any);
+          break;
+        case 'accept_offering':
+          this.composableBuilder.addAcceptOffering(action.params as any);
+          break;
+        case 'transfer':
+          this.composableBuilder.addTransfer(action.params as any);
+          break;
+        case 'claim_ubi':
+          this.composableBuilder.addClaimUbi(action.params as any);
+          break;
+        case 'record_impact':
+          this.composableBuilder.addRecordImpact(action.params as any);
+          break;
+        case 'create_bucket':
+          this.composableBuilder.addCreateBucket(action.params as any);
+          break;
+        case 'fund_bucket':
+          this.composableBuilder.addFundBucket(action.params as any);
+          break;
+        case 'spend_bucket':
+          this.composableBuilder.addSpendBucket(action.params as any);
+          break;
+        case 'create_collective':
+          this.composableBuilder.addCreateCollective(action.params as any);
+          break;
+        case 'add_collective_member':
+          this.composableBuilder.addAddCollectiveMember(action.params as any);
+          break;
+        case 'claim_grant':
+          this.composableBuilder.addClaimGrant(action.params as any);
+          break;
+        default:
+          throw new Error(`Unknown action type: ${action.type}`);
+      }
+    }
+
+    const result = await this.composableBuilder.build();
+    this.composableBuilder.clear();
+
+    return {
+      action: 'Build Composed Transaction',
+      action_count: actions.length,
+      actions: actions.map(a => a.type),
+      tx_hash: result.txHash,
+      summary: result.summary,
+      savings_estimate: `~${(actions.length - 1) * 0.17} ADA saved vs separate transactions`,
+      unsigned_tx: result.tx.toString(),
+      next_step: 'Sign the transaction with your wallet to execute all actions atomically',
+    };
+  }
+
+  private getCompositionBundles(bundleType?: string): object {
+    const bundles = {
+      onboarding: {
+        name: 'Onboarding Bundle',
+        description: 'Create identity, claim bootstrap grant, set up spending bucket',
+        actions: ['mint_pnft', 'claim_grant', 'create_bucket'],
+        typical_fee: '~0.35 ADA',
+        savings: '~0.34 ADA vs separate transactions',
+      },
+      marketplace: {
+        name: 'Marketplace Bundle',
+        description: 'Accept offering, record impact, transfer payment',
+        actions: ['accept_offering', 'record_impact', 'transfer'],
+        typical_fee: '~0.40 ADA',
+        savings: '~0.34 ADA vs separate transactions',
+      },
+      settlement: {
+        name: 'Settlement Bundle',
+        description: 'Multiple transfers and impact recordings in one transaction',
+        actions: ['transfer (multiple)', 'record_impact (multiple)'],
+        typical_fee: '~0.50 ADA for 5 transfers',
+        savings: '~0.68 ADA vs separate transactions',
+      },
+      impact: {
+        name: 'Impact Bundle',
+        description: 'Record multiple impact events from a single activity',
+        actions: ['record_impact (multiple with different compounds)'],
+        typical_fee: '~0.25 ADA for 3 impacts',
+        savings: '~0.34 ADA vs separate transactions',
+      },
+    };
+
+    if (bundleType && bundleType !== 'all' && bundleType in bundles) {
+      return bundles[bundleType as keyof typeof bundles];
+    }
+
+    return {
+      available_bundles: Object.keys(bundles),
+      bundles,
+      usage: 'Use build_composed_transaction with an array of actions to create bundled transactions',
+    };
+  }
+
+  private async estimateComposedFees(args: Record<string, unknown>): Promise<object> {
+    const actions = args.actions as ComposedActionInput[];
+
+    if (!actions || actions.length === 0) {
+      return { error: 'At least one action is required' };
+    }
+
+    const baseFee = 0.17;
+    const additionalActionFee = 0.05;
+    const estimatedFee = baseFee + (actions.length - 1) * additionalActionFee;
+    const separateFees = actions.length * baseFee;
+    const savings = separateFees - estimatedFee;
+
+    return {
+      action_count: actions.length,
+      actions: actions.map(a => a.type),
+      estimated_fee: `~${estimatedFee.toFixed(2)} ADA`,
+      if_separate: `~${separateFees.toFixed(2)} ADA`,
+      savings: `~${savings.toFixed(2)} ADA`,
+      note: 'Actual fees depend on transaction size and script execution units',
     };
   }
 
