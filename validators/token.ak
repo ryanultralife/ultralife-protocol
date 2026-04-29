@@ -59,6 +59,8 @@ pub type TokenConfig {
   grants_contract: ByteArray,
   /// Remediation contract (for bonds)
   remediation_contract: ByteArray,
+  /// Impact token policy (only burns of this policy count as remediation)
+  impact_token_policy: PolicyId,
 }
 
 // =============================================================================
@@ -414,21 +416,23 @@ fn verify_remediation_commitment(
   config: TokenConfig,
 ) -> Bool {
   // Check for impact token burns (immediate offset)
-  let burned_offset = count_impact_token_burns(tx)
+  let burned_offset = count_impact_token_burns(tx, config.impact_token_policy)
   // Check for remediation bonds posted
   let bonded_offset = count_remediation_bonds(tx, config.remediation_contract)
   // Total offset must cover required remediation
   burned_offset + bonded_offset >= required
 }
 
-fn count_impact_token_burns(tx: Transaction) -> Int {
-  // Sum negative quantities in mint field (burns)
+fn count_impact_token_burns(tx: Transaction, impact_policy: PolicyId) -> Int {
+  // Only burns of the official impact token policy count as remediation.
+  // Without this filter, attackers could burn worthless tokens (any policy)
+  // to claim remediation credit for negative impact transactions.
   list.foldl(
     flatten(tx.mint),
     0,
     fn(asset, acc) {
-      let (_, _, qty) = asset
-      if qty < 0 {
+      let (policy, _, qty) = asset
+      if policy == impact_policy && qty < 0 {
         acc + -qty
       } else {
         acc
@@ -441,7 +445,11 @@ fn count_remediation_bonds(
   tx: Transaction,
   remediation_contract: ByteArray,
 ) -> Int {
-  // Sum bond amounts posted to remediation contract
+  // Bond datums are self-reported, so we cannot trust required_magnitude
+  // alone. Verify the output's actual locked value (lovelace) is at least
+  // bond_amount, and that bond_amount >= required_magnitude. Without these
+  // checks, an attacker could claim arbitrary remediation credit by posting
+  // a bond datum with inflated magnitude but minimal collateral.
   list.foldl(
     tx.outputs,
     0,
@@ -452,7 +460,17 @@ fn count_remediation_bonds(
             when output.datum is {
               InlineDatum(data) -> {
                 expect bond: BondDatum = data
-                acc + bond.required_magnitude
+                let locked_lovelace =
+                  quantity_of(output.value, "", "")
+                let collateral_sufficient =
+                  locked_lovelace >= bond.bond_amount
+                let magnitude_backed =
+                  bond.bond_amount >= bond.required_magnitude
+                if collateral_sufficient && magnitude_backed && bond.required_magnitude > 0 {
+                  acc + bond.required_magnitude
+                } else {
+                  acc
+                }
               }
               _ -> acc
             }
@@ -614,14 +632,14 @@ fn is_remediation_contract(address: Address, contract: ByteArray) -> Bool {
 }
 
 fn has_bond_datum(output: Output, bond_id: ByteArray, deadline: Int) -> Bool {
-  // Check output has bond datum with matching ID and deadline
+  // Parse the BondDatum and verify it matches the expected bond_id and
+  // deadline from the redeemer. Without this, any inline datum would pass
+  // and bond verification would be meaningless.
   when output.datum is {
-    InlineDatum(data) ->
-      // Bond datum structure: { bond_id, deadline, ... }
-      // We check the data contains expected values
-      // This is a simplified check - full implementation would parse BondDatum
-      True
-    // Datum exists, detailed validation in remediation contract
+    InlineDatum(data) -> {
+      expect bond: BondDatum = data
+      bond.bond_id == bond_id && bond.deadline == deadline
+    }
     _ -> False
   }
 }

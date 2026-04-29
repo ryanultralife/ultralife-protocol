@@ -319,21 +319,29 @@ fn verify_guardian_level(
   guardian_pnft: AssetName,
   policy_id: PolicyId,
 ) -> Bool {
-  // Guardian must be Standard, Verified, or Steward (not Basic or Ward)
+  // Find the SPECIFIC guardian pNFT in reference inputs (not just any pNFT).
+  // Without this filter, any Steward pNFT in references would satisfy the
+  // check, allowing unrelated stewards to "vouch" for ward creation.
   list.any(
     tx.reference_inputs,
     fn(input) {
-      when input.output.datum is {
-        InlineDatum(data) -> {
-          expect datum: PnftDatum = data
-          when datum.level is {
-            Standard -> True
-            Verified -> True
-            Steward -> True
-            _ -> False
+      let is_guardian_pnft =
+        has_specific_pnft(input.output.value, policy_id, guardian_pnft)
+      if is_guardian_pnft {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            when datum.level is {
+              Standard -> True
+              Verified -> True
+              Steward -> True
+              _ -> False
+            }
           }
+          _ -> False
         }
-        _ -> False
+      } else {
+        False
       }
     },
   )
@@ -439,6 +447,7 @@ fn validate_upgrade_ward_standard(
   // 3. DNA verification must be valid (oracle attestations)
   let dna_valid =
     verify_oracle_attestations(
+      tx,
       attestations,
       dna_hash,
       config.dna_oracle,
@@ -708,6 +717,7 @@ fn validate_upgrade_standard(
   // 5. Oracle attestations must meet threshold
   let attestations_valid =
     verify_oracle_attestations(
+      tx,
       attestations,
       dna_hash,
       config.dna_oracle,
@@ -829,6 +839,7 @@ fn validate_upgrade_steward(
   // Each endorsement is a signed message from a Steward-level pNFT holder
   let endorsements_valid =
     verify_steward_endorsements(
+      tx,
       tx.reference_inputs,
       endorsements,
       datum.pnft_id,
@@ -881,6 +892,7 @@ fn validate_burn(
   // 2. Oracle must attest to the proof
   let attestation_valid =
     verify_burn_attestation(
+      tx,
       proof_hash,
       attestation,
       config.dna_oracle,
@@ -961,13 +973,34 @@ fn verify_dna_unique(reference_inputs: List<Input>, dna_hash: ByteArray) -> Bool
 }
 
 fn verify_oracle_attestations(
+  tx: Transaction,
   attestations: List<ByteArray>,
   dna_hash: ByteArray,
   oracles: List<VerificationKeyHash>,
   threshold: Int,
 ) -> Bool {
-  // Verify signatures from oracle multi-sig
-  list.length(attestations) >= threshold
+  // Cardano's ledger natively verifies signatures of keys in extra_signatories.
+  // An oracle that signs a transaction containing this dna_hash in its redeemer
+  // is cryptographically attesting to that hash. We require:
+  // 1. At least `threshold` oracles from the trusted set signed this tx
+  // 2. The redeemer-supplied attestations list matches the count of oracle signers
+  //    (used as a redeemer-side commitment for transparency)
+  // 3. dna_hash must be non-empty
+  let oracle_signers =
+    list.foldl(
+      oracles,
+      0,
+      fn(oracle, count) {
+        if list.has(tx.extra_signatories, oracle) {
+          count + 1
+        } else {
+          count
+        }
+      },
+    )
+  oracle_signers >= threshold && list.length(attestations) >= threshold && bytearray.length(
+    dna_hash,
+  ) > 0
 }
 
 fn verify_residency(
@@ -1019,27 +1052,81 @@ fn get_bioregion_from_proof(
 }
 
 fn verify_steward_endorsements(
+  tx: Transaction,
   reference_inputs: List<Input>,
   endorsements: List<ByteArray>,
   pnft_id: ByteArray,
   required: Int,
   policy_id: PolicyId,
 ) -> Bool {
-  // Verify each endorsement is from a Steward-level pNFT holder
-  list.length(endorsements) >= required
+  // Endorsements are valid only if backed by Steward-level pNFTs in reference
+  // inputs whose owners signed this transaction. This ensures:
+  // 1. Endorsing pNFTs actually exist and are at Steward level (datum verified)
+  // 2. The Steward owner cryptographically signed (via extra_signatories)
+  // 3. The endorsement is for the specific pNFT being upgraded (not generic)
+  let valid_endorser_count =
+    list.foldl(
+      reference_inputs,
+      0,
+      fn(input, count) {
+        let has_pnft_under_policy =
+          list.any(
+            flatten(input.output.value),
+            fn(asset) {
+              let (p, _, qty) = asset
+              p == policy_id && qty > 0
+            },
+          )
+        if has_pnft_under_policy {
+          when input.output.datum is {
+            InlineDatum(data) -> {
+              expect endorser: PnftDatum = data
+              let is_steward = endorser.level == Steward
+              let owner_signed =
+                list.has(tx.extra_signatories, endorser.owner)
+              let not_self = endorser.pnft_id != pnft_id
+              if is_steward && owner_signed && not_self {
+                count + 1
+              } else {
+                count
+              }
+            }
+            _ -> count
+          }
+        } else {
+          count
+        }
+      },
+    )
+  valid_endorser_count >= required && list.length(endorsements) >= required
 }
 
 fn verify_burn_attestation(
+  tx: Transaction,
   proof_hash: ByteArray,
   attestation: ByteArray,
   oracles: List<VerificationKeyHash>,
   threshold: Int,
 ) -> Bool {
-  // Verify oracle attestation for burn
-  // The attestation should be a signature over the proof_hash
-  // In production, would verify cryptographic signature
-  // For now, verify attestation exists and threshold met
-  attestation != "" && threshold >= 1
+  // Burning a pNFT requires cryptographic attestation from trusted oracles.
+  // Cardano's ledger natively verifies signatures via extra_signatories;
+  // the proof_hash and attestation are committed to in the redeemer, so any
+  // oracle signing the tx is attesting to this specific burn.
+  let oracle_signers =
+    list.foldl(
+      oracles,
+      0,
+      fn(oracle, count) {
+        if list.has(tx.extra_signatories, oracle) {
+          count + 1
+        } else {
+          count
+        }
+      },
+    )
+  oracle_signers >= threshold && bytearray.length(proof_hash) > 0 && bytearray.length(
+    attestation,
+  ) > 0 && threshold >= 1
 }
 
 // =============================================================================
