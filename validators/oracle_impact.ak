@@ -182,7 +182,8 @@ fn validate_mint_verified_impact(
   // 1. Find issuer pNFT with Verified+ level
   let issuer_result = find_issuer_pnft(tx, bioregion, config.pnft_policy)
   expect Some(issuer) = issuer_result
-  expect issuer.level == Verified || issuer.level == Steward
+  let issuer_level_ok = issuer.level == Verified || issuer.level == Steward
+  expect True = issuer_level_ok
 
   // 2. Issuer must sign
   let issuer_signed = list.has(tx.extra_signatories, issuer.owner)
@@ -334,7 +335,7 @@ fn validate_mint_unverified_impact(
   // 1. Find issuer pNFT - must be Steward for unverified
   let issuer_result = find_issuer_pnft(tx, bioregion, config.pnft_policy)
   expect Some(issuer) = issuer_result
-  expect issuer.level == Steward
+  expect True = issuer.level == Steward
 
   // 2. Issuer must sign
   let issuer_signed = list.has(tx.extra_signatories, issuer.owner)
