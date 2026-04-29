@@ -1535,3 +1535,126 @@ export const GRANT_DURATIONS = {
   PERMANENT: { type: 'Permanent' } as GrantDuration,
   SINGLE_VIEW: { type: 'SingleView' } as GrantDuration,
 } as const;
+
+// =============================================================================
+// COMPOSED TRANSACTIONS (Fallen Icarus-style bundling)
+// =============================================================================
+//
+// Enables composing multiple DApp actions into single transactions.
+// Cardano's eUTxO model natively supports arbitrary action composition.
+// This provides lower fees and better UX through bundling.
+//
+// =============================================================================
+
+/**
+ * Supported action types for composed transactions
+ */
+export type ComposedActionType =
+  | 'mint_pnft'
+  | 'create_offering'
+  | 'accept_offering'
+  | 'transfer'
+  | 'claim_ubi'
+  | 'record_impact'
+  | 'create_bucket'
+  | 'fund_bucket'
+  | 'spend_bucket'
+  | 'create_collective'
+  | 'add_collective_member'
+  | 'claim_grant';
+
+/**
+ * Input schema for MCP build_composed_transaction tool
+ */
+export interface ComposedTransactionInput {
+  actions: ComposedActionInput[];
+}
+
+export interface ComposedActionInput {
+  type: ComposedActionType;
+  params: Record<string, unknown>;
+}
+
+/**
+ * Result from building a composed transaction
+ */
+export interface ComposedTransactionResult {
+  action: 'Composed Transaction';
+  transaction: {
+    unsigned_cbor: string;
+    tx_hash: string;
+  };
+  summary: {
+    actionCount: number;
+    actions: Array<{
+      id: string;
+      type: ComposedActionType;
+      description: string;
+    }>;
+    totalCosts: {
+      ada: string;
+      tokens: string;
+    };
+    totalReceives: {
+      tokens: string;
+      pnfts: string[];
+    };
+    estimatedFees: string;
+    inputCount: number;
+    outputCount: number;
+    optimizations: string[];
+  };
+  common_bundles: string[];
+  next_step: string;
+}
+
+/**
+ * Common composition bundle names
+ */
+export type CompositionBundleName =
+  | 'onboarding'      // mint_pnft + claim_grant + create_bucket
+  | 'marketplace'     // create_offering + fund_bucket
+  | 'settlement'      // multiple transfers
+  | 'impact';         // multiple record_impact
+
+/**
+ * Bundle-specific parameters
+ */
+export interface OnboardingBundleParams {
+  userAddress: string;
+  dnaHash?: string;
+  verificationProof?: string;
+  bucketName: string;
+  bucketTemplate: string;
+}
+
+export interface MarketplaceBundleParams {
+  offererPnft: string;
+  whatType: string;
+  description: string;
+  bioregion?: string;
+  price?: number;
+  fundAmount: number;
+  fundBucketId: string;
+}
+
+export interface SettlementBundleParams {
+  transfers: Array<{
+    senderPnft: string;
+    senderAddress: string;
+    recipientPnft: string;
+    recipientAddress: string;
+    amount: number;
+    purpose: string;
+  }>;
+}
+
+export interface ImpactBundleParams {
+  actorPnft: string;
+  impacts: Array<{
+    compoundFlows: CompoundFlow[];
+    evidenceHash: string;
+    destinationType: 'Asset' | 'Consumer' | 'Commons';
+    destinationId: string;
+  }>;
+}
