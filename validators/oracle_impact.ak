@@ -13,7 +13,7 @@
 use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash, blake2b_256}
 use aiken/interval.{Finite}
-use cardano/assets.{AssetName, PolicyId, flatten, quantity_of}
+use cardano/assets.{AssetName, MintedValue, PolicyId, flatten, from_minted_value, quantity_of}
 use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Transaction,
 }
@@ -517,8 +517,8 @@ fn verify_impact_fee(
 }
 
 /// Verify single impact mint
-fn verify_single_impact_mint(mint: cardano/assets.MintedValue, policy_id: PolicyId) -> Bool {
-  let minted = flatten(cardano/assets.from_minted_value(mint))
+fn verify_single_impact_mint(mint: MintedValue, policy_id: PolicyId) -> Bool {
+  let minted = flatten(from_minted_value(mint))
   let impact_mints = list.filter(
     minted,
     fn(asset) {
@@ -533,8 +533,8 @@ fn verify_single_impact_mint(mint: cardano/assets.MintedValue, policy_id: Policy
 }
 
 /// Verify single impact burn
-fn verify_single_impact_burn(mint: cardano/assets.MintedValue, policy_id: PolicyId) -> Bool {
-  let minted = flatten(cardano/assets.from_minted_value(mint))
+fn verify_single_impact_burn(mint: MintedValue, policy_id: PolicyId) -> Bool {
+  let minted = flatten(from_minted_value(mint))
   let impact_burns = list.filter(
     minted,
     fn(asset) {

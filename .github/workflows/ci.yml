@@ -15,7 +15,7 @@ jobs:
 
       - name: Install Aiken
         run: |
-          AIKEN_VERSION="v1.1.9"
+          AIKEN_VERSION="v1.1.21"
           mkdir -p aiken-extract
           curl -sSL "https://github.com/aiken-lang/aiken/releases/download/${AIKEN_VERSION}/aiken-x86_64-unknown-linux-gnu.tar.gz" -o aiken.tar.gz
           tar -xzf aiken.tar.gz -C aiken-extract
