@@ -780,13 +780,17 @@ fn verify_pool_datum_updated(
   old_pool: UbiPoolDatum,
   distributed: Int,
 ) -> Bool {
+  // Without the cycle check, a transaction could reference an old pool's
+  // datum but produce an output with a different cycle's pool, breaking
+  // cross-cycle accounting. All other invariants must hold within the
+  // SAME cycle.
   list.any(
     outputs,
     fn(output) {
       when output.datum is {
         InlineDatum(data) -> {
           expect new_pool: UbiPoolDatum = data
-          new_pool.ubi_pool == old_pool.ubi_pool - distributed && new_pool.claims_count == old_pool.claims_count + 1
+          new_pool.cycle == old_pool.cycle && new_pool.ubi_pool == old_pool.ubi_pool - distributed && new_pool.claims_count == old_pool.claims_count + 1
         }
         _ -> False
       }
