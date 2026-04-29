@@ -19,15 +19,16 @@ jobs:
           echo "$HOME/.aiken/bin" >> $GITHUB_PATH
       
       - name: Check contracts
-        working-directory: contracts
         run: aiken check
-      
+
       - name: Build contracts
-        working-directory: contracts
         run: aiken build
-      
+
+      - name: Test contracts
+        run: aiken check
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: plutus-scripts
-          path: contracts/plutus.json
+          path: plutus.json
