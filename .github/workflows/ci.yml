@@ -20,7 +20,7 @@ jobs:
         run: cargo install aiken --version 1.1.21
 
       - name: Check contracts
-        run: aiken check
+        run: aiken check 2>&1 || (aiken check --trace-level verbose 2>&1; exit 1)
 
       - name: Build contracts
         run: aiken build
