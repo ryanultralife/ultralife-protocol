@@ -15,23 +15,20 @@ jobs:
 
       - name: Install Aiken
         run: |
-          curl -sSfL https://install.aiken-lang.org | bash
-          echo "$HOME/.aiken/bin" >> $GITHUB_PATH
+          AIKEN_VERSION="v1.1.9"
+          curl -sSL "https://github.com/aiken-lang/aiken/releases/download/${AIKEN_VERSION}/aiken-x86_64-unknown-linux-gnu.tar.gz" -o aiken.tar.gz
+          tar -xzf aiken.tar.gz
+          sudo mv aiken /usr/local/bin/
+          aiken --version
 
       - name: Check contracts
-        run: |
-          export PATH="$HOME/.aiken/bin:$PATH"
-          aiken check
+        run: aiken check
 
       - name: Build contracts
-        run: |
-          export PATH="$HOME/.aiken/bin:$PATH"
-          aiken build
+        run: aiken build
 
       - name: Test contracts
-        run: |
-          export PATH="$HOME/.aiken/bin:$PATH"
-          aiken check
+        run: aiken check
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
