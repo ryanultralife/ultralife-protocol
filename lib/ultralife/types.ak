@@ -75,16 +75,21 @@ pub type NutritionProfile {
 
 /// How efficiently this person processes specific nutrients
 pub type NutrientProcessing {
-  nutrient: ByteArray,           // e.g., "iron", "vitamin_d", "folate"
+  nutrient: ByteArray,
+  // e.g., "iron", "vitamin_d", "folate"
   efficiency: ProcessingLevel,
 }
 
 pub type ProcessingLevel {
   Normal
-  Reduced          // Needs more of this nutrient
-  Enhanced         // Processes efficiently, needs less
-  Impaired         // Significant absorption issues
+  Reduced
+  // Needs more of this nutrient
+  Enhanced
+  // Processes efficiently, needs less
+  Impaired
 }
+
+// Significant absorption issues
 
 /// Food sensitivities that affect what survival food should match
 pub type FoodSensitivity {
@@ -100,16 +105,22 @@ pub type SensitivityCategory {
   Lectins
   Oxalates
   FODMAP
-  SeedOils          // Inflammatory response to industrial oils
-  RefinedSugars     // Insulin sensitivity issues
+  SeedOils
+  // Inflammatory response to industrial oils
+  RefinedSugars
+  // Insulin sensitivity issues
   Other { code: ByteArray }
 }
 
 pub type SensitivityLevel {
-  Mild              // Preference to avoid
-  Moderate          // Should avoid for optimal health
-  Severe            // Must avoid, causes harm
+  Mild
+  // Preference to avoid
+  Moderate
+  // Should avoid for optimal health
+  Severe
 }
+
+// Must avoid, causes harm
 
 /// Consumer's accumulated impact from their consumption decisions
 /// The consumer accrues impact because their demand drives the supply chain
@@ -165,7 +176,7 @@ pub type BioregionDatum {
 pub type TransactionType {
   // === PRIMARY SECTOR (Extraction) ===
   /// Payment for labor/work
-  Labor { 
+  Labor {
     /// Work code from registry (0x02xx)
     work_code: ByteArray,
     /// Hours worked (optional)
@@ -183,10 +194,9 @@ pub type TransactionType {
     quantity: Int,
     unit_code: ByteArray,
   }
-  
   // === SECONDARY SECTOR (Manufacturing) ===
   /// Payment for physical goods
-  Goods { 
+  Goods {
     /// Product code from registry (0x03xx)
     product_code: ByteArray,
     /// Quantity
@@ -202,19 +212,12 @@ pub type TransactionType {
     batch_id: Option<ByteArray>,
   }
   /// Construction payment
-  Construction {
-    phase: ByteArray,
-    asset_id: AssetName,
-  }
+  Construction { phase: ByteArray, asset_id: AssetName }
   /// Energy purchase
-  Energy {
-    energy_type: EnergyType,
-    quantity_kwh: Int,
-  }
-  
+  Energy { energy_type: EnergyType, quantity_kwh: Int }
   // === TERTIARY SECTOR (Services) ===
   /// Payment for services
-  Services { 
+  Services {
     /// Service code from registry (0x04xx)
     service_code: ByteArray,
   }
@@ -225,79 +228,44 @@ pub type TransactionType {
     reference_hash: ByteArray,
   }
   /// Education payment
-  Education {
-    program_type: ByteArray,
-    provider: AssetName,
-  }
+  Education { program_type: ByteArray, provider: AssetName }
   /// Transportation payment
-  Transport {
-    mode: ByteArray,
-    distance: Option<Int>,
-  }
+  Transport { mode: ByteArray, distance: Option<Int> }
   /// Hospitality (lodging, food service)
-  Hospitality {
-    service_type: ByteArray,
-  }
+  Hospitality { service_type: ByteArray }
   /// Rental/lease payment
-  Rental {
-    asset_id: AssetName,
-    period: Int,
-  }
+  Rental { asset_id: AssetName, period: Int }
   /// Insurance premium
-  Insurance {
-    pool_id: ByteArray,
-    coverage_type: ByteArray,
-  }
-  
+  Insurance { pool_id: ByteArray, coverage_type: ByteArray }
   // === QUATERNARY SECTOR (Knowledge) ===
   /// Research/consulting payment
-  Research {
-    field: ByteArray,
-    deliverable_hash: ByteArray,
-  }
+  Research { field: ByteArray, deliverable_hash: ByteArray }
   /// Data/information purchase
-  Data {
-    data_type: ByteArray,
-    access_type: ByteArray,
-  }
+  Data { data_type: ByteArray, access_type: ByteArray }
   /// Intellectual property license
-  License {
-    ip_id: ByteArray,
-    terms_hash: ByteArray,
-  }
-  
+  License { ip_id: ByteArray, terms_hash: ByteArray }
   // === QUINARY SECTOR (Care) ===
   /// Care work payment/recognition
-  Care {
-    care_type: ByteArray,
-    hours: Int,
-  }
+  Care { care_type: ByteArray, hours: Int }
   /// Community service recognition
-  CommunityService {
-    service_type: ByteArray,
-  }
-  
+  CommunityService { service_type: ByteArray }
   // === FINANCIAL ===
   /// Gift or donation
   Gift
   /// Investment or loan disbursement
-  Investment { 
+  Investment {
     /// Terms hash (IPFS)
     terms_hash: ByteArray,
   }
   /// Loan repayment
-  LoanRepayment {
-    loan_id: ByteArray,
-    principal: Int,
-    interest: Int,
-  }
+  LoanRepayment { loan_id: ByteArray, principal: Int, interest: Int }
   /// Remediation payment
-  Remediation { 
+  Remediation {
     /// Bond identifier
     bond_id: ByteArray,
   }
   /// UBI distribution (system only)
-  UBI { 
+  UBI {
     /// Distribution cycle
     cycle: Int,
   }
@@ -309,15 +277,9 @@ pub type TransactionType {
   /// Internal reorganization (same owner)
   Internal
   /// Stake pool reward distribution
-  StakeReward {
-    pool_id: ByteArray,
-    epoch: Int,
-  }
+  StakeReward { pool_id: ByteArray, epoch: Int }
   /// Impact token trade
-  ImpactTrade {
-    impact_token_id: ByteArray,
-    quantity: Int,
-  }
+  ImpactTrade { impact_token_id: ByteArray, quantity: Int }
 }
 
 // =============================================================================
@@ -365,7 +327,8 @@ pub type EnergyType {
 
 /// Compound codes — actual chemical formulas
 /// First byte: element group, remaining bytes: specific compound
-pub type CompoundCode = ByteArray
+pub type CompoundCode =
+  ByteArray
 
 // Compound code constants:
 // Carbon (0x01xx): CO2=0101, CH4=0102, CO=0103, Cellulose=0105
@@ -424,7 +387,7 @@ pub type ActivityImpact {
 /// DEPRECATED: Use ActivityImpact with CompoundFlow instead
 pub type ImpactClass {
   /// Net positive environmental impact
-  Positive { 
+  Positive {
     /// Impact code from registry (0x05xx)
     impact_code: ByteArray,
     /// Magnitude (1-1000)
@@ -434,9 +397,8 @@ pub type ImpactClass {
   }
   /// NOTE: Neutral REMOVED — no physical activity is neutral
   /// Every activity produces or consumes compounds
-  
   /// Net negative (requires remediation commitment)
-  Negative { 
+  Negative {
     /// Impact code from registry (0x05xx)
     impact_code: ByteArray,
     /// Magnitude (1-1000)
@@ -451,16 +413,26 @@ pub type ImpactClass {
 /// Legacy impact categories (for backwards compatibility)
 /// DEPRECATED: Use CompoundCode instead
 pub type ImpactCategory {
-  CarbonImpact       // 0x0500
-  WaterImpact        // 0x0510
-  BiodiversityImpact // 0x0520
-  SoilImpact         // 0x0530
-  AirImpact          // 0x0540
-  WasteImpact        // 0x0550
-  EnergyImpact       // 0x0560
-  LandUseImpact      // 0x0570
-  MultipleImpact     // Multiple codes
+  CarbonImpact
+  // 0x0500
+  WaterImpact
+  // 0x0510
+  BiodiversityImpact
+  // 0x0520
+  SoilImpact
+  // 0x0530
+  AirImpact
+  // 0x0540
+  WasteImpact
+  // 0x0550
+  EnergyImpact
+  // 0x0560
+  LandUseImpact
+  // 0x0570
+  MultipleImpact
 }
+
+// Multiple codes
 
 /// How negative impact will be remediated
 pub type RemediationType {
@@ -1000,13 +972,16 @@ pub fn has_valid_impact(impact: ActivityImpact) -> Bool {
 /// Sum compound flows by compound code
 pub fn sum_by_compound(flows: List<CompoundFlow>) -> List<CompoundBalance> {
   // Group and sum (simplified — real impl needs grouping logic)
-  list_map(flows, fn(f) {
-    CompoundBalance {
-      compound: f.compound,
-      quantity: f.quantity,
-      unit: f.unit,
-    }
-  })
+  list_map(
+    flows,
+    fn(f) {
+      CompoundBalance {
+        compound: f.compound,
+        quantity: f.quantity,
+        unit: f.unit,
+      }
+    },
+  )
 }
 
 /// Add compound balances to consumer record
@@ -1017,9 +992,15 @@ pub fn accrue_to_consumer(
 ) -> ConsumerImpactRecord {
   // Add new compounds to lifetime and unremediated
   ConsumerImpactRecord {
-    lifetime_compounds: merge_compound_lists(record.lifetime_compounds, new_compounds),
+    lifetime_compounds: merge_compound_lists(
+      record.lifetime_compounds,
+      new_compounds,
+    ),
     remediated_compounds: record.remediated_compounds,
-    unremediated_compounds: merge_compound_lists(record.unremediated_compounds, new_compounds),
+    unremediated_compounds: merge_compound_lists(
+      record.unremediated_compounds,
+      new_compounds,
+    ),
     last_updated: cycle,
   }
 }
@@ -1063,7 +1044,11 @@ fn list_concat(a: List<t>, b: List<t>) -> List<t> {
 }
 
 fn abs(x: Int) -> Int {
-  if x < 0 { -x } else { x }
+  if x < 0 {
+    -x
+  } else {
+    x
+  }
 }
 
 // =============================================================================
@@ -1147,31 +1132,37 @@ test impact_sign_positive_is_1() {
 }
 
 test impact_sign_negative_is_minus_1() {
-  impact_sign(Negative {
-    impact_code: "",
-    magnitude: 100,
-    unit_code: None,
-    remediation: Immediate { output_index: 0 }
-  }) == -1
+  impact_sign(
+    Negative {
+      impact_code: "",
+      magnitude: 100,
+      unit_code: None,
+      remediation: Immediate { output_index: 0 },
+    },
+  ) == -1
 }
 
 test impact_magnitude_positive() {
-  impact_magnitude(Positive { impact_code: "", magnitude: 500, unit_code: None }) == 500
+  impact_magnitude(
+    Positive { impact_code: "", magnitude: 500, unit_code: None },
+  ) == 500
 }
 
 test impact_magnitude_negative() {
-  impact_magnitude(Negative {
-    impact_code: "",
-    magnitude: 750,
-    unit_code: None,
-    remediation: Immediate { output_index: 0 }
-  }) == 750
+  impact_magnitude(
+    Negative {
+      impact_code: "",
+      magnitude: 750,
+      unit_code: None,
+      remediation: Immediate { output_index: 0 },
+    },
+  ) == 750
 }
 
 test verification_levels_ordered() {
-  voting_weight(Basic) < voting_weight(Standard) &&
-  voting_weight(Standard) < voting_weight(Verified) &&
-  voting_weight(Verified) < voting_weight(Steward)
+  voting_weight(Basic) < voting_weight(Standard) && voting_weight(Standard) < voting_weight(
+    Verified,
+  ) && voting_weight(Verified) < voting_weight(Steward)
 }
 
 // =============================================================================
@@ -1187,19 +1178,31 @@ test verification_levels_ordered() {
 
 /// Types of content that can be stored off-chain
 pub type ContentType {
-  Document        // PDF, contracts, agreements
-  Image           // JPEG, PNG, photos
-  Video           // MP4, recordings
-  Audio           // MP3, voice memos
-  DataFile        // JSON, CSV, structured data
-  Model3D         // CAD, 3D scans
-  Certificate     // Credentials, certifications
-  Evidence        // Work completion proofs
-  Medical         // Health records (extra privacy)
-  Financial       // Bank statements, invoices
-  Legal           // Legal documents
-  Identity        // ID documents
-  Custom { type_code: ByteArray }
+  Document
+  // PDF, contracts, agreements
+  Image
+  // JPEG, PNG, photos
+  Video
+  // MP4, recordings
+  Audio
+  // MP3, voice memos
+  DataFile
+  // JSON, CSV, structured data
+  Model3D
+  // CAD, 3D scans
+  Certificate
+  // Credentials, certifications
+  Evidence
+  // Work completion proofs
+  Medical
+  // Health records (extra privacy)
+  Financial
+  // Bank statements, invoices
+  Legal
+  // Legal documents
+  Identity
+  // ID documents
+  CustomContentType { type_code: ByteArray }
 }
 
 /// Storage networks for off-chain content
@@ -1245,16 +1248,21 @@ pub type GrantDuration {
   /// One-time view only
   SingleView
   /// Custom expiry timestamp
-  Custom { expires_at: Int }
+  CustomExpiry { expires_at: Int }
 }
 
 /// Access level for granted content
 pub type AccessLevel {
-  ViewOnly      // Can view but not download
-  Download      // Can download a copy
-  Share         // Can share with others (limited)
-  Full          // Full access including resharing
+  ViewOnly
+  // Can view but not download
+  Download
+  // Can download a copy
+  Share
+  // Can share with others (limited)
+  Full
 }
+
+// Full access including resharing
 
 /// Access grant — permission to view content behind a hash
 /// This is what goes on-chain (small datum)
@@ -1321,20 +1329,11 @@ pub type AccessGrantRedeemer {
     access_level: AccessLevel,
   }
   /// Revoke existing access
-  RevokeAccess {
-    grant_id: ByteArray,
-    reason_hash: Option<ByteArray>,
-  }
+  RevokeAccess { grant_id: ByteArray, reason_hash: Option<ByteArray> }
   /// Extend access duration
-  ExtendAccess {
-    grant_id: ByteArray,
-    new_expiry: Int,
-  }
+  ExtendAccess { grant_id: ByteArray, new_expiry: Int }
   /// Transfer content ownership
-  TransferOwnership {
-    content_hash: ByteArray,
-    new_owner: AssetName,
-  }
+  TransferOwnership { content_hash: ByteArray, new_owner: AssetName }
   /// Batch grant to multiple contents
   BatchGrant {
     content_hashes: List<ByteArray>,
@@ -1342,13 +1341,9 @@ pub type AccessGrantRedeemer {
     duration: GrantDuration,
   }
   /// Auto-grant from work contract
-  WorkContractGrant {
-    agreement_id: ByteArray,
-  }
+  WorkContractGrant { agreement_id: ByteArray }
   /// Record a view (increments view_count)
-  RecordView {
-    grant_id: ByteArray,
-  }
+  RecordView { grant_id: ByteArray }
 }
 
 /// Output format for LLM view generation
@@ -1361,9 +1356,12 @@ pub type OutputFormat {
   PlainText
   HTML
   CSV
-  Summary       // LLM-generated summary
-  Thumbnail     // Small preview
+  Summary
+  // LLM-generated summary
+  Thumbnail
 }
+
+// Small preview
 
 /// View request for LLM to generate viewable content
 pub type ViewRequest {
@@ -1387,8 +1385,8 @@ pub type AccessLogEntry {
 }
 
 pub type AccessType {
-  View
-  Download
+  ViewAction
+  DownloadAction
   ShareAction
 }
 
@@ -1397,31 +1395,35 @@ pub type AccessType {
 // =============================================================================
 
 /// Calculate expiry slot from grant duration
-pub fn calculate_expiry(duration: GrantDuration, start_slot: Int, slots_per_hour: Int) -> Option<Int> {
+pub fn calculate_expiry(
+  duration: GrantDuration,
+  start_slot: Int,
+  slots_per_hour: Int,
+) -> Option<Int> {
   when duration is {
     Hours { hours } -> Some(start_slot + hours * slots_per_hour)
     Days { days } -> Some(start_slot + days * 24 * slots_per_hour)
     Permanent -> None
-    SingleView -> Some(start_slot + 24 * slots_per_hour)  // 24hr max for single view
-    Custom { expires_at } -> Some(expires_at)
-    WorkContract { .. } -> None  // Resolved by work contract
+    SingleView -> Some(start_slot + 24 * slots_per_hour)
+    // 24hr max for single view
+    CustomExpiry { expires_at } -> Some(expires_at)
+    WorkContract { .. } -> None
   }
+  // Resolved by work contract
 }
 
 /// Check if an access grant is currently valid
 pub fn is_grant_valid(grant: AccessGrant, current_slot: Int) -> Bool {
   // Not revoked
-  !grant.revoked &&
-  // Not expired (if has expiry)
-  (when grant.expires_at is {
+  !grant.revoked && // Not expired (if has expiry)
+  when grant.expires_at is {
     None -> True
     Some(exp) -> current_slot <= exp
-  }) &&
-  // Not over view limit (if has limit)
-  (when grant.max_views is {
+  } && // Not over view limit (if has limit)
+  when grant.max_views is {
     None -> True
     Some(max) -> grant.view_count < max
-  })
+  }
 }
 
 /// Check if grantor owns the content
@@ -1431,10 +1433,7 @@ pub fn can_grant_access(content: ContentReference, grantor: AssetName) -> Bool {
 
 /// Increment view count on grant
 pub fn record_view(grant: AccessGrant, slot: Int) -> AccessGrant {
-  AccessGrant {
-    ..grant,
-    view_count: grant.view_count + 1,
-  }
+  AccessGrant { ..grant, view_count: grant.view_count + 1 }
 }
 
 // =============================================================================
@@ -1444,13 +1443,17 @@ pub fn record_view(grant: AccessGrant, slot: Int) -> AccessGrant {
 test grant_duration_hours_expiry() {
   let start = 1000
   let slots_per_hour = 3600
-  calculate_expiry(Hours { hours: 8 }, start, slots_per_hour) == Some(1000 + 8 * 3600)
+  calculate_expiry(Hours { hours: 8 }, start, slots_per_hour) == Some(
+    1000 + 8 * 3600,
+  )
 }
 
 test grant_duration_days_expiry() {
   let start = 1000
   let slots_per_hour = 3600
-  calculate_expiry(Days { days: 7 }, start, slots_per_hour) == Some(1000 + 7 * 24 * 3600)
+  calculate_expiry(Days { days: 7 }, start, slots_per_hour) == Some(
+    1000 + 7 * 24 * 3600,
+  )
 }
 
 test grant_duration_permanent_no_expiry() {
@@ -1458,73 +1461,77 @@ test grant_duration_permanent_no_expiry() {
 }
 
 test valid_grant_not_revoked() {
-  let grant = AccessGrant {
-    grant_id: "test",
-    content_hash: "hash",
-    grantee_pnft: "grantee",
-    grantor_pnft: "grantor",
-    duration: Permanent,
-    granted_at: 1000,
-    expires_at: None,
-    access_level: ViewOnly,
-    revoked: False,
-    view_count: 0,
-    max_views: None,
-    work_agreement_id: None,
-  }
+  let grant =
+    AccessGrant {
+      grant_id: "test",
+      content_hash: "hash",
+      grantee_pnft: "grantee",
+      grantor_pnft: "grantor",
+      duration: Permanent,
+      granted_at: 1000,
+      expires_at: None,
+      access_level: ViewOnly,
+      revoked: False,
+      view_count: 0,
+      max_views: None,
+      work_agreement_id: None,
+    }
   is_grant_valid(grant, 2000)
 }
 
 test invalid_grant_revoked() {
-  let grant = AccessGrant {
-    grant_id: "test",
-    content_hash: "hash",
-    grantee_pnft: "grantee",
-    grantor_pnft: "grantor",
-    duration: Permanent,
-    granted_at: 1000,
-    expires_at: None,
-    access_level: ViewOnly,
-    revoked: True,
-    view_count: 0,
-    max_views: None,
-    work_agreement_id: None,
-  }
+  let grant =
+    AccessGrant {
+      grant_id: "test",
+      content_hash: "hash",
+      grantee_pnft: "grantee",
+      grantor_pnft: "grantor",
+      duration: Permanent,
+      granted_at: 1000,
+      expires_at: None,
+      access_level: ViewOnly,
+      revoked: True,
+      view_count: 0,
+      max_views: None,
+      work_agreement_id: None,
+    }
   !is_grant_valid(grant, 2000)
 }
 
 test invalid_grant_expired() {
-  let grant = AccessGrant {
-    grant_id: "test",
-    content_hash: "hash",
-    grantee_pnft: "grantee",
-    grantor_pnft: "grantor",
-    duration: Hours { hours: 8 },
-    granted_at: 1000,
-    expires_at: Some(1500),
-    access_level: ViewOnly,
-    revoked: False,
-    view_count: 0,
-    max_views: None,
-    work_agreement_id: None,
-  }
+  let grant =
+    AccessGrant {
+      grant_id: "test",
+      content_hash: "hash",
+      grantee_pnft: "grantee",
+      grantor_pnft: "grantor",
+      duration: Hours { hours: 8 },
+      granted_at: 1000,
+      expires_at: Some(1500),
+      access_level: ViewOnly,
+      revoked: False,
+      view_count: 0,
+      max_views: None,
+      work_agreement_id: None,
+    }
   !is_grant_valid(grant, 2000)
 }
 
 test invalid_grant_max_views_reached() {
-  let grant = AccessGrant {
-    grant_id: "test",
-    content_hash: "hash",
-    grantee_pnft: "grantee",
-    grantor_pnft: "grantor",
-    duration: Permanent,
-    granted_at: 1000,
-    expires_at: None,
-    access_level: ViewOnly,
-    revoked: False,
-    view_count: 5,
-    max_views: Some(5),
-    work_agreement_id: None,
-  }
+  let grant =
+    AccessGrant {
+      grant_id: "test",
+      content_hash: "hash",
+      grantee_pnft: "grantee",
+      grantor_pnft: "grantor",
+      duration: Permanent,
+      granted_at: 1000,
+      expires_at: None,
+      access_level: ViewOnly,
+      revoked: False,
+      view_count: 5,
+      max_views: Some(5),
+      work_agreement_id: None,
+    }
   !is_grant_valid(grant, 2000)
 }

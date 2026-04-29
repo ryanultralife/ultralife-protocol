@@ -22,15 +22,17 @@
 use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use aiken/interval.{Finite}
-use cardano/assets.{PolicyId, AssetName, quantity_of, flatten}
-use cardano/address.{VerificationKey, Script}
-use cardano/transaction.{Transaction, Input, Output, OutputReference, InlineDatum}
-use ultralife/types.{
-  PnftDatum, BioregionDatum, AvatarCycleStats, BioregionCycleStats,
-  VerificationLevel, Basic, Ward, Standard, Verified, Steward,
-  UbiPoolDatum, UbiClaimDatum,
+use cardano/address.{Script, VerificationKey}
+use cardano/assets.{AssetName, PolicyId, flatten, quantity_of}
+use cardano/transaction.{
+  InlineDatum, Input, Output, OutputReference, Transaction,
 }
 use ultralife/prc37.{current_cycle, cycle_start, in_ubi_window}
+use ultralife/types.{
+  AvatarCycleStats, Basic, BioregionCycleStats, BioregionDatum, PnftDatum,
+  Standard, Steward, UbiClaimDatum, UbiPoolDatum, VerificationLevel, Verified,
+  Ward,
+}
 
 /// Owner info for pNFT verification
 pub type OwnerInfo {
@@ -42,13 +44,19 @@ pub type OwnerInfo {
 // =============================================================================
 
 /// BASE UBI fee share (in basis points) - starting point
-const base_ubi_fee_share_bps = 5000  // 50%
+const base_ubi_fee_share_bps = 5000
+
+// 50%
 
 /// Minimum UBI fee share (floor)
-const min_ubi_fee_share_bps = 3000   // 30%
+const min_ubi_fee_share_bps = 3000
+
+// 30%
 
 /// Maximum UBI fee share (ceiling)
-const max_ubi_fee_share_bps = 7000   // 70%
+const max_ubi_fee_share_bps = 7000
+
+// 70%
 
 /// ENGAGEMENT THRESHOLD: Minimum transactions for FULL share
 const min_engagement_tx = 5
@@ -59,12 +67,13 @@ const min_engagement_counterparties = 2
 /// SURVIVAL FLOOR: Enough for 1-2 food transactions per month
 /// Everyone gets this regardless of engagement - basic dignity
 /// But it's small enough to incentivize participation
-const survival_floor = 20  // ~2 basic food transactions
+const survival_floor = 20
+
+// ~2 basic food transactions
 
 /// ENGAGEMENT RAMP: Gradual increase from floor to full share
 /// Floor → 25% → 50% → 75% → 100% based on engagement level
 /// Encourages incremental participation
-
 /// Minimum UBI per eligible person (with some engagement)
 const min_ubi_per_person = 10
 
@@ -121,21 +130,29 @@ fn calculate_adjusted_fee_share(
   period_stats: PeriodStats,
 ) -> Int {
   // Average UBI per person over the period
-  let avg_ubi = if period_stats.total_claimants > 0 {
-    period_stats.total_distributed / period_stats.total_claimants
-  } else {
-    0
-  }
-  
+  let avg_ubi =
+    if period_stats.total_claimants > 0 {
+      period_stats.total_distributed / period_stats.total_claimants
+    } else {
+      0
+    }
   // Compare to target
   if avg_ubi < target_ubi_per_person {
     // UBI too low - increase fee share
     let new_share = current_share_bps + 500
-    if new_share > max_ubi_fee_share_bps { max_ubi_fee_share_bps } else { new_share }
+    if new_share > max_ubi_fee_share_bps {
+      max_ubi_fee_share_bps
+    } else {
+      new_share
+    }
   } else if avg_ubi > target_ubi_per_person * 3 / 2 {
     // UBI too high (>150% of target) - decrease fee share
     let new_share = current_share_bps - 500
-    if new_share < min_ubi_fee_share_bps { min_ubi_fee_share_bps } else { new_share }
+    if new_share < min_ubi_fee_share_bps {
+      min_ubi_fee_share_bps
+    } else {
+      new_share
+    }
   } else {
     // Within acceptable range - no change
     current_share_bps
@@ -164,21 +181,11 @@ pub type PeriodStats {
 
 pub type UbiRedeemer {
   /// Fund the UBI pool for a cycle
-  FundPool {
-    cycle: Int,
-    amount: Int,
-  }
-  
+  FundPool { cycle: Int, amount: Int }
   /// Claim UBI distribution
-  ClaimUBI {
-    pnft: AssetName,
-    cycle: Int,
-  }
-  
+  ClaimUBI { pnft: AssetName, cycle: Int }
   /// Close cycle (return unclaimed to treasury)
-  CloseCycle {
-    cycle: Int,
-  }
+  CloseCycle { cycle: Int }
 }
 
 // =============================================================================
@@ -212,20 +219,21 @@ validator ubi(config: UbiConfig) {
     tx: Transaction,
   ) {
     when redeemer is {
-      FundPool { cycle, amount } -> {
+      FundPool { cycle, amount } ->
         validate_fund_pool(tx, cycle, amount, config)
-      }
-      
       ClaimUBI { pnft, cycle } -> {
         expect Some(d) = datum
         validate_claim_ubi(tx, d, pnft, cycle, config)
       }
-      
       CloseCycle { cycle } -> {
         expect Some(d) = datum
         validate_close_cycle(tx, d, cycle, config)
       }
     }
+  }
+
+  else(_) {
+    fail
   }
 }
 
@@ -241,23 +249,20 @@ fn validate_fund_pool(
 ) -> Bool {
   // Pool funding happens from treasury or governance
   // Creates UBI pool for specific bioregion and cycle
-  
   // 1. Cycle must be current or next
   let current_slot = get_slot(tx)
   let current = current_cycle(current_slot)
   let cycle_valid = cycle == current || cycle == current + 1
-  
   // 2. Tokens must be locked in pool
-  let tokens_locked = verify_tokens_locked(
-    tx.outputs,
-    config.token_policy,
-    config.token_name,
-    amount,
-  )
-  
+  let tokens_locked =
+    verify_tokens_locked(
+      tx.outputs,
+      config.token_policy,
+      config.token_name,
+      amount,
+    )
   // 3. Pool datum must be created
   let datum_created = verify_pool_datum(tx.outputs, cycle, amount, current_slot)
-  
   cycle_valid && tokens_locked && datum_created
 }
 
@@ -275,43 +280,35 @@ fn validate_claim_ubi(
   // 1. Must be in UBI window (first 3.7 days of cycle)
   let current_slot = get_slot(tx)
   let in_window = in_ubi_window(current_slot)
-  
   // 2. Cycle must match pool
   let cycle_matches = cycle == pool.cycle
-  
   // 3. Claimant must have Standard+ pNFT in this bioregion
-  let pnft_valid = verify_claimant_pnft(tx, pnft, pool.bioregion, config.pnft_policy)
+  let pnft_valid =
+    verify_claimant_pnft(tx, pnft, pool.bioregion, config.pnft_policy)
   expect Some(pnft_data) = pnft_valid
-  
   // 4. Claimant must sign
   let claimant_signed = list.has(tx.extra_signatories, pnft_data.owner)
-  
   // 5. Must not have claimed this cycle already
   let not_claimed = verify_no_prior_claim(tx.reference_inputs, pnft, cycle)
-  
   // 6. Calculate distribution amount
   let distribution = calculate_ubi_amount(tx, pool, pnft, cycle, config)
-  
   // 7. Pool must have sufficient funds
   let sufficient_funds = pool.ubi_pool >= distribution
-  
   // 8. Tokens must go to claimant
-  let tokens_sent = verify_tokens_to_claimant(
-    tx.outputs,
-    config.token_policy,
-    config.token_name,
-    distribution,
-    pnft_data.owner,
-  )
-  
+  let tokens_sent =
+    verify_tokens_to_claimant(
+      tx.outputs,
+      config.token_policy,
+      config.token_name,
+      distribution,
+      pnft_data.owner,
+    )
   // 9. Claim record created
-  let claim_recorded = verify_claim_record(tx.outputs, pnft, cycle, distribution)
-  
+  let claim_recorded =
+    verify_claim_record(tx.outputs, pnft, cycle, distribution)
   // 10. Pool datum updated
   let pool_updated = verify_pool_datum_updated(tx.outputs, pool, distribution)
-  
-  in_window && cycle_matches && claimant_signed && not_claimed &&
-  sufficient_funds && tokens_sent && claim_recorded && pool_updated
+  in_window && cycle_matches && claimant_signed && not_claimed && sufficient_funds && tokens_sent && claim_recorded && pool_updated
 }
 
 // =============================================================================
@@ -343,24 +340,21 @@ fn calculate_ubi_amount(
 ) -> Int {
   // 1. Everyone gets survival floor
   let floor = survival_floor
-  
   // 2. Get engagement level and ramp multiplier
-  let (engagement_weight, ramp_pct) = get_engagement_with_ramp(tx, pnft, cycle, config.records_contract)
-  
+  let (engagement_weight, ramp_pct) =
+    get_engagement_with_ramp(tx, pnft, cycle, config.records_contract)
   // 3. Calculate variable share of remaining pool
-  let pool_after_floors = pool.ubi_pool - (pool.eligible_count * survival_floor)
-  let variable_share = if pool.total_engagement_weight > 0 && pool_after_floors > 0 {
-    (engagement_weight * pool_after_floors) / pool.total_engagement_weight
-  } else {
-    0
-  }
-  
+  let pool_after_floors = pool.ubi_pool - pool.eligible_count * survival_floor
+  let variable_share =
+    if pool.total_engagement_weight > 0 && pool_after_floors > 0 {
+      engagement_weight * pool_after_floors / pool.total_engagement_weight
+    } else {
+      0
+    }
   // 4. Apply ramp percentage to variable share
-  let ramped_share = (variable_share * ramp_pct) / 10000
-  
+  let ramped_share = variable_share * ramp_pct / 10000
   // 5. Total = floor + ramped variable
   let total = floor + ramped_share
-  
   // 6. Apply max cap
   min(total, max_ubi_per_person)
 }
@@ -373,33 +367,36 @@ fn get_engagement_with_ramp(
   cycle: Int,
   records_contract: ByteArray,
 ) -> (Int, Int) {
-  list.find_map(tx.reference_inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect stats: AvatarCycleStats = data
-        if stats.pnft == pnft && stats.cycle == cycle - 1 {
-          let total_tx = stats.tx_sent + stats.tx_received
-          let counterparties = stats.unique_counterparties
-          
-          // Calculate engagement weight
-          let tx_weight = total_tx * 100
-          let counterparty_weight = counterparties * 500
-          let labor_weight = stats.labor_count * 1000
-          let remediation_weight = stats.remediation_count * 2000
-          let base = 1000
-          let weight = base + tx_weight + counterparty_weight + labor_weight + remediation_weight
-          
-          // Calculate ramp percentage based on engagement level
-          let ramp = calculate_ramp(total_tx, counterparties)
-          
-          Some((weight, ramp))
-        } else {
-          None
+  list.find_map(
+    tx.reference_inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect stats: AvatarCycleStats = data
+          if stats.pnft == pnft && stats.cycle == cycle - 1 {
+            let total_tx = stats.tx_sent + stats.tx_received
+            let counterparties = stats.unique_counterparties
+            // Calculate engagement weight
+            let tx_weight = total_tx * 100
+            let counterparty_weight = counterparties * 500
+            let labor_weight = stats.labor_count * 1000
+            let remediation_weight = stats.remediation_count * 2000
+            let base = 1000
+            let weight =
+              base + tx_weight + counterparty_weight + labor_weight + remediation_weight
+            // Calculate ramp percentage based on engagement level
+            let ramp = calculate_ramp(total_tx, counterparties)
+            Some((weight, ramp))
+          } else {
+            None
+          }
         }
+        _ -> None
       }
-      _ -> None
-    }
-  }) |> unwrap_or_pair((0, 0))  // No stats = floor only
+    },
+  )
+    |> unwrap_or_pair((0, 0))
+  // No stats = floor only
 }
 
 /// Calculate engagement ramp percentage (basis points)
@@ -407,18 +404,24 @@ fn get_engagement_with_ramp(
 fn calculate_ramp(total_tx: Int, counterparties: Int) -> Int {
   if total_tx >= min_engagement_tx && counterparties >= min_engagement_counterparties {
     // Full engagement
-    10000  // 100%
-  } else if total_tx >= 4 {
-    8500   // 85%
-  } else if total_tx >= 3 {
-    7000   // 70%
-  } else if total_tx >= 2 {
-    5000   // 50%
-  } else if total_tx >= 1 {
-    2500   // 25%
+    10000
+  } else if // 100%
+  total_tx >= 4 {
+    8500
+  } else if // 85%
+  total_tx >= 3 {
+    7000
+  } else if // 70%
+  total_tx >= 2 {
+    5000
+  } else if // 50%
+  total_tx >= 1 {
+    2500
   } else {
-    0      // Floor only
+    // 25%
+    0
   }
+  // Floor only
 }
 
 /// Legacy function for backward compatibility
@@ -428,24 +431,27 @@ fn get_engagement_weight(
   cycle: Int,
   records_contract: ByteArray,
 ) -> Int {
-  let (weight, _ramp) = get_engagement_with_ramp(tx, pnft, cycle, records_contract)
+  let (weight, _ramp) =
+    get_engagement_with_ramp(tx, pnft, cycle, records_contract)
   weight
 }
 
 /// Calculate engagement ratio (basis points) for partial engagement
 fn calculate_engagement_ratio(total_tx: Int, counterparties: Int) -> Int {
-  let tx_ratio = if min_engagement_tx > 0 {
-    min(total_tx * 10000 / min_engagement_tx, 10000)
-  } else {
-    10000
-  }
-  let cp_ratio = if min_engagement_counterparties > 0 {
-    min(counterparties * 10000 / min_engagement_counterparties, 10000)
-  } else {
-    10000
-  }
+  let tx_ratio =
+    if min_engagement_tx > 0 {
+      min(total_tx * 10000 / min_engagement_tx, 10000)
+    } else {
+      10000
+    }
+  let cp_ratio =
+    if min_engagement_counterparties > 0 {
+      min(counterparties * 10000 / min_engagement_counterparties, 10000)
+    } else {
+      10000
+    }
   // Average of both ratios, with floor
-  max((tx_ratio + cp_ratio) / 2, zero_engagement_floor)
+  max(( tx_ratio + cp_ratio ) / 2, zero_engagement_floor)
 }
 
 // =============================================================================
@@ -458,15 +464,13 @@ fn calculate_epoch_ubi_pool(
   bioregion_stats: BioregionCycleStats,
 ) -> (Int, Int, Int) {
   // UBI gets 50% of fees
-  let ubi_allocation = (total_fees * base_ubi_fee_share_bps) / 10000
-  
+  let ubi_allocation = total_fees * base_ubi_fee_share_bps / 10000
   // Eligible = active participants from previous cycle
   let eligible_count = bioregion_stats.active_count
-  
   // Total engagement weight calculated from all participants
   // (This would be aggregated from all AvatarCycleStats in the bioregion)
-  let total_weight = bioregion_stats.unique_participants * 1000  // Simplified
-  
+  let total_weight = bioregion_stats.unique_participants * 1000
+  // Simplified
   (ubi_allocation, eligible_count, total_weight)
 }
 
@@ -479,44 +483,52 @@ fn get_engagement_score(
   records_contract: ByteArray,
 ) -> (Int, Bool) {
   // Find avatar cycle stats in reference inputs
-  list.find_map(tx.reference_inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect stats: AvatarCycleStats = data
-        if stats.pnft == pnft && stats.cycle == cycle - 1 {
-          // Check engagement thresholds
-          let total_tx = stats.tx_sent + stats.tx_received
-          let counterparties = stats.unique_counterparties
-          
-          // FULL SHARE: Met both thresholds
-          if total_tx >= min_engagement_tx && counterparties >= min_engagement_counterparties {
-            Some((10000, True))  // 100% multiplier, full share
+  list.find_map(
+    tx.reference_inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect stats: AvatarCycleStats = data
+          if stats.pnft == pnft && stats.cycle == cycle - 1 {
+            // Check engagement thresholds
+            let total_tx = stats.tx_sent + stats.tx_received
+            let counterparties = stats.unique_counterparties
+            // FULL SHARE: Met both thresholds
+            if total_tx >= min_engagement_tx && counterparties >= min_engagement_counterparties {
+              Some((10000, True))
+            } else {
+              // 100% multiplier, full share
+              // FRACTIONAL SHARE: Calculate engagement ratio
+              let tx_ratio =
+                if min_engagement_tx > 0 {
+                  min(total_tx * 10000 / min_engagement_tx, 10000)
+                } else {
+                  10000
+                }
+              let cp_ratio =
+                if min_engagement_counterparties > 0 {
+                  min(
+                    counterparties * 10000 / min_engagement_counterparties,
+                    10000,
+                  )
+                } else {
+                  10000
+                }
+              // Average of both ratios, with floor
+              let avg_ratio = ( tx_ratio + cp_ratio ) / 2
+              let floored = max(avg_ratio, zero_engagement_floor)
+              Some((floored, False))
+            }
           } else {
-            // FRACTIONAL SHARE: Calculate engagement ratio
-            let tx_ratio = if min_engagement_tx > 0 {
-              min(total_tx * 10000 / min_engagement_tx, 10000)
-            } else {
-              10000
-            }
-            let cp_ratio = if min_engagement_counterparties > 0 {
-              min(counterparties * 10000 / min_engagement_counterparties, 10000)
-            } else {
-              10000
-            }
-            
-            // Average of both ratios, with floor
-            let avg_ratio = (tx_ratio + cp_ratio) / 2
-            let floored = max(avg_ratio, zero_engagement_floor)
-            
-            Some((floored, False))
+            None
           }
-        } else {
-          None
         }
+        _ -> None
       }
-      _ -> None
-    }
-  }) |> unwrap_or_int_bool((zero_engagement_floor, False))  // Default: 10% floor, not full share
+    },
+  )
+    |> unwrap_or_int_bool((zero_engagement_floor, False))
+  // Default: 10% floor, not full share
 }
 
 /// Get impact multiplier (7000-13000 = 70%-130%)
@@ -527,21 +539,25 @@ fn get_impact_score(
   records_contract: ByteArray,
 ) -> Int {
   // Find avatar cycle stats
-  list.find_map(tx.reference_inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect stats: AvatarCycleStats = data
-        if stats.pnft == pnft && stats.cycle == cycle - 1 {
-          // Score based on net impact
-          let raw = 10000 + stats.net_impact
-          Some(clamp(raw, 7000, 13000))
-        } else {
-          None
+  list.find_map(
+    tx.reference_inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect stats: AvatarCycleStats = data
+          if stats.pnft == pnft && stats.cycle == cycle - 1 {
+            // Score based on net impact
+            let raw = 10000 + stats.net_impact
+            Some(clamp(raw, 7000, 13000))
+          } else {
+            None
+          }
         }
+        _ -> None
       }
-      _ -> None
-    }
-  }) |> unwrap_or(10000)
+    },
+  )
+    |> unwrap_or(10000)
 }
 
 /// Get verification level bonus
@@ -550,20 +566,26 @@ fn get_level_bonus(
   pnft: AssetName,
   pnft_policy: PolicyId,
 ) -> Int {
-  list.find_map(tx.reference_inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect datum: PnftDatum = data
-        when datum.level is {
-          Standard -> Some(0)
-          Verified -> Some(base_ubi / 10)   // +10%
-          Steward -> Some(base_ubi / 5)     // +20%
-          _ -> Some(0)
+  list.find_map(
+    tx.reference_inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect datum: PnftDatum = data
+          when datum.level is {
+            Standard -> Some(0)
+            Verified -> Some(base_ubi / 10)
+            // +10%
+            Steward -> Some(base_ubi / 5)
+            // +20%
+            _ -> Some(0)
+          }
         }
+        _ -> None
       }
-      _ -> None
-    }
-  }) |> unwrap_or(0)
+    },
+  )
+    |> unwrap_or(0)
 }
 
 // =============================================================================
@@ -577,22 +599,20 @@ fn validate_close_cycle(
   config: UbiConfig,
 ) -> Bool {
   // After UBI window, unclaimed tokens return to treasury
-  
   // 1. Must be after UBI window for this cycle
   let current_slot = get_slot(tx)
   let window_end = cycle_start(cycle) + ubi_window
   let after_window = current_slot > window_end
-  
   // 2. Unclaimed tokens go to treasury
   let remaining = pool.ubi_pool
-  let tokens_returned = verify_tokens_to_treasury(
-    tx.outputs,
-    config.token_policy,
-    config.token_name,
-    remaining,
-    config.treasury,
-  )
-  
+  let tokens_returned =
+    verify_tokens_to_treasury(
+      tx.outputs,
+      config.token_policy,
+      config.token_name,
+      remaining,
+      config.treasury,
+    )
   after_window && tokens_returned
 }
 
@@ -615,9 +635,12 @@ fn verify_tokens_locked(
   amount: Int,
 ) -> Bool {
   // Sum tokens in outputs (to UBI contract)
-  let total = list.foldl(outputs, 0, fn(output, acc) {
-    acc + quantity_of(output.value, policy, name)
-  })
+  let total =
+    list.foldl(
+      outputs,
+      0,
+      fn(output, acc) { acc + quantity_of(output.value, policy, name) },
+    )
   total >= amount
 }
 
@@ -628,15 +651,18 @@ fn verify_pool_datum(
   slot: Int,
 ) -> Bool {
   // Verify output has UbiPoolDatum with correct cycle and amount
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect pool: UbiPoolDatum = data
-        pool.cycle == cycle && pool.ubi_pool == amount
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect pool: UbiPoolDatum = data
+          pool.cycle == cycle && pool.ubi_pool == amount
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn verify_claimant_pnft(
@@ -646,29 +672,39 @@ fn verify_claimant_pnft(
   policy: PolicyId,
 ) -> Option<OwnerInfo> {
   // Find pNFT in reference inputs, verify bioregion and Standard+ level
-  list.find_map(tx.reference_inputs, fn(input) {
-    let assets = list.filter_map(flatten(input.output.value), fn(asset) {
-      let (p, name, qty) = asset
-      if p == policy && name == pnft && qty > 0 { Some(name) } else { None }
-    })
-    when assets is {
-      [_, ..] -> {
-        when input.output.datum is {
-          InlineDatum(data) -> {
-            expect datum: PnftDatum = data
-            // Verify bioregion matches and level is Standard+
-            if datum.bioregion == Some(bioregion) && datum.level != Basic {
-              Some(OwnerInfo { owner: datum.owner })
+  list.find_map(
+    tx.reference_inputs,
+    fn(input) {
+      let assets =
+        list.filter_map(
+          flatten(input.output.value),
+          fn(asset) {
+            let (p, name, qty) = asset
+            if p == policy && name == pnft && qty > 0 {
+              Some(name)
             } else {
               None
             }
+          },
+        )
+      when assets is {
+        [_, ..] ->
+          when input.output.datum is {
+            InlineDatum(data) -> {
+              expect datum: PnftDatum = data
+              // Verify bioregion matches and level is Standard+
+              if datum.bioregion == Some(bioregion) && datum.level != Basic {
+                Some(OwnerInfo { owner: datum.owner })
+              } else {
+                None
+              }
+            }
+            _ -> None
           }
-          _ -> None
-        }
+        _ -> None
       }
-      _ -> None
-    }
-  })
+    },
+  )
 }
 
 fn verify_no_prior_claim(
@@ -677,15 +713,18 @@ fn verify_no_prior_claim(
   cycle: Int,
 ) -> Bool {
   // Check no claim record exists for this pNFT and cycle
-  !list.any(reference_inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect claim: UbiClaimDatum = data
-        claim.pnft == pnft && claim.cycle == cycle
+  !list.any(
+    reference_inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect claim: UbiClaimDatum = data
+          claim.pnft == pnft && claim.cycle == cycle
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn verify_tokens_to_claimant(
@@ -696,17 +735,22 @@ fn verify_tokens_to_claimant(
   owner: VerificationKeyHash,
 ) -> Bool {
   // Sum tokens sent to owner's address
-  let total = list.foldl(outputs, 0, fn(output, acc) {
-    when output.address.payment_credential is {
-      VerificationKey(key) ->
-        if key == owner {
-          acc + quantity_of(output.value, policy, name)
-        } else {
-          acc
+  let total =
+    list.foldl(
+      outputs,
+      0,
+      fn(output, acc) {
+        when output.address.payment_credential is {
+          VerificationKey(key) ->
+            if key == owner {
+              acc + quantity_of(output.value, policy, name)
+            } else {
+              acc
+            }
+          _ -> acc
         }
-      _ -> acc
-    }
-  })
+      },
+    )
   total >= amount
 }
 
@@ -717,15 +761,18 @@ fn verify_claim_record(
   amount: Int,
 ) -> Bool {
   // Verify claim record output is created
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect claim: UbiClaimDatum = data
-        claim.pnft == pnft && claim.cycle == cycle && claim.amount == amount
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect claim: UbiClaimDatum = data
+          claim.pnft == pnft && claim.cycle == cycle && claim.amount == amount
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn verify_pool_datum_updated(
@@ -733,16 +780,18 @@ fn verify_pool_datum_updated(
   old_pool: UbiPoolDatum,
   distributed: Int,
 ) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect new_pool: UbiPoolDatum = data
-        new_pool.ubi_pool == old_pool.ubi_pool - distributed &&
-        new_pool.claims_count == old_pool.claims_count + 1
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect new_pool: UbiPoolDatum = data
+          new_pool.ubi_pool == old_pool.ubi_pool - distributed && new_pool.claims_count == old_pool.claims_count + 1
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn verify_tokens_to_treasury(
@@ -753,24 +802,33 @@ fn verify_tokens_to_treasury(
   treasury: ByteArray,
 ) -> Bool {
   // Sum tokens sent to treasury script
-  let total = list.foldl(outputs, 0, fn(output, acc) {
-    when output.address.payment_credential is {
-      Script(hash) ->
-        if hash == treasury {
-          acc + quantity_of(output.value, policy, name)
-        } else {
-          acc
+  let total =
+    list.foldl(
+      outputs,
+      0,
+      fn(output, acc) {
+        when output.address.payment_credential is {
+          Script(hash) ->
+            if hash == treasury {
+              acc + quantity_of(output.value, policy, name)
+            } else {
+              acc
+            }
+          _ -> acc
         }
-      _ -> acc
-    }
-  })
+      },
+    )
   total >= amount
 }
 
 fn clamp(value: Int, min: Int, max: Int) -> Int {
-  if value < min { min }
-  else if value > max { max }
-  else { value }
+  if value < min {
+    min
+  } else if value > max {
+    max
+  } else {
+    value
+  }
 }
 
 fn unwrap_or(opt: Option<Int>, default: Int) -> Int {
@@ -787,7 +845,10 @@ fn unwrap_or_pair(opt: Option<(Int, Int)>, default: (Int, Int)) -> (Int, Int) {
   }
 }
 
-fn unwrap_or_int_bool(opt: Option<(Int, Bool)>, default: (Int, Bool)) -> (Int, Bool) {
+fn unwrap_or_int_bool(
+  opt: Option<(Int, Bool)>,
+  default: (Int, Bool),
+) -> (Int, Bool) {
   when opt is {
     Some(v) -> v
     None -> default
@@ -795,13 +856,20 @@ fn unwrap_or_int_bool(opt: Option<(Int, Bool)>, default: (Int, Bool)) -> (Int, B
 }
 
 fn min(a: Int, b: Int) -> Int {
-  if a < b { a } else { b }
+  if a < b {
+    a
+  } else {
+    b
+  }
 }
 
 fn max(a: Int, b: Int) -> Int {
-  if a > b { a } else { b }
+  if a > b {
+    a
+  } else {
+    b
+  }
 }
-
 // =============================================================================
 // DOCUMENTATION
 // =============================================================================

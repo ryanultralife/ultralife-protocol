@@ -56,6 +56,25 @@ This means users can ask:
 
 ## Quick Start
 
+### Option A: Local Mode (No Blockchain Required)
+
+For development and demos without deploying to Cardano:
+
+```bash
+cd service
+npm install
+
+# Copy sample deployment data
+cp ../scripts/deployment.sample.json ../scripts/deployment.json
+
+# Start in local mode
+LOCAL_MODE=true npm run dev
+```
+
+The server will use sample data from `deployment.json` instead of querying the blockchain.
+
+### Option B: Blockchain Mode
+
 ### 1. Install Dependencies
 
 ```bash

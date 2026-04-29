@@ -6,13 +6,13 @@
 
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 
-// Mock Blockfrost
+// Mock Blockfrost - using type assertions for Jest ESM compatibility
 jest.mock('@blockfrost/blockfrost-js', () => {
   return {
     BlockFrostAPI: jest.fn().mockImplementation(() => ({
-      addressesUtxos: jest.fn().mockResolvedValue([]),
-      assetsAddresses: jest.fn().mockResolvedValue([]),
-      assetsPolicyByIdAll: jest.fn().mockResolvedValue([]),
+      addressesUtxos: jest.fn<() => Promise<never[]>>().mockResolvedValue([]),
+      assetsAddresses: jest.fn<() => Promise<never[]>>().mockResolvedValue([]),
+      assetsPolicyByIdAll: jest.fn<() => Promise<never[]>>().mockResolvedValue([]),
     })),
   };
 });

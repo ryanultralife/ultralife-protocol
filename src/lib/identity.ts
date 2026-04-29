@@ -8,7 +8,7 @@
  * The eigenvalue (confidence score) indicates authentication strength.
  */
 
-import { FeatureVector, AuthLevel, EnrollmentData, AuthResult, IdentityStatus } from './types';
+import { FeatureVector, AuthLevel, EnrollmentData, AuthResult, IdentityStatus, TouchEvent as UltraTouchEvent } from './types';
 import { cosineSimilarity, weightedCombine, zeroVector } from './math';
 import { CardiacEngine } from '../biometrics/cardiac';
 import { MovementEngine } from '../biometrics/movement';
@@ -43,7 +43,6 @@ export class IdentityManager {
   private touch: TouchEngine;
   private storage: SecureStorage;
   private enrolledVector: FeatureVector | null = null;
-  private continuousBuffer: FeatureVector[] = [];
   private isAuthenticated = false;
   private currentConfidence = 0;
   private continuousInterval: ReturnType<typeof setInterval> | null = null;
@@ -79,7 +78,7 @@ export class IdentityManager {
   async enroll(
     ppgFrames: Float64Array[],
     accelData: Float64Array[],
-    touchEvents: TouchEvent[],
+    touchEvents: UltraTouchEvent[],
     // voiceData: Float64Array[], // Phase 2
   ): Promise<EnrollmentData> {
     // Extract features from each modality
@@ -138,7 +137,7 @@ export class IdentityManager {
     liveData: {
       ppgFrames?: Float64Array[];
       accelData?: Float64Array[];
-      touchEvents?: TouchEvent[];
+      touchEvents?: UltraTouchEvent[];
     },
   ): Promise<AuthResult> {
     if (!this.enrolledVector) {
@@ -276,7 +275,6 @@ export class IdentityManager {
   lock(): void {
     this.isAuthenticated = false;
     this.currentConfidence = 0;
-    this.continuousBuffer = [];
   }
 
   /**

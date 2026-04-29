@@ -12,7 +12,9 @@
 // =============================================================================
 
 /// 37 days in seconds
-const cycle_seconds = 3_196_800  // 37 * 24 * 60 * 60
+const cycle_seconds = 3_196_800
+
+// 37 * 24 * 60 * 60
 
 /// 37 days in slots (1 slot = 1 second on Cardano)
 const cycle_slots = 3_196_800
@@ -39,7 +41,7 @@ const smoothing_window = 37
 
 /// Get current cycle number from slot
 pub fn current_cycle(slot: Int) -> Int {
-  (slot - genesis_slot) / cycle_slots
+  ( slot - genesis_slot ) / cycle_slots
 }
 
 /// Get cycle start slot
@@ -59,7 +61,7 @@ pub fn in_cycle(slot: Int, cycle: Int) -> Bool {
 
 /// Get position within cycle (0 to cycle_slots-1)
 pub fn cycle_position(slot: Int) -> Int {
-  (slot - genesis_slot) % cycle_slots
+  ( slot - genesis_slot ) % cycle_slots
 }
 
 /// Get progress through cycle (0-10000 = 0-100.00%)
@@ -121,7 +123,9 @@ pub fn next_ubi_start(slot: Int) -> Int {
 // =============================================================================
 
 /// Health index update: last day of each cycle
-const health_update_start = 3_110_400  // cycle_slots - 86400
+const health_update_start = 3_110_400
+
+// cycle_slots - 86400
 
 /// Check if slot is in health update window
 pub fn in_health_update_window(slot: Int) -> Bool {
@@ -133,7 +137,9 @@ pub fn in_health_update_window(slot: Int) -> Bool {
 // =============================================================================
 
 /// Vitality decay per cycle (interpretations lose relevance without resonance)
-const vitality_decay_per_cycle = 1000  // 10% per cycle
+const vitality_decay_per_cycle = 1000
+
+// 10% per cycle
 
 /// Calculate remaining vitality
 pub fn calculate_vitality(initial: Int, cycles_elapsed: Int) -> Int {

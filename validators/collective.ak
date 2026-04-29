@@ -1,3 +1,4 @@
+use aiken/collection/dict
 // =============================================================================
 // UltraLife Protocol — Collective
 // =============================================================================
@@ -25,12 +26,11 @@
 // =============================================================================
 
 use aiken/collection/list
-use aiken/collection/dict
 use aiken/crypto.{VerificationKeyHash}
-use cardano/assets.{PolicyId, AssetName, Value, quantity_of, flatten}
+use aiken/interval.{Finite}
+use cardano/assets.{AssetName, PolicyId, Value, flatten, quantity_of}
 use cardano/transaction.{
-  Transaction, Input, Output, OutputReference,
-  InlineDatum,
+  InlineDatum, Input, Output, OutputReference, Transaction,
 }
 
 // =============================================================================
@@ -54,27 +54,14 @@ pub type CollectiveMember {
 /// Reference to a shared resource
 pub type SharedResource {
   /// Land NFT
-  Land {
-    land_id: ByteArray,
-    rights_held: List<ByteArray>,  // Which rights this collective controls
-  }
+  Land { land_id: ByteArray, rights_held: List<ByteArray> }
+  // Which rights this collective controls
   /// Escrow for incoming payments
-  Escrow {
-    escrow_ref: OutputReference,
-    purpose: ByteArray,
-  }
+  Escrow { escrow_ref: OutputReference, purpose: ByteArray }
   /// Quality/performance bond
-  Bond {
-    bond_ref: OutputReference,
-    amount: Int,
-    expires_at: Int,
-  }
+  Bond { bond_ref: OutputReference, amount: Int, expires_at: Int }
   /// Equipment or inventory
-  Asset {
-    asset_id: ByteArray,
-    description: ByteArray,
-    value: Int,
-  }
+  Asset { asset_id: ByteArray, description: ByteArray, value: Int }
 }
 
 /// Governance rules for the collective
@@ -166,24 +153,12 @@ pub type CollectiveRedeemer {
     governance: GovernanceRules,
     categories: List<ByteArray>,
   }
-  
   /// Add a shared resource
-  AddResource {
-    resource: SharedResource,
-  }
-  
+  AddResource { resource: SharedResource }
   /// Remove a shared resource
-  RemoveResource {
-    resource_index: Int,
-  }
-  
+  RemoveResource { resource_index: Int }
   /// Process a payment (customer pays collective)
-  ReceivePayment {
-    from_pnft: AssetName,
-    amount: Int,
-    purpose: ByteArray,
-  }
-  
+  ReceivePayment { from_pnft: AssetName, amount: Int, purpose: ByteArray }
   /// Make a payment (collective pays out)
   MakePayment {
     to_pnft: AssetName,
@@ -192,46 +167,25 @@ pub type CollectiveRedeemer {
     /// Which member is authorizing
     authorizer: AssetName,
   }
-  
   /// Distribute revenue to members
-  DistributeRevenue {
-    total_amount: Int,
-  }
-  
+  DistributeRevenue { total_amount: Int }
   /// Record impact from collective activity
-  RecordCollectiveImpact {
-    impact_amount: Int,
-    impact_category: ByteArray,
-  }
-  
+  RecordCollectiveImpact { impact_amount: Int, impact_category: ByteArray }
   /// Initiate a major decision
-  InitiateDecision {
-    decision: DecisionType,
-    initiator: AssetName,
-  }
-  
+  InitiateDecision { decision: DecisionType, initiator: AssetName }
   /// Approve a pending decision
-  ApproveDecision {
-    approver: AssetName,
-  }
-  
+  ApproveDecision { approver: AssetName }
   /// Execute a decision after threshold + delay
   ExecuteDecision
-  
   /// Cancel a pending decision
-  CancelDecision {
-    canceller: AssetName,
-  }
-  
+  CancelDecision { canceller: AssetName }
   /// Update collective info (name, categories)
   UpdateInfo {
     new_name: Option<ByteArray>,
     new_categories: Option<List<ByteArray>>,
   }
-  
   /// Deactivate collective (pause operations)
   Deactivate
-  
   /// Reactivate collective
   Reactivate
 }
@@ -254,210 +208,215 @@ validator collective(config: CollectiveConfig) {
       // =========================================================================
       Form { name, bioregion, initial_members, governance, categories } -> {
         // 1. All initial members have valid pNFTs that signed
-        let all_signed = list.all(
-          initial_members,
-          fn(m) { verify_pnft_signed(tx, m.pnft, config.pnft_policy) }
-        )
-        
+        let all_signed =
+          list.all(
+            initial_members,
+            fn(m) { verify_pnft_signed(tx, m.pnft, config.pnft_policy) },
+          )
         // 2. At least minimum members
         let enough_members = list.length(initial_members) >= config.min_members
-        
         // 3. Weights sum to 10000 (100%)
         let valid_weights = verify_weights_sum(initial_members)
-        
         // 4. Valid governance thresholds
-        let valid_governance = verify_governance_rules(governance, initial_members)
-        
+        let valid_governance =
+          verify_governance_rules(governance, initial_members)
         // 5. Creates proper datum
-        let creates_datum = verify_collective_formed(
-          tx, own_ref, name, bioregion, initial_members, governance, categories
-        )
-        
+        let creates_datum =
+          verify_collective_formed(
+            tx,
+            own_ref,
+            name,
+            bioregion,
+            initial_members,
+            governance,
+            categories,
+          )
         all_signed && enough_members && valid_weights && valid_governance && creates_datum
       }
-      
       // =========================================================================
       // ADD RESOURCE
       // =========================================================================
       AddResource { resource } -> {
         // 1. Operations threshold met
-        let threshold_met = verify_governance_threshold(
-          tx, datum.members, datum.governance.operations_threshold_bps, config.pnft_policy
-        )
-        
+        let threshold_met =
+          verify_governance_threshold(
+            tx,
+            datum.members,
+            datum.governance.operations_threshold_bps,
+            config.pnft_policy,
+          )
         // 2. Resource is valid and controlled
-        let resource_valid = verify_resource_controlled(tx, resource, datum.members, config)
-        
+        let resource_valid =
+          verify_resource_controlled(tx, resource, datum.members, config)
         // 3. Updates datum correctly
-        let updates_correctly = verify_resource_added(tx, own_ref, datum, resource)
-        
+        let updates_correctly =
+          verify_resource_added(tx, own_ref, datum, resource)
         threshold_met && resource_valid && updates_correctly
       }
-      
       // =========================================================================
       // RECEIVE PAYMENT
       // =========================================================================
       ReceivePayment { from_pnft, amount, purpose } -> {
         // Collective is active
         let is_active = datum.is_active
-        
         // Payment actually received
-        let payment_received = verify_tokens_received(tx, config.token_policy, amount)
-        
+        let payment_received =
+          verify_tokens_received(tx, config.token_policy, amount)
         // Updates transaction count
         let updates_stats = verify_stats_incremented(tx, own_ref, datum, amount)
-        
         is_active && payment_received && updates_stats
       }
-      
       // =========================================================================
       // MAKE PAYMENT
       // =========================================================================
       MakePayment { to_pnft, amount, purpose, authorizer } -> {
         // 1. Collective is active
         let is_active = datum.is_active
-        
         // 2. Authorizer is a member
-        expect Some(member) = list.find(datum.members, fn(m) { m.pnft == authorizer })
-        
+        expect Some(member) =
+          list.find(datum.members, fn(m) { m.pnft == authorizer })
         // 3. Authorizer signed
-        let authorizer_signed = verify_pnft_signed(tx, authorizer, config.pnft_policy)
-        
+        let authorizer_signed =
+          verify_pnft_signed(tx, authorizer, config.pnft_policy)
         // 4. Either within solo limit OR operations threshold met
-        let authorized = 
-          amount <= member.solo_limit ||
-          verify_governance_threshold(
-            tx, datum.members, datum.governance.operations_threshold_bps, config.pnft_policy
+        let authorized =
+          amount <= member.solo_limit || verify_governance_threshold(
+            tx,
+            datum.members,
+            datum.governance.operations_threshold_bps,
+            config.pnft_policy,
           )
-        
         // 5. Payment actually made
         let payment_made = verify_payment_to_pnft(tx, to_pnft, amount, config)
-        
         is_active && authorizer_signed && authorized && payment_made
       }
-      
       // =========================================================================
       // DISTRIBUTE REVENUE
       // =========================================================================
       DistributeRevenue { total_amount } -> {
         // 1. Operations threshold met
-        let threshold_met = verify_governance_threshold(
-          tx, datum.members, datum.governance.operations_threshold_bps, config.pnft_policy
-        )
-        
+        let threshold_met =
+          verify_governance_threshold(
+            tx,
+            datum.members,
+            datum.governance.operations_threshold_bps,
+            config.pnft_policy,
+          )
         // 2. Distribution matches weights
-        let distribution_correct = verify_distribution(
-          tx, datum.members, total_amount, config
-        )
-        
+        let distribution_correct =
+          verify_distribution(tx, datum.members, total_amount, config)
         threshold_met && distribution_correct
       }
-      
       // =========================================================================
       // RECORD COLLECTIVE IMPACT
       // =========================================================================
       RecordCollectiveImpact { impact_amount, impact_category } -> {
         // 1. Operations threshold met
-        let threshold_met = verify_governance_threshold(
-          tx, datum.members, datum.governance.operations_threshold_bps, config.pnft_policy
-        )
-        
+        let threshold_met =
+          verify_governance_threshold(
+            tx,
+            datum.members,
+            datum.governance.operations_threshold_bps,
+            config.pnft_policy,
+          )
         // 2. Impact tokens minted/burned appropriately
-        let impact_recorded = verify_impact_tokens(tx, impact_amount, impact_category)
-        
+        let impact_recorded =
+          verify_impact_tokens(tx, impact_amount, impact_category)
         // 3. Updates total impact
-        let updates_impact = verify_impact_updated(tx, own_ref, datum, impact_amount)
-        
+        let updates_impact =
+          verify_impact_updated(tx, own_ref, datum, impact_amount)
         threshold_met && impact_recorded && updates_impact
       }
-      
       // =========================================================================
       // INITIATE DECISION
       // =========================================================================
       InitiateDecision { decision, initiator } -> {
         // 1. Initiator is a member
         let is_member = list.any(datum.members, fn(m) { m.pnft == initiator })
-        
         // 2. Initiator signed
         let signed = verify_pnft_signed(tx, initiator, config.pnft_policy)
-        
         // 3. No pending decision already
-        let no_pending = verify_no_pending_decision(tx.reference_inputs, own_ref)
-        
+        let no_pending =
+          verify_no_pending_decision(tx.reference_inputs, own_ref)
         // 4. Creates pending decision datum
-        let creates_pending = verify_decision_initiated(tx, own_ref, datum, decision, initiator)
-        
+        let creates_pending =
+          verify_decision_initiated(tx, own_ref, datum, decision, initiator)
         is_member && signed && no_pending && creates_pending
       }
-      
       // =========================================================================
       // APPROVE DECISION
       // =========================================================================
       ApproveDecision { approver } -> {
         // 1. Approver is a member
-        expect Some(member) = list.find(datum.members, fn(m) { m.pnft == approver })
-        
+        expect Some(member) =
+          list.find(datum.members, fn(m) { m.pnft == approver })
         // 2. Approver signed
         let signed = verify_pnft_signed(tx, approver, config.pnft_policy)
-        
         // 3. Not already approved
         // 4. Updates approval correctly
-        let updates_correctly = verify_approval_recorded(tx, own_ref, approver, member.weight_bps)
-        
+        let updates_correctly =
+          verify_approval_recorded(tx, own_ref, approver, member.weight_bps)
         signed && updates_correctly
       }
-      
       // =========================================================================
       // EXECUTE DECISION
       // =========================================================================
-      ExecuteDecision -> {
+      ExecuteDecision ->
         // Get pending decision from datum
         // 1. Threshold met based on decision type
         // 2. Delay passed for major decisions
         // 3. Execute the actual change
         verify_decision_executable(tx, own_ref, datum)
-      }
-      
       // =========================================================================
       // UPDATE INFO
       // =========================================================================
       UpdateInfo { new_name, new_categories } -> {
         // Operations threshold met
-        let threshold_met = verify_governance_threshold(
-          tx, datum.members, datum.governance.operations_threshold_bps, config.pnft_policy
-        )
-        
+        let threshold_met =
+          verify_governance_threshold(
+            tx,
+            datum.members,
+            datum.governance.operations_threshold_bps,
+            config.pnft_policy,
+          )
         // Updates correctly
-        let updates_correctly = verify_info_updated(tx, own_ref, datum, new_name, new_categories)
-        
+        let updates_correctly =
+          verify_info_updated(tx, own_ref, datum, new_name, new_categories)
         threshold_met && updates_correctly
       }
-      
       // =========================================================================
       // DEACTIVATE / REACTIVATE
       // =========================================================================
       Deactivate -> {
-        let threshold_met = verify_governance_threshold(
-          tx, datum.members, datum.governance.membership_threshold_bps, config.pnft_policy
-        )
+        let threshold_met =
+          verify_governance_threshold(
+            tx,
+            datum.members,
+            datum.governance.membership_threshold_bps,
+            config.pnft_policy,
+          )
         let is_active = datum.is_active
         let updates = verify_deactivated(tx, own_ref, datum)
-        
         threshold_met && is_active && updates
       }
-      
       Reactivate -> {
-        let threshold_met = verify_governance_threshold(
-          tx, datum.members, datum.governance.membership_threshold_bps, config.pnft_policy
-        )
+        let threshold_met =
+          verify_governance_threshold(
+            tx,
+            datum.members,
+            datum.governance.membership_threshold_bps,
+            config.pnft_policy,
+          )
         let is_inactive = !datum.is_active
         let updates = verify_reactivated(tx, own_ref, datum)
-        
         threshold_met && is_inactive && updates
       }
-      
       _ -> False
     }
+  }
+
+  else(_) {
+    fail
   }
 }
 
@@ -473,7 +432,7 @@ fn verify_pnft_signed(
 ) -> Bool {
   list.any(
     tx.inputs,
-    fn(input) { quantity_of(input.output.value, policy, pnft) == 1 }
+    fn(input) { quantity_of(input.output.value, policy, pnft) == 1 },
   )
 }
 
@@ -484,17 +443,18 @@ fn verify_governance_threshold(
   threshold_bps: Int,
   pnft_policy: PolicyId,
 ) -> Bool {
-  let signing_weight = list.foldl(
-    members,
-    0,
-    fn(member, acc) {
-      if verify_pnft_signed(tx, member.pnft, pnft_policy) {
-        acc + member.weight_bps
-      } else {
-        acc
-      }
-    }
-  )
+  let signing_weight =
+    list.foldl(
+      members,
+      0,
+      fn(member, acc) {
+        if verify_pnft_signed(tx, member.pnft, pnft_policy) {
+          acc + member.weight_bps
+        } else {
+          acc
+        }
+      },
+    )
   signing_weight >= threshold_bps
 }
 
@@ -505,14 +465,12 @@ fn verify_weights_sum(members: List<CollectiveMember>) -> Bool {
 }
 
 /// Verify governance rules are valid
-fn verify_governance_rules(rules: GovernanceRules, members: List<CollectiveMember>) -> Bool {
+fn verify_governance_rules(
+  rules: GovernanceRules,
+  members: List<CollectiveMember>,
+) -> Bool {
   // Thresholds must be achievable (at least one member combination can meet them)
-  rules.operations_threshold_bps > 0 &&
-  rules.operations_threshold_bps <= 10000 &&
-  rules.membership_threshold_bps > 0 &&
-  rules.membership_threshold_bps <= 10000 &&
-  rules.major_threshold_bps > 0 &&
-  rules.major_threshold_bps <= 10000
+  rules.operations_threshold_bps > 0 && rules.operations_threshold_bps <= 10000 && rules.membership_threshold_bps > 0 && rules.membership_threshold_bps <= 10000 && rules.major_threshold_bps > 0 && rules.major_threshold_bps <= 10000
 }
 
 /// Verify collective formation creates correct datum
@@ -531,19 +489,13 @@ fn verify_collective_formed(
       when output.datum is {
         InlineDatum(d) -> {
           expect datum: CollectiveDatum = d
-          datum.name == name &&
-          datum.bioregion == bioregion &&
-          datum.members == members &&
-          datum.governance == governance &&
-          datum.categories == categories &&
-          datum.is_active == True &&
-          datum.total_impact == 0 &&
-          datum.total_transactions == 0 &&
-          list.is_empty(datum.resources)
+          datum.name == name && datum.bioregion == bioregion && datum.members == members && datum.governance == governance && datum.categories == categories && datum.is_active == True && datum.total_impact == 0 && datum.total_transactions == 0 && list.is_empty(
+            datum.resources,
+          )
         }
         _ -> False
       }
-    }
+    },
   )
 }
 
@@ -555,22 +507,19 @@ fn verify_resource_controlled(
   config: CollectiveConfig,
 ) -> Bool {
   when resource is {
-    Land { land_id, rights_held } -> {
+    Land { land_id, rights_held } ->
       // Land NFT must be in inputs, controlled by a member
-      True // Would verify land ownership
-    }
-    Escrow { escrow_ref, purpose } -> {
+      True
+    // Would verify land ownership
+    Escrow { escrow_ref, purpose } ->
       // Escrow must reference this collective
       True
-    }
-    Bond { bond_ref, amount, expires_at } -> {
+    Bond { bond_ref, amount, expires_at } ->
       // Bond must be staked by member(s)
       True
-    }
-    Asset { asset_id, description, value } -> {
+    Asset { asset_id, description, value } ->
       // Asset tracking
       True
-    }
   }
 }
 
@@ -587,188 +536,294 @@ fn verify_distribution(
       let expected_share = total_amount * member.weight_bps / 10000
       // Verify member received their share
       verify_payment_to_pnft(tx, member.pnft, expected_share, config)
-    }
+    },
   )
 }
 
 // Helper function implementations
-fn verify_resource_added(tx: Transaction, own_ref: OutputReference, datum: CollectiveDatum, resource: SharedResource) -> Bool {
+fn verify_resource_added(
+  tx: Transaction,
+  own_ref: OutputReference,
+  datum: CollectiveDatum,
+  resource: SharedResource,
+) -> Bool {
   // Verify the output datum has the new resource added
-  list.any(tx.outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect new_datum: CollectiveDatum = data
-        // Name and members should remain the same
-        new_datum.name == datum.name &&
-        new_datum.members == datum.members &&
-        // Resources should have the new one added
-        list.length(new_datum.resources) == list.length(datum.resources) + 1 &&
-        list.has(new_datum.resources, resource)
+  list.any(
+    tx.outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect new_datum: CollectiveDatum = data
+          // Name and members should remain the same
+          new_datum.name == datum.name && new_datum.members == datum.members && // Resources should have the new one added
+          list.length(new_datum.resources) == list.length(datum.resources) + 1 && list.has(
+            new_datum.resources,
+            resource,
+          )
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
-fn verify_tokens_received(tx: Transaction, policy: PolicyId, amount: Int) -> Bool {
+fn verify_tokens_received(
+  tx: Transaction,
+  policy: PolicyId,
+  amount: Int,
+) -> Bool {
   // Verify that the specified amount of tokens is received in outputs
-  let output_total = list.foldl(tx.outputs, 0, fn(output, acc) {
-    // Sum all tokens of the given policy across all asset names
-    let tokens = list.filter_map(flatten(output.value), fn(asset) {
-      let (p, _, qty) = asset
-      if p == policy { Some(qty) } else { None }
-    })
-    acc + list.foldl(tokens, 0, fn(qty, sum) { sum + qty })
-  })
-  let input_total = list.foldl(tx.inputs, 0, fn(input, acc) {
-    let tokens = list.filter_map(flatten(input.output.value), fn(asset) {
-      let (p, _, qty) = asset
-      if p == policy { Some(qty) } else { None }
-    })
-    acc + list.foldl(tokens, 0, fn(qty, sum) { sum + qty })
-  })
+  let output_total =
+    list.foldl(
+      tx.outputs,
+      0,
+      fn(output, acc) {
+        // Sum all tokens of the given policy across all asset names
+        let tokens =
+          list.filter_map(
+            flatten(output.value),
+            fn(asset) {
+              let (p, _, qty) = asset
+              if p == policy {
+                Some(qty)
+              } else {
+                None
+              }
+            },
+          )
+        acc + list.foldl(tokens, 0, fn(qty, sum) { sum + qty })
+      },
+    )
+  let input_total =
+    list.foldl(
+      tx.inputs,
+      0,
+      fn(input, acc) {
+        let tokens =
+          list.filter_map(
+            flatten(input.output.value),
+            fn(asset) {
+              let (p, _, qty) = asset
+              if p == policy {
+                Some(qty)
+              } else {
+                None
+              }
+            },
+          )
+        acc + list.foldl(tokens, 0, fn(qty, sum) { sum + qty })
+      },
+    )
   // Net tokens received should be >= amount
   output_total - input_total >= amount || input_total >= amount
 }
 
-fn verify_stats_incremented(tx: Transaction, own_ref: OutputReference, datum: CollectiveDatum, amount: Int) -> Bool {
+fn verify_stats_incremented(
+  tx: Transaction,
+  own_ref: OutputReference,
+  datum: CollectiveDatum,
+  amount: Int,
+) -> Bool {
   // Verify the output datum has incremented transaction count and stats
-  list.any(tx.outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect new_datum: CollectiveDatum = data
-        new_datum.name == datum.name &&
-        new_datum.members == datum.members &&
-        new_datum.total_transactions == datum.total_transactions + 1
+  list.any(
+    tx.outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect new_datum: CollectiveDatum = data
+          new_datum.name == datum.name && new_datum.members == datum.members && new_datum.total_transactions == datum.total_transactions + 1
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
-fn verify_payment_to_pnft(tx: Transaction, pnft: AssetName, amount: Int, config: CollectiveConfig) -> Bool {
+fn verify_payment_to_pnft(
+  tx: Transaction,
+  pnft: AssetName,
+  amount: Int,
+  config: CollectiveConfig,
+) -> Bool {
   // Verify that a payment of specified amount goes to the pNFT holder
-  list.any(tx.outputs, fn(output) {
-    // Check that output contains the pNFT and has sufficient tokens
-    quantity_of(output.value, config.pnft_policy, pnft) == 1 &&
-    list.any(flatten(output.value), fn(asset) {
-      let (p, _, qty) = asset
-      p == config.token_policy && qty >= amount
-    })
-  })
+  list.any(
+    tx.outputs,
+    fn(output) {
+      // Check that output contains the pNFT and has sufficient tokens
+      quantity_of(output.value, config.pnft_policy, pnft) == 1 && list.any(
+        flatten(output.value),
+        fn(asset) {
+          let (p, _, qty) = asset
+          p == config.token_policy && qty >= amount
+        },
+      )
+    },
+  )
 }
 
-fn verify_impact_tokens(tx: Transaction, amount: Int, category: ByteArray) -> Bool {
+fn verify_impact_tokens(
+  tx: Transaction,
+  amount: Int,
+  category: ByteArray,
+) -> Bool {
   // Verify impact tokens are minted/burned as appropriate
   // Impact tokens should have specific asset names based on category
   let minted_values = flatten(tx.mint)
-  list.any(minted_values, fn(asset) {
-    let (_, name, qty) = asset
-    // Check if this is an impact token for the given category
-    name == category && (qty == amount || qty == -amount)
-  })
+  list.any(
+    minted_values,
+    fn(asset) {
+      let (_, name, qty) = asset
+      // Check if this is an impact token for the given category
+      name == category && ( qty == amount || qty == -amount )
+    },
+  )
 }
 
-fn verify_impact_updated(tx: Transaction, own_ref: OutputReference, datum: CollectiveDatum, amount: Int) -> Bool {
+fn verify_impact_updated(
+  tx: Transaction,
+  own_ref: OutputReference,
+  datum: CollectiveDatum,
+  amount: Int,
+) -> Bool {
   // Verify the output datum has updated total_impact
-  list.any(tx.outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect new_datum: CollectiveDatum = data
-        new_datum.name == datum.name &&
-        new_datum.total_impact == datum.total_impact + amount
+  list.any(
+    tx.outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect new_datum: CollectiveDatum = data
+          new_datum.name == datum.name && new_datum.total_impact == datum.total_impact + amount
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
-fn verify_no_pending_decision(refs: List<Input>, own_ref: OutputReference) -> Bool {
+fn verify_no_pending_decision(
+  refs: List<Input>,
+  own_ref: OutputReference,
+) -> Bool {
   // Verify there's no existing pending decision in reference inputs
-  !list.any(refs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        // Try to detect if this is a pending decision datum
-        // In this implementation, we check for PendingDecision type presence
-        // by checking if the datum matches expected structure
-        expect _: PendingDecision = data
-        True
+  !list.any(
+    refs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          // Try to detect if this is a pending decision datum
+          // In this implementation, we check for PendingDecision type presence
+          // by checking if the datum matches expected structure
+          expect _: PendingDecision = data
+          True
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
-fn verify_decision_initiated(tx: Transaction, own_ref: OutputReference, datum: CollectiveDatum, decision: DecisionType, initiator: AssetName) -> Bool {
+fn verify_decision_initiated(
+  tx: Transaction,
+  own_ref: OutputReference,
+  datum: CollectiveDatum,
+  decision: DecisionType,
+  initiator: AssetName,
+) -> Bool {
   // Verify a pending decision output is created
-  list.any(tx.outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect pending: PendingDecision = data
-        pending.decision_type == decision &&
-        list.has(pending.approvals, initiator) &&
-        pending.approval_weight_bps > 0
+  list.any(
+    tx.outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect pending: PendingDecision = data
+          pending.decision_type == decision && list.has(
+            pending.approvals,
+            initiator,
+          ) && pending.approval_weight_bps > 0
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
-fn verify_approval_recorded(tx: Transaction, own_ref: OutputReference, approver: AssetName, weight: Int) -> Bool {
+fn verify_approval_recorded(
+  tx: Transaction,
+  own_ref: OutputReference,
+  approver: AssetName,
+  weight: Int,
+) -> Bool {
   // Verify the pending decision is updated with the new approval
-  let has_approval_in_output = list.any(tx.outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect pending: PendingDecision = data
-        list.has(pending.approvals, approver)
-      }
-      _ -> False
-    }
-  })
+  let has_approval_in_output =
+    list.any(
+      tx.outputs,
+      fn(output) {
+        when output.datum is {
+          InlineDatum(data) -> {
+            expect pending: PendingDecision = data
+            list.has(pending.approvals, approver)
+          }
+          _ -> False
+        }
+      },
+    )
 
   // Also verify the weight was added
   has_approval_in_output
 }
 
-fn verify_decision_executable(tx: Transaction, own_ref: OutputReference, datum: CollectiveDatum) -> Bool {
+fn verify_decision_executable(
+  tx: Transaction,
+  own_ref: OutputReference,
+  datum: CollectiveDatum,
+) -> Bool {
   // Find the pending decision in inputs
-  let pending_decision = list.find_map(tx.inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect pending: PendingDecision = data
-        Some(pending)
-      }
-      _ -> None
-    }
-  })
+  let pending_decision =
+    list.find_map(
+      tx.inputs,
+      fn(input) {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect pending: PendingDecision = data
+            Some(pending)
+          }
+          _ -> None
+        }
+      },
+    )
 
   when pending_decision is {
     Some(pending) -> {
       // Determine required threshold based on decision type
-      let required_threshold = when pending.decision_type is {
-        AddMember { .. } -> datum.governance.membership_threshold_bps
-        RemoveMember { .. } -> datum.governance.membership_threshold_bps
-        TransferResource { .. } -> datum.governance.major_threshold_bps
-        Dissolve -> datum.governance.major_threshold_bps
-        UpdateGovernance { .. } -> datum.governance.major_threshold_bps
-      }
+      let required_threshold =
+        when pending.decision_type is {
+          AddMember { .. } -> datum.governance.membership_threshold_bps
+          RemoveMember { .. } -> datum.governance.membership_threshold_bps
+          TransferResource { .. } -> datum.governance.major_threshold_bps
+          Dissolve -> datum.governance.major_threshold_bps
+          UpdateGovernance { .. } -> datum.governance.major_threshold_bps
+        }
 
       // Check threshold met
       let threshold_met = pending.approval_weight_bps >= required_threshold
 
       // Check delay passed for major decisions
       // Extract current slot from transaction validity range
-      let current_slot = when tx.validity_range.lower_bound.bound_type is {
-        Finite(slot) -> slot
-        _ -> 0
-      }
+      let current_slot =
+        when tx.validity_range.lower_bound.bound_type is {
+          Finite(slot) -> slot
+          _ -> 0
+        }
 
       // Calculate required delay based on decision type
-      let required_delay = when pending.decision is {
-        UpdateGovernance { .. } -> datum.governance.decision_delay_slots * 2  // Major change needs 2x delay
-        Dissolve { .. } -> datum.governance.decision_delay_slots * 3  // Dissolution needs 3x delay
-        _ -> datum.governance.decision_delay_slots
-      }
+      let required_delay =
+        when pending.decision_type is {
+          UpdateGovernance { .. } -> datum.governance.major_decision_delay * 2
+          // Major change needs 2x delay
+          Dissolve { .. } -> datum.governance.major_decision_delay * 3
+          // Dissolution needs 3x delay
+          _ -> datum.governance.major_decision_delay
+        }
 
       let delay_ok = current_slot >= pending.initiated_at + required_delay
 
@@ -778,57 +833,73 @@ fn verify_decision_executable(tx: Transaction, own_ref: OutputReference, datum: 
   }
 }
 
-fn verify_info_updated(tx: Transaction, own_ref: OutputReference, datum: CollectiveDatum, name: Option<ByteArray>, cats: Option<List<ByteArray>>) -> Bool {
+fn verify_info_updated(
+  tx: Transaction,
+  own_ref: OutputReference,
+  datum: CollectiveDatum,
+  name: Option<ByteArray>,
+  cats: Option<List<ByteArray>>,
+) -> Bool {
   // Verify the output datum has the updated info
-  list.any(tx.outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect new_datum: CollectiveDatum = data
-        // Members and governance should remain unchanged
-        new_datum.members == datum.members &&
-        new_datum.governance == datum.governance &&
-        // Name updated if provided
-        (when name is {
-          Some(n) -> new_datum.name == n
-          None -> new_datum.name == datum.name
-        }) &&
-        // Categories updated if provided
-        (when cats is {
-          Some(c) -> new_datum.categories == c
-          None -> new_datum.categories == datum.categories
-        })
+  list.any(
+    tx.outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect new_datum: CollectiveDatum = data
+          // Members and governance should remain unchanged
+          new_datum.members == datum.members && new_datum.governance == datum.governance && // Name updated if provided
+          when name is {
+            Some(n) -> new_datum.name == n
+            None -> new_datum.name == datum.name
+          } && // Categories updated if provided
+          when cats is {
+            Some(c) -> new_datum.categories == c
+            None -> new_datum.categories == datum.categories
+          }
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
-fn verify_deactivated(tx: Transaction, own_ref: OutputReference, datum: CollectiveDatum) -> Bool {
+fn verify_deactivated(
+  tx: Transaction,
+  own_ref: OutputReference,
+  datum: CollectiveDatum,
+) -> Bool {
   // Verify the output datum has is_active set to False
-  list.any(tx.outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect new_datum: CollectiveDatum = data
-        new_datum.name == datum.name &&
-        new_datum.members == datum.members &&
-        new_datum.is_active == False
+  list.any(
+    tx.outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect new_datum: CollectiveDatum = data
+          new_datum.name == datum.name && new_datum.members == datum.members && new_datum.is_active == False
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
-fn verify_reactivated(tx: Transaction, own_ref: OutputReference, datum: CollectiveDatum) -> Bool {
+fn verify_reactivated(
+  tx: Transaction,
+  own_ref: OutputReference,
+  datum: CollectiveDatum,
+) -> Bool {
   // Verify the output datum has is_active set to True
-  list.any(tx.outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect new_datum: CollectiveDatum = data
-        new_datum.name == datum.name &&
-        new_datum.members == datum.members &&
-        new_datum.is_active == True
+  list.any(
+    tx.outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect new_datum: CollectiveDatum = data
+          new_datum.name == datum.name && new_datum.members == datum.members && new_datum.is_active == True
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }

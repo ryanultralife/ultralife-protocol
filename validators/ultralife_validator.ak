@@ -86,9 +86,12 @@
 //
 // =============================================================================
 
+use aiken/collection/dict
 use aiken/collection/list
-use cardano/assets.{PolicyId, AssetName, quantity_of}
-use cardano/transaction.{Transaction, Output, OutputReference, InlineDatum}
+use aiken/interval.{Finite}
+use cardano/address.{Address, Script}
+use cardano/assets.{AssetName, PolicyId, quantity_of, tokens}
+use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
 
 /// Minimum stake required to become a validator (10,000 ULTRA)
 const min_validator_stake = 10000000000
@@ -119,24 +122,13 @@ pub type FeePoolDatum {
 /// Fee pool actions
 pub type FeePoolRedeemer {
   /// User pays ULTRA, pool pays ADA fee
-  SubsidizeFee {
-    ultra_amount: Int,
-    tx_size_estimate: Int,
-  }
+  SubsidizeFee { ultra_amount: Int, tx_size_estimate: Int }
   /// Replenish ADA from treasury
-  ReplenishAda {
-    amount: Int,
-  }
+  ReplenishAda { amount: Int }
   /// Distribute collected ULTRA fees to validators
-  DistributeFees {
-    epoch: Int,
-    validators: List<AssetName>,
-    amounts: List<Int>,
-  }
+  DistributeFees { epoch: Int, validators: List<AssetName>, amounts: List<Int> }
   /// Update fee rate
-  UpdateFeeRate {
-    new_rate: Int,
-  }
+  UpdateFeeRate { new_rate: Int }
 }
 
 // =============================================================================
@@ -153,7 +145,8 @@ pub type UltraLifeValidatorDatum {
   bioregion: ByteArray,
   /// Performance metrics
   transactions_validated: Int,
-  uptime_score: Int,  // 0-10000 (0-100.00%)
+  uptime_score: Int,
+  // 0-10000 (0-100.00%)
   /// Fees earned this epoch
   fees_earned_epoch: Int,
   /// Total fees earned lifetime
@@ -176,38 +169,24 @@ pub type ValidatorStatus {
 
 pub type ValidatorRedeemer {
   /// Register as validator (stake ULTRA)
-  Register {
-    stake_amount: Int,
-    bioregion: ByteArray,
-  }
+  Register { stake_amount: Int, bioregion: ByteArray }
   /// Add more stake
-  AddStake {
-    amount: Int,
-  }
+  AddStake { amount: Int }
   /// Begin unstaking process
-  BeginUnstake {
-    amount: Int,
-  }
+  BeginUnstake { amount: Int }
   /// Complete unstaking after unbonding period
   CompleteUnstake
   /// Claim earned fees
-  ClaimFees {
-    epoch: Int,
-  }
+  ClaimFees { epoch: Int }
   /// Slash validator for misbehavior
-  Slash {
-    evidence_hash: ByteArray,
-    slash_amount: Int,
-  }
+  Slash { evidence_hash: ByteArray, slash_amount: Int }
 }
 
 // =============================================================================
 // VALIDATOR LOGIC
 // =============================================================================
 
-validator ultralife_validator(
-  config: ValidatorConfig,
-) {
+validator ultralife_validator(config: ValidatorConfig) {
   spend(
     datum: Option<UltraLifeValidatorDatum>,
     redeemer: ValidatorRedeemer,
@@ -215,42 +194,34 @@ validator ultralife_validator(
     tx: Transaction,
   ) {
     expect Some(d) = datum
-    
     when redeemer is {
       Register { stake_amount, bioregion } -> {
         // Must stake minimum ULTRA
         expect stake_amount >= min_validator_stake
-        
         // Must have valid pNFT (Verified or Steward)
         expect verify_pnft_level(tx, d.validator_pnft, config.pnft_policy)
-        
         // ULTRA must be locked in validator contract
         expect verify_ultra_locked(tx, stake_amount, config.token_policy)
-        
         True
       }
-      
       AddStake { amount } -> {
         expect d.status == Active
         expect amount > 0
         expect verify_ultra_locked(tx, amount, config.token_policy)
         True
       }
-      
       BeginUnstake { amount } -> {
         expect d.status == Active
         expect amount <= d.ultra_staked
         // Changes status to Deregistering with unbonding period
         True
       }
-      
       CompleteUnstake -> {
         expect Deregistering { effective_epoch } = d.status
         expect current_epoch(tx) >= effective_epoch
         // Returns staked ULTRA to validator
         True
       }
-      
       ClaimFees { epoch } -> {
         expect d.status == Active
         expect epoch < current_epoch(tx)
@@ -258,7 +229,6 @@ validator ultralife_validator(
         expect verify_fee_claim(tx, d.validator_pnft, epoch, config)
         True
       }
-      
       Slash { evidence_hash, slash_amount } -> {
         // Must be called by governance or automated slashing contract
         expect verify_slash_authority(tx, config)
@@ -268,15 +238,17 @@ validator ultralife_validator(
       }
     }
   }
+
+  else(_) {
+    fail
+  }
 }
 
 // =============================================================================
 // FEE POOL VALIDATOR
 // =============================================================================
 
-validator fee_pool(
-  config: FeePoolConfig,
-) {
+validator fee_pool(config: FeePoolConfig) {
   spend(
     datum: Option<FeePoolDatum>,
     redeemer: FeePoolRedeemer,
@@ -284,47 +256,37 @@ validator fee_pool(
     tx: Transaction,
   ) {
     expect Some(d) = datum
-    
     when redeemer is {
       SubsidizeFee { ultra_amount, tx_size_estimate } -> {
         // User pays ULTRA fee
-        let expected_ultra = calculate_ultra_fee(tx_size_estimate, d.ultra_fee_rate)
+        let expected_ultra =
+          calculate_ultra_fee(tx_size_estimate, d.ultra_fee_rate)
         expect ultra_amount >= expected_ultra
-        
         // Pool pays ADA (happens automatically via tx fee)
         // Pool's ADA balance decreases, ULTRA balance increases
-        
         // Verify ULTRA received
         expect verify_ultra_received(tx, ultra_amount, config.token_policy)
-        
         // Ensure minimum ADA reserve maintained
         let new_ada_balance = d.ada_balance - estimate_ada_fee(tx_size_estimate)
         expect new_ada_balance >= d.min_ada_reserve
-        
         True
       }
-      
       ReplenishAda { amount } -> {
         // Only treasury can replenish
         expect verify_treasury_signature(tx, config)
         expect amount > 0
         True
       }
-      
       DistributeFees { epoch, validators, amounts } -> {
         // Must be after epoch end
         expect epoch < current_epoch(tx)
-        
         // Total distribution must match collected fees
         let total = list.foldl(amounts, 0, fn(a, acc) { acc + a })
         expect total == d.ultra_fees_collected
-        
         // Distribute proportionally to validator performance
         expect verify_distribution(validators, amounts, epoch, config)
-        
         True
       }
-      
       UpdateFeeRate { new_rate } -> {
         // Only governance can update
         expect verify_governance_signature(tx, config)
@@ -332,6 +294,10 @@ validator fee_pool(
         True
       }
     }
+  }
+
+  else(_) {
+    fail
   }
 }
 
@@ -342,13 +308,14 @@ validator fee_pool(
 fn verify_pnft_level(tx: Transaction, pnft: AssetName, policy: PolicyId) -> Bool {
   // Check pNFT exists in inputs and is Verified or Steward level
   // Look for pNFT in transaction inputs
-  let pnft_found = list.any(
-    tx.inputs,
-    fn(input) {
-      let tokens = value.tokens(input.output.value, policy)
-      dict.has_key(tokens, pnft)
-    }
-  )
+  let pnft_found =
+    list.any(
+      tx.inputs,
+      fn(input) {
+        let tokens = tokens(input.output.value, policy)
+        dict.has_key(tokens, pnft)
+      },
+    )
 
   // If pNFT found, we assume it's valid level (full check would require datum)
   // In production, would parse datum to verify level >= Verified
@@ -357,94 +324,101 @@ fn verify_pnft_level(tx: Transaction, pnft: AssetName, policy: PolicyId) -> Bool
 
 fn verify_ultra_locked(tx: Transaction, amount: Int, policy: PolicyId) -> Bool {
   // Verify ULTRA tokens are sent to validator contract output
-  let total_locked = list.foldl(
-    tx.outputs,
-    0,
-    fn(output, acc) {
-      // Check if output has datum (indicates contract output)
-      when output.datum is {
-        InlineDatum(_) -> {
-          let tokens = value.tokens(output.value, policy)
-          let token_amount = dict.foldl(tokens, 0, fn(_k, v, a) { a + v })
-          acc + token_amount
+  let total_locked =
+    list.foldl(
+      tx.outputs,
+      0,
+      fn(output, acc) {
+        // Check if output has datum (indicates contract output)
+        when output.datum is {
+          InlineDatum(_) -> {
+            let tokens = tokens(output.value, policy)
+            let token_amount = dict.foldl(tokens, 0, fn(_k, v, a) { a + v })
+            acc + token_amount
+          }
+          _ -> acc
         }
-        _ -> acc
-      }
-    }
-  )
+      },
+    )
   total_locked >= amount
 }
 
-fn verify_fee_claim(tx: Transaction, pnft: AssetName, epoch: Int, config: ValidatorConfig) -> Bool {
+fn verify_fee_claim(
+  tx: Transaction,
+  pnft: AssetName,
+  epoch: Int,
+  config: ValidatorConfig,
+) -> Bool {
   // Verify fee claim is valid:
   // 1. pNFT is present in inputs
   // 2. Epoch is valid (not in future, not already claimed)
   let pnft_present = verify_pnft_level(tx, pnft, config.pnft_policy)
   let current = current_epoch(tx)
-  let epoch_valid = epoch <= current && epoch >= current - 10  // Allow claims up to 10 epochs back
+  let epoch_valid = epoch <= current && epoch >= current - 10
 
+  // Allow claims up to 10 epochs back
   pnft_present && epoch_valid
 }
 
 fn verify_slash_authority(tx: Transaction, config: ValidatorConfig) -> Bool {
   // Verify slashing is authorized by governance multisig
   // Check that governance address signed the transaction
-  let governance_cred = Address {
-    payment_credential: ScriptCredential(config.governance_address),
-    stake_credential: None,
-  }
+  let governance_cred =
+    Address {
+      payment_credential: Script(config.governance_address),
+      stake_credential: None,
+    }
 
   // Look for governance script in reference inputs or signatories
   list.any(
     tx.reference_inputs,
-    fn(ref_input) {
-      ref_input.output.address == governance_cred
-    }
+    fn(ref_input) { ref_input.output.address == governance_cred },
   ) || list.any(
     tx.extra_signatories,
-    fn(sig) { sig == config.governance_address }
+    fn(sig) { sig == config.governance_address },
   )
 }
 
 fn verify_ultra_received(tx: Transaction, amount: Int, policy: PolicyId) -> Bool {
   // Verify ULTRA tokens received by fee pool
-  let total_received = list.foldl(
-    tx.outputs,
-    0,
-    fn(output, acc) {
-      let tokens = value.tokens(output.value, policy)
-      let token_amount = dict.foldl(tokens, 0, fn(_k, v, a) { a + v })
-      acc + token_amount
-    }
-  )
+  let total_received =
+    list.foldl(
+      tx.outputs,
+      0,
+      fn(output, acc) {
+        let tokens = tokens(output.value, policy)
+        let token_amount = dict.foldl(tokens, 0, fn(_k, v, a) { a + v })
+        acc + token_amount
+      },
+    )
   total_received >= amount
 }
 
 fn verify_treasury_signature(tx: Transaction, config: FeePoolConfig) -> Bool {
   // Verify treasury authorized this action via signature
-  list.any(
-    tx.extra_signatories,
-    fn(sig) { sig == config.treasury_address }
-  )
+  list.any(tx.extra_signatories, fn(sig) { sig == config.treasury_address })
 }
 
 fn verify_governance_signature(tx: Transaction, config: FeePoolConfig) -> Bool {
   // Verify governance authorized this action via signature
-  list.any(
-    tx.extra_signatories,
-    fn(sig) { sig == config.governance_address }
-  )
+  list.any(tx.extra_signatories, fn(sig) { sig == config.governance_address })
 }
 
-fn verify_distribution(validators: List<AssetName>, amounts: List<Int>, epoch: Int, config: FeePoolConfig) -> Bool {
+fn verify_distribution(
+  validators: List<AssetName>,
+  amounts: List<Int>,
+  epoch: Int,
+  config: FeePoolConfig,
+) -> Bool {
   // Verify distribution is valid:
   // 1. Number of validators matches number of amounts
   // 2. All amounts are non-negative
   // 3. Epoch is recent (within last 5 epochs)
   let counts_match = list.length(validators) == list.length(amounts)
   let all_positive = list.all(amounts, fn(amt) { amt >= 0 })
-  let valid_epoch = epoch > 0  // Basic sanity check
+  let valid_epoch = epoch > 0
 
+  // Basic sanity check
   counts_match && all_positive && valid_epoch
 }
 
@@ -456,16 +430,18 @@ fn calculate_ultra_fee(tx_size: Int, rate: Int) -> Int {
 fn estimate_ada_fee(tx_size: Int) -> Int {
   // Estimate ADA fee for transaction
   // Cardano: ~0.17 ADA for typical transaction
-  170_000 + tx_size * 44  // Linear fee formula
+  170_000 + tx_size * 44
+  // Linear fee formula
 }
 
 fn current_epoch(tx: Transaction) -> Int {
   // Get current epoch from transaction validity range
   // Cardano epochs are ~5 days (432,000 slots at 1 slot/sec)
-  let validity_start = when tx.validity_range.lower_bound.bound_type is {
-    Finite(slot) -> slot
-    _ -> 0
-  }
+  let validity_start =
+    when tx.validity_range.lower_bound.bound_type is {
+      Finite(slot) -> slot
+      _ -> 0
+    }
   // Approximate epoch: slot / 432000
   validity_start / 432000
 }

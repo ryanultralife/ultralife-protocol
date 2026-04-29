@@ -28,20 +28,21 @@
 use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use aiken/interval.{Finite}
-use cardano/assets.{PolicyId, AssetName, quantity_of, flatten}
 use cardano/address.{Script, VerificationKey}
-use cardano/transaction.{Transaction, Input, Output, OutputReference, InlineDatum}
-use ultralife/types_v2.{
-  PnftDatum, VerificationLevel, Basic, Ward, Standard, Verified, Steward,
-  SurveyorType, SurveyorCert,
-  SurveyRecord, SurveyType, SurveyMeasurement, SurveyStatus, SurveyVerification,
-  SurveyPending, SurveyVerified, SurveyDisputed, SurveyRejected,
-  PreservationGrant, GrantType, GrantStatus, GrantPayment, HealthTarget,
-  GrantApplied, GrantApproved, GrantActive, GrantCompleted, GrantTerminated, GrantSuspended,
-  EcosystemHealthRecord, HealthTrend,
-  ImpactCategory, TreasuryDatum,
+use cardano/assets.{AssetName, PolicyId, flatten, quantity_of}
+use cardano/transaction.{
+  InlineDatum, Input, Output, OutputReference, Transaction,
 }
 use ultralife/prc37.{current_cycle}
+use ultralife/types_v2.{
+  Basic, EcosystemHealthRecord, GrantActive, GrantApplied, GrantApproved,
+  GrantCompleted, GrantPayment, GrantStatus, GrantSuspended, GrantTerminated,
+  GrantType, HealthTarget, HealthTrend, ImpactCategory, PnftDatum,
+  PreservationGrant, Standard, Steward, SurveyDisputed, SurveyMeasurement,
+  SurveyPending, SurveyRecord, SurveyRejected, SurveyStatus, SurveyType,
+  SurveyVerification, SurveyVerified, SurveyorCert, SurveyorType, TreasuryDatum,
+  VerificationLevel, Verified, Ward,
+}
 
 // =============================================================================
 // CONSTANTS
@@ -68,7 +69,6 @@ const cert_validity = 52
 
 pub type PreservationRedeemer {
   // === SURVEYOR MANAGEMENT ===
-  
   /// Certify a new surveyor (requires governance approval)
   CertifySurveyor {
     candidate: AssetName,
@@ -76,21 +76,15 @@ pub type PreservationRedeemer {
     specializations: List<ImpactCategory>,
     governance_proof: ByteArray,
   }
-  
   /// Renew surveyor certification
-  RenewCertification {
-    surveyor: AssetName,
-  }
-  
+  RenewCertification { surveyor: AssetName }
   /// Revoke surveyor certification (misconduct)
   RevokeCertification {
     surveyor: AssetName,
     reason_hash: ByteArray,
     governance_proof: ByteArray,
   }
-  
   // === SURVEYS ===
-  
   /// Submit a new survey
   SubmitSurvey {
     survey_type: SurveyType,
@@ -98,7 +92,6 @@ pub type PreservationRedeemer {
     measurements: List<SurveyMeasurement>,
     evidence_hash: ByteArray,
   }
-  
   /// Verify another surveyor's survey
   VerifySurvey {
     survey_id: ByteArray,
@@ -106,15 +99,9 @@ pub type PreservationRedeemer {
     own_measurements: Option<List<SurveyMeasurement>>,
     notes_hash: Option<ByteArray>,
   }
-  
   /// Dispute a survey
-  DisputeSurvey {
-    survey_id: ByteArray,
-    dispute_evidence: ByteArray,
-  }
-  
+  DisputeSurvey { survey_id: ByteArray, dispute_evidence: ByteArray }
   // === GRANTS ===
-  
   /// Apply for preservation grant
   ApplyForGrant {
     grant_type: GrantType,
@@ -123,34 +110,23 @@ pub type PreservationRedeemer {
     duration_cycles: Int,
     health_targets: List<HealthTarget>,
   }
-  
   /// Approve grant application (requires steward signatures)
   ApproveGrant {
     grant_id: ByteArray,
     baseline_survey: ByteArray,
     amount_per_cycle: Int,
   }
-  
   /// Claim grant payment for completed cycle
   ClaimGrantPayment {
     grant_id: ByteArray,
     cycle: Int,
     verification_survey: ByteArray,
   }
-  
   /// Terminate grant (failure to meet targets)
-  TerminateGrant {
-    grant_id: ByteArray,
-    reason_hash: ByteArray,
-  }
-  
+  TerminateGrant { grant_id: ByteArray, reason_hash: ByteArray }
   // === HEALTH RECORDS ===
-  
   /// Update ecosystem health record from survey
-  UpdateHealthRecord {
-    location_hash: ByteArray,
-    survey_id: ByteArray,
-  }
+  UpdateHealthRecord { location_hash: ByteArray, survey_id: ByteArray }
 }
 
 // =============================================================================
@@ -185,57 +161,88 @@ validator preservation(config: PreservationConfig) {
   ) {
     when redeemer is {
       // === SURVEYOR CERTIFICATION ===
-      
-      CertifySurveyor { candidate, surveyor_type, specializations, governance_proof } -> {
-        validate_certify_surveyor(tx, candidate, surveyor_type, specializations, governance_proof, config)
-      }
-      
-      RenewCertification { surveyor } -> {
+      CertifySurveyor {
+        candidate,
+        surveyor_type,
+        specializations,
+        governance_proof,
+      } ->
+        validate_certify_surveyor(
+          tx,
+          candidate,
+          surveyor_type,
+          specializations,
+          governance_proof,
+          config,
+        )
+      RenewCertification { surveyor } ->
         validate_renew_certification(tx, surveyor, config)
-      }
-      
-      RevokeCertification { surveyor, reason_hash, governance_proof } -> {
-        validate_revoke_certification(tx, surveyor, reason_hash, governance_proof, config)
-      }
-      
+      RevokeCertification { surveyor, reason_hash, governance_proof } ->
+        validate_revoke_certification(
+          tx,
+          surveyor,
+          reason_hash,
+          governance_proof,
+          config,
+        )
       // === SURVEYS ===
-      
-      SubmitSurvey { survey_type, location_hash, measurements, evidence_hash } -> {
-        validate_submit_survey(tx, survey_type, location_hash, measurements, evidence_hash, config)
-      }
-      
-      VerifySurvey { survey_id, confirms, own_measurements, notes_hash } -> {
-        validate_verify_survey(tx, survey_id, confirms, own_measurements, notes_hash, config)
-      }
-      
-      DisputeSurvey { survey_id, dispute_evidence } -> {
+      SubmitSurvey { survey_type, location_hash, measurements, evidence_hash } ->
+        validate_submit_survey(
+          tx,
+          survey_type,
+          location_hash,
+          measurements,
+          evidence_hash,
+          config,
+        )
+      VerifySurvey { survey_id, confirms, own_measurements, notes_hash } ->
+        validate_verify_survey(
+          tx,
+          survey_id,
+          confirms,
+          own_measurements,
+          notes_hash,
+          config,
+        )
+      DisputeSurvey { survey_id, dispute_evidence } ->
         validate_dispute_survey(tx, survey_id, dispute_evidence, config)
-      }
-      
       // === GRANTS ===
-      
-      ApplyForGrant { grant_type, location_hash, area_size, duration_cycles, health_targets } -> {
-        validate_apply_grant(tx, grant_type, location_hash, area_size, duration_cycles, health_targets, config)
-      }
-      
-      ApproveGrant { grant_id, baseline_survey, amount_per_cycle } -> {
-        validate_approve_grant(tx, grant_id, baseline_survey, amount_per_cycle, config)
-      }
-      
-      ClaimGrantPayment { grant_id, cycle, verification_survey } -> {
+      ApplyForGrant {
+        grant_type,
+        location_hash,
+        area_size,
+        duration_cycles,
+        health_targets,
+      } ->
+        validate_apply_grant(
+          tx,
+          grant_type,
+          location_hash,
+          area_size,
+          duration_cycles,
+          health_targets,
+          config,
+        )
+      ApproveGrant { grant_id, baseline_survey, amount_per_cycle } ->
+        validate_approve_grant(
+          tx,
+          grant_id,
+          baseline_survey,
+          amount_per_cycle,
+          config,
+        )
+      ClaimGrantPayment { grant_id, cycle, verification_survey } ->
         validate_claim_payment(tx, grant_id, cycle, verification_survey, config)
-      }
-      
-      TerminateGrant { grant_id, reason_hash } -> {
+      TerminateGrant { grant_id, reason_hash } ->
         validate_terminate_grant(tx, grant_id, reason_hash, config)
-      }
-      
       // === HEALTH RECORDS ===
-      
-      UpdateHealthRecord { location_hash, survey_id } -> {
+      UpdateHealthRecord { location_hash, survey_id } ->
         validate_update_health(tx, location_hash, survey_id, config)
-      }
     }
+  }
+
+  else(_) {
+    fail
   }
 }
 
@@ -255,24 +262,29 @@ fn validate_certify_surveyor(
   let candidate_data = find_pnft(tx, candidate, config.pnft_policy)
   expect Some(pnft) = candidate_data
   let qualified = pnft.level == Verified || pnft.level == Steward
-  
   // 2. Must have governance approval
-  let approved = verify_governance_approval(tx, governance_proof, config.governance)
-  
+  let approved =
+    verify_governance_approval(tx, governance_proof, config.governance)
   // 3. Certification datum must be created correctly
   let current = get_slot(tx)
-  let cert_created = verify_cert_created(
-    tx.outputs,
-    candidate,
-    surveyor_type,
-    specializations,
-    current,
-    current + cert_validity * 37 * 86400  // slots per cycle * cycles
-  )
-  
+  let cert_created =
+    verify_cert_created(
+      tx.outputs,
+      candidate,
+      surveyor_type,
+      specializations,
+      current,
+      current + cert_validity * 37 * 86400,
+    )
+  // slots per cycle * cycles
   // 4. pNFT updated to show surveyor status
-  let pnft_updated = verify_pnft_surveyor_added(tx.outputs, candidate, surveyor_type, config.pnft_policy)
-  
+  let pnft_updated =
+    verify_pnft_surveyor_added(
+      tx.outputs,
+      candidate,
+      surveyor_type,
+      config.pnft_policy,
+    )
   qualified && approved && cert_created && pnft_updated
 }
 
@@ -283,19 +295,20 @@ fn validate_renew_certification(
 ) -> Bool {
   // 1. Surveyor must sign
   let signed = verify_pnft_signed(tx, surveyor, config.pnft_policy)
-  
   // 2. Must have completed minimum surveys
   let cert = find_cert(tx.reference_inputs, surveyor)
   expect Some(c) = cert
   let min_surveys = c.surveys_completed >= 10
-  
   // 3. Must have acceptable accuracy
   let good_accuracy = c.accuracy_score >= 80
-  
   // 4. New expiration date set
   let current = get_slot(tx)
-  let renewed = verify_cert_renewed(tx.outputs, surveyor, current + cert_validity * 37 * 86400)
-  
+  let renewed =
+    verify_cert_renewed(
+      tx.outputs,
+      surveyor,
+      current + cert_validity * 37 * 86400,
+    )
   signed && min_surveys && good_accuracy && renewed
 }
 
@@ -326,33 +339,40 @@ fn validate_submit_survey(
   let surveyor_data = find_signer_pnft(tx, config.pnft_policy)
   expect Some(surveyor) = surveyor_data
   expect Some(cert) = surveyor.surveyor_certification
-  
   // 2. Certification must be valid (not expired)
   let current = get_slot(tx)
   let cert_valid = cert.expires_at > current
-  
   // 3. Location must be in surveyor's authorized regions
-  let bioregion = get_bioregion_for_location(tx, location_hash, config.bioregion_registry)
+  let bioregion =
+    get_bioregion_for_location(tx, location_hash, config.bioregion_registry)
   expect Some(bio) = bioregion
   let authorized = list.has(surveyor.survey_regions, bio)
-  
   // 4. Measurements must be non-empty and valid
-  let valid_measurements = list.length(measurements) > 0 &&
-    list.all(measurements, fn(m) {
-      m.confidence >= 0 && m.confidence <= 100 && m.unit != ""
-    })
-  
+  let valid_measurements =
+    list.length(measurements) > 0 && list.all(
+      measurements,
+      fn(m) { m.confidence >= 0 && m.confidence <= 100 && m.unit != "" },
+    )
   // 5. Survey record created
-  let survey_created = verify_survey_created(
-    tx.outputs, surveyor.pnft_id, bio, location_hash, 
-    survey_type, measurements, evidence_hash, current
-  )
-  
+  let survey_created =
+    verify_survey_created(
+      tx.outputs,
+      surveyor.pnft_id,
+      bio,
+      location_hash,
+      survey_type,
+      measurements,
+      evidence_hash,
+      current,
+    )
   // 6. Survey payment from treasury
-  let payment_received = verify_survey_payment(
-    tx.outputs, surveyor.pnft_id, config.token_policy, config.token_name
-  )
-  
+  let payment_received =
+    verify_survey_payment(
+      tx.outputs,
+      surveyor.pnft_id,
+      config.token_policy,
+      config.token_name,
+    )
   cert_valid && authorized && valid_measurements && survey_created && payment_received
 }
 
@@ -368,34 +388,38 @@ fn validate_verify_survey(
   let verifier_data = find_signer_pnft(tx, config.pnft_policy)
   expect Some(verifier) = verifier_data
   expect Some(cert) = verifier.surveyor_certification
-  
   // 2. Cannot verify own survey
   let survey = find_survey(tx.reference_inputs, survey_id)
   expect Some(s) = survey
   let not_self = s.surveyor != verifier.pnft_id
-  
   // 3. Survey must be pending verification
   let is_pending = s.status == SurveyPending
-  
   // 4. Verification added to survey
-  let verification_added = verify_verification_added(
-    tx.outputs, survey_id, verifier.pnft_id, confirms, own_measurements, notes_hash
-  )
-  
+  let verification_added =
+    verify_verification_added(
+      tx.outputs,
+      survey_id,
+      verifier.pnft_id,
+      confirms,
+      own_measurements,
+      notes_hash,
+    )
   // 5. If enough verifications, update status
   let verification_count = list.length(s.verifications) + 1
-  let status_updated = 
+  let status_updated =
     if verification_count >= min_verifications {
       verify_survey_status_updated(tx.outputs, survey_id, confirms)
     } else {
       True
     }
-  
   // 6. Verifier receives payment
-  let payment_received = verify_survey_payment(
-    tx.outputs, verifier.pnft_id, config.token_policy, config.token_name
-  )
-  
+  let payment_received =
+    verify_survey_payment(
+      tx.outputs,
+      verifier.pnft_id,
+      config.token_policy,
+      config.token_name,
+    )
   not_self && is_pending && verification_added && status_updated && payment_received
 }
 
@@ -409,7 +433,6 @@ fn validate_dispute_survey(
   let disputer_data = find_signer_pnft(tx, config.pnft_policy)
   expect Some(disputer) = disputer_data
   expect Some(_cert) = disputer.surveyor_certification
-  
   // 2. Survey marked as disputed
   verify_survey_disputed(tx.outputs, survey_id, dispute_evidence)
 }
@@ -430,20 +453,22 @@ fn validate_apply_grant(
   // 1. Applicant must have pNFT in bioregion
   let applicant_data = find_signer_pnft(tx, config.pnft_policy)
   expect Some(applicant) = applicant_data
-  
   // 2. Duration within bounds
-  let valid_duration = duration_cycles >= min_grant_duration && 
-                       duration_cycles <= max_grant_duration
-  
+  let valid_duration =
+    duration_cycles >= min_grant_duration && duration_cycles <= max_grant_duration
   // 3. Must have health targets
   let has_targets = list.length(health_targets) > 0
-  
   // 4. Grant application created
-  let grant_created = verify_grant_created(
-    tx.outputs, applicant.pnft_id, grant_type, location_hash, 
-    area_size, duration_cycles, health_targets
-  )
-  
+  let grant_created =
+    verify_grant_created(
+      tx.outputs,
+      applicant.pnft_id,
+      grant_type,
+      location_hash,
+      area_size,
+      duration_cycles,
+      health_targets,
+    )
   valid_duration && has_targets && grant_created
 }
 
@@ -457,24 +482,25 @@ fn validate_approve_grant(
   // 1. Requires Steward approval (multiple signers)
   let steward_count = count_steward_signatures(tx, config.pnft_policy)
   let enough_stewards = steward_count >= 2
-  
   // 2. Baseline survey must be verified
   let survey = find_survey(tx.reference_inputs, baseline_survey)
   expect Some(s) = survey
   let survey_verified = s.status == SurveyVerified
-  
   // 3. Grant exists and is in Applied status
   let grant = find_grant(tx.reference_inputs, grant_id)
   expect Some(g) = grant
   let is_applied = g.status == GrantApplied
-  
   // 4. Treasury has sufficient funds
   let total_cost = amount_per_cycle * g.duration_cycles
   let funds_available = verify_treasury_funds(tx, total_cost, config.treasury)
-  
   // 5. Grant status updated to Approved
-  let grant_approved = verify_grant_approved(tx.outputs, grant_id, baseline_survey, amount_per_cycle)
-  
+  let grant_approved =
+    verify_grant_approved(
+      tx.outputs,
+      grant_id,
+      baseline_survey,
+      amount_per_cycle,
+    )
   enough_stewards && survey_verified && is_applied && funds_available && grant_approved
 }
 
@@ -489,18 +515,14 @@ fn validate_claim_payment(
   let grant = find_grant(tx.reference_inputs, grant_id)
   expect Some(g) = grant
   let is_active = g.status == GrantActive
-  
   // 2. Recipient must sign
   let signed = verify_pnft_signed(tx, g.recipient, config.pnft_policy)
-  
   // 3. Verification survey must be verified and recent
   let survey = find_survey(tx.reference_inputs, verification_survey)
   expect Some(s) = survey
   let survey_valid = s.status == SurveyVerified
-  
   // 4. Cycle hasn't been claimed yet
   let not_claimed = !list.any(g.payments, fn(p) { p.cycle == cycle })
-  
   // 5. Health targets checked against survey
   let (all_met, score) = check_health_targets(g.health_targets, s.measurements)
 
@@ -510,15 +532,26 @@ fn validate_claim_payment(
   let payment_amount = base_amount + adjustment
 
   // 7. Payment made from treasury
-  let payment_made = verify_grant_payment(
-    tx.outputs, g.recipient, payment_amount, config.token_policy, config.token_name
-  )
+  let payment_made =
+    verify_grant_payment(
+      tx.outputs,
+      g.recipient,
+      payment_amount,
+      config.token_policy,
+      config.token_name,
+    )
 
   // 8. Payment recorded
-  let payment_recorded = verify_payment_recorded(
-    tx.outputs, grant_id, cycle, payment_amount, verification_survey, all_met, adjustment
-  )
-  
+  let payment_recorded =
+    verify_payment_recorded(
+      tx.outputs,
+      grant_id,
+      cycle,
+      payment_amount,
+      verification_survey,
+      all_met,
+      adjustment,
+    )
   is_active && signed && survey_valid && not_claimed && payment_made && payment_recorded
 }
 
@@ -547,13 +580,11 @@ fn validate_update_health(
   let survey = find_survey(tx.reference_inputs, survey_id)
   expect Some(s) = survey
   let verified = s.status == SurveyVerified
-  
   // 2. Survey location matches
   let location_matches = s.location_hash == location_hash
-  
   // 3. Health record updated
-  let health_updated = verify_health_record_updated(tx.outputs, location_hash, s.measurements)
-  
+  let health_updated =
+    verify_health_record_updated(tx.outputs, location_hash, s.measurements)
   verified && location_matches && health_updated
 }
 
@@ -573,51 +604,65 @@ fn find_pnft(
   pnft_id: AssetName,
   pnft_policy: PolicyId,
 ) -> Option<PnftDatum> {
-  list.find_map(tx.reference_inputs, fn(input) {
-    let has_pnft = list.any(flatten(input.output.value), fn(asset) {
-      let (p, name, qty) = asset
-      p == pnft_policy && name == pnft_id && qty > 0
-    })
-    if has_pnft {
-      when input.output.datum is {
-        InlineDatum(data) -> {
-          expect datum: PnftDatum = data
-          Some(datum)
-        }
-        _ -> None
-      }
-    } else {
-      None
-    }
-  })
-}
-
-fn find_signer_pnft(
-  tx: Transaction,
-  pnft_policy: PolicyId,
-) -> Option<PnftDatum> {
-  list.find_map(tx.reference_inputs, fn(input) {
-    let pnfts = list.filter_map(flatten(input.output.value), fn(asset) {
-      let (p, _, qty) = asset
-      if p == pnft_policy && qty > 0 { Some(True) } else { None }
-    })
-    when pnfts is {
-      [_, ..] -> {
+  list.find_map(
+    tx.reference_inputs,
+    fn(input) {
+      let has_pnft =
+        list.any(
+          flatten(input.output.value),
+          fn(asset) {
+            let (p, name, qty) = asset
+            p == pnft_policy && name == pnft_id && qty > 0
+          },
+        )
+      if has_pnft {
         when input.output.datum is {
           InlineDatum(data) -> {
             expect datum: PnftDatum = data
-            if list.has(tx.extra_signatories, datum.owner) {
-              Some(datum)
-            } else {
-              None
-            }
+            Some(datum)
           }
           _ -> None
         }
+      } else {
+        None
       }
-      _ -> None
-    }
-  })
+    },
+  )
+}
+
+fn find_signer_pnft(tx: Transaction, pnft_policy: PolicyId) -> Option<PnftDatum> {
+  list.find_map(
+    tx.reference_inputs,
+    fn(input) {
+      let pnfts =
+        list.filter_map(
+          flatten(input.output.value),
+          fn(asset) {
+            let (p, _, qty) = asset
+            if p == pnft_policy && qty > 0 {
+              Some(True)
+            } else {
+              None
+            }
+          },
+        )
+      when pnfts is {
+        [_, ..] ->
+          when input.output.datum is {
+            InlineDatum(data) -> {
+              expect datum: PnftDatum = data
+              if list.has(tx.extra_signatories, datum.owner) {
+                Some(datum)
+              } else {
+                None
+              }
+            }
+            _ -> None
+          }
+        _ -> None
+      }
+    },
+  )
 }
 
 fn verify_pnft_signed(
@@ -632,80 +677,118 @@ fn verify_pnft_signed(
   }
 }
 
-fn find_cert(
-  inputs: List<Input>,
-  surveyor: AssetName,
-) -> Option<SurveyorCert> {
-  list.find_map(inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect datum: PnftDatum = data
-        if datum.pnft_id == surveyor {
-          datum.surveyor_certification
-        } else {
-          None
-        }
-      }
-      _ -> None
-    }
-  })
-}
-
-fn find_survey(inputs: List<Input>, survey_id: ByteArray) -> Option<SurveyRecord> {
-  list.find_map(inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect survey: SurveyRecord = data
-        if survey.survey_id == survey_id { Some(survey) } else { None }
-      }
-      _ -> None
-    }
-  })
-}
-
-fn find_grant(inputs: List<Input>, grant_id: ByteArray) -> Option<PreservationGrant> {
-  list.find_map(inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect grant: PreservationGrant = data
-        if grant.grant_id == grant_id { Some(grant) } else { None }
-      }
-      _ -> None
-    }
-  })
-}
-
-fn count_steward_signatures(tx: Transaction, pnft_policy: PolicyId) -> Int {
-  list.foldl(tx.reference_inputs, 0, fn(input, acc) {
-    let has_pnft = list.any(flatten(input.output.value), fn(asset) {
-      let (p, _, qty) = asset
-      p == pnft_policy && qty > 0
-    })
-    if has_pnft {
+fn find_cert(inputs: List<Input>, surveyor: AssetName) -> Option<SurveyorCert> {
+  list.find_map(
+    inputs,
+    fn(input) {
       when input.output.datum is {
         InlineDatum(data) -> {
           expect datum: PnftDatum = data
-          if datum.level == Steward && list.has(tx.extra_signatories, datum.owner) {
-            acc + 1
+          if datum.pnft_id == surveyor {
+            datum.surveyor_certification
           } else {
-            acc
+            None
           }
         }
-        _ -> acc
+        _ -> None
       }
-    } else {
-      acc
-    }
-  })
+    },
+  )
 }
 
-fn verify_governance_approval(tx: Transaction, proof: ByteArray, governance: ByteArray) -> Bool {
-  list.any(tx.reference_inputs, fn(input) {
-    when input.output.address.payment_credential is {
-      Script(hash) -> hash == governance
-      _ -> False
-    }
-  })
+fn find_survey(
+  inputs: List<Input>,
+  survey_id: ByteArray,
+) -> Option<SurveyRecord> {
+  list.find_map(
+    inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect survey: SurveyRecord = data
+          if survey.survey_id == survey_id {
+            Some(survey)
+          } else {
+            None
+          }
+        }
+        _ -> None
+      }
+    },
+  )
+}
+
+fn find_grant(
+  inputs: List<Input>,
+  grant_id: ByteArray,
+) -> Option<PreservationGrant> {
+  list.find_map(
+    inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect grant: PreservationGrant = data
+          if grant.grant_id == grant_id {
+            Some(grant)
+          } else {
+            None
+          }
+        }
+        _ -> None
+      }
+    },
+  )
+}
+
+fn count_steward_signatures(tx: Transaction, pnft_policy: PolicyId) -> Int {
+  list.foldl(
+    tx.reference_inputs,
+    0,
+    fn(input, acc) {
+      let has_pnft =
+        list.any(
+          flatten(input.output.value),
+          fn(asset) {
+            let (p, _, qty) = asset
+            p == pnft_policy && qty > 0
+          },
+        )
+      if has_pnft {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            if datum.level == Steward && list.has(
+              tx.extra_signatories,
+              datum.owner,
+            ) {
+              acc + 1
+            } else {
+              acc
+            }
+          }
+          _ -> acc
+        }
+      } else {
+        acc
+      }
+    },
+  )
+}
+
+fn verify_governance_approval(
+  tx: Transaction,
+  proof: ByteArray,
+  governance: ByteArray,
+) -> Bool {
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      when input.output.address.payment_credential is {
+        Script(hash) -> hash == governance
+        _ -> False
+      }
+    },
+  )
 }
 
 fn get_bioregion_for_location(
@@ -715,19 +798,22 @@ fn get_bioregion_for_location(
 ) -> Option<ByteArray> {
   // Would look up location in bioregion registry
   // Simplified: assume bioregion is in reference inputs
-  list.find_map(tx.reference_inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect health: EcosystemHealthRecord = data
-        if health.location_hash == location_hash {
-          Some(health.bioregion)
-        } else {
-          None
+  list.find_map(
+    tx.reference_inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect health: EcosystemHealthRecord = data
+          if health.location_hash == location_hash {
+            Some(health.bioregion)
+          } else {
+            None
+          }
         }
+        _ -> None
       }
-      _ -> None
-    }
-  })
+    },
+  )
 }
 
 /// Health check result: (all_met, score)
@@ -735,16 +821,35 @@ fn check_health_targets(
   targets: List<HealthTarget>,
   measurements: List<SurveyMeasurement>,
 ) -> (Bool, Int) {
-  let results = list.map(targets, fn(target) {
-    let measurement = list.find(measurements, fn(m) {
-      m.category == target.category && m.metric_code == target.metric_code
-    })
-    when measurement is {
-      Some(m) -> m.value >= target.minimum_value
-      None -> False
-    }
-  })
-  let met_count = list.foldl(results, 0, fn(met, acc) { if met { acc + 1 } else { acc } })
+  let results =
+    list.map(
+      targets,
+      fn(target) {
+        let measurement =
+          list.find(
+            measurements,
+            fn(m) {
+              m.category == target.category && m.metric_code == target.metric_code
+            },
+          )
+        when measurement is {
+          Some(m) -> m.value >= target.minimum_value
+          None -> False
+        }
+      },
+    )
+  let met_count =
+    list.foldl(
+      results,
+      0,
+      fn(met, acc) {
+        if met {
+          acc + 1
+        } else {
+          acc
+        }
+      },
+    )
   let total = list.length(targets)
   (met_count == total, met_count * 100 / total)
 }
@@ -753,8 +858,9 @@ fn check_health_targets(
 fn calculate_adjustment(all_met: Bool, score: Int) -> Int {
   // +10% bonus if all targets met, -10% penalty if <50% met
   if all_met {
-    10  // Simplified: would be percentage of base
-  } else if score < 50 {
+    10
+  } else if // Simplified: would be percentage of base
+  score < 50 {
     -10
   } else {
     0
@@ -766,231 +872,343 @@ fn calculate_adjustment(all_met: Bool, score: Int) -> Int {
 // =============================================================================
 
 /// Verify surveyor certification created
-fn verify_cert_created(outputs: List<Output>, candidate: AssetName, surveyor_type: SurveyorType, specializations: List<ImpactCategory>, issued: Int, expires: Int) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect cert: SurveyorCert = data
-        cert.cert_type == surveyor_type &&
-        cert.specializations == specializations &&
-        cert.issued_at == issued &&
-        cert.expires_at == expires &&
-        cert.surveys_completed == 0 &&
-        cert.accuracy_score == 100  // Start at 100%
+fn verify_cert_created(
+  outputs: List<Output>,
+  candidate: AssetName,
+  surveyor_type: SurveyorType,
+  specializations: List<ImpactCategory>,
+  issued: Int,
+  expires: Int,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect cert: SurveyorCert = data
+          cert.cert_type == surveyor_type && cert.specializations == specializations && cert.issued_at == issued && cert.expires_at == expires && cert.surveys_completed == 0 && cert.accuracy_score == 100
+        }
+        // Start at 100%
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 /// Verify certification renewed with new expiry
-fn verify_cert_renewed(outputs: List<Output>, surveyor: AssetName, new_expiry: Int) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect cert: SurveyorCert = data
-        cert.expires_at == new_expiry
-      }
-      _ -> False
-    }
-  })
-}
-
-/// Verify pNFT updated with surveyor certification
-fn verify_pnft_surveyor_added(outputs: List<Output>, pnft: AssetName, surveyor_type: SurveyorType, policy: PolicyId) -> Bool {
-  list.any(outputs, fn(output) {
-    let has_pnft = list.any(flatten(output.value), fn(asset) {
-      let (p, name, qty) = asset
-      p == policy && name == pnft && qty > 0
-    })
-    if has_pnft {
+fn verify_cert_renewed(
+  outputs: List<Output>,
+  surveyor: AssetName,
+  new_expiry: Int,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
       when output.datum is {
         InlineDatum(data) -> {
-          expect datum: PnftDatum = data
-          when datum.surveyor_certification is {
-            Some(cert) -> cert.cert_type == surveyor_type
-            None -> False
-          }
+          expect cert: SurveyorCert = data
+          cert.expires_at == new_expiry
         }
         _ -> False
       }
-    } else {
-      False
-    }
-  })
+    },
+  )
 }
 
-/// Verify survey record created
-fn verify_survey_created(outputs: List<Output>, surveyor: AssetName, bioregion: ByteArray, location: ByteArray, survey_type: SurveyType, measurements: List<SurveyMeasurement>, evidence: ByteArray, slot: Int) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect survey: SurveyRecord = data
-        survey.surveyor == surveyor &&
-        survey.bioregion == bioregion &&
-        survey.location_hash == location &&
-        survey.survey_type == survey_type &&
-        survey.measurements == measurements &&
-        survey.evidence_hash == evidence &&
-        survey.surveyed_at == slot &&
-        survey.status == SurveyPending
-      }
-      _ -> False
-    }
-  })
-}
-
-/// Verify surveyor received payment
-fn verify_survey_payment(outputs: List<Output>, recipient: AssetName, policy: PolicyId, name: AssetName) -> Bool {
-  list.any(outputs, fn(output) {
-    let has_tokens = quantity_of(output.value, policy, name) >= 50  // 50 tokens per survey
-    let has_pnft = list.any(flatten(output.value), fn(asset) {
-      let (p, n, qty) = asset
-      p == policy && n == recipient && qty > 0
-    })
-    has_tokens
-  })
-}
-
-/// Verify verification added to survey
-fn verify_verification_added(outputs: List<Output>, survey_id: ByteArray, verifier: AssetName, confirms: Bool, measurements: Option<List<SurveyMeasurement>>, notes: Option<ByteArray>) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect survey: SurveyRecord = data
-        survey.survey_id == survey_id &&
-        list.any(survey.verifications, fn(v) {
-          v.verifier == verifier && v.confirms == confirms
-        })
-      }
-      _ -> False
-    }
-  })
-}
-
-/// Verify survey status updated based on verifications
-fn verify_survey_status_updated(outputs: List<Output>, survey_id: ByteArray, confirmed: Bool) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect survey: SurveyRecord = data
-        survey.survey_id == survey_id &&
-        if confirmed {
-          survey.status == SurveyVerified
-        } else {
-          survey.status == SurveyRejected
-        }
-      }
-      _ -> False
-    }
-  })
-}
-
-/// Verify survey marked as disputed
-fn verify_survey_disputed(outputs: List<Output>, survey_id: ByteArray, evidence: ByteArray) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect survey: SurveyRecord = data
-        survey.survey_id == survey_id && survey.status == SurveyDisputed
-      }
-      _ -> False
-    }
-  })
-}
-
-/// Verify preservation grant application created
-fn verify_grant_created(outputs: List<Output>, applicant: AssetName, grant_type: GrantType, location: ByteArray, area: Int, duration: Int, targets: List<HealthTarget>) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect grant: PreservationGrant = data
-        grant.recipient == applicant &&
-        grant.grant_type == grant_type &&
-        grant.location_hash == location &&
-        grant.area_size == area &&
-        grant.duration_cycles == duration &&
-        grant.health_targets == targets &&
-        grant.status == GrantApplied
-      }
-      _ -> False
-    }
-  })
-}
-
-/// Verify grant approved with baseline and amount
-fn verify_grant_approved(outputs: List<Output>, grant_id: ByteArray, baseline: ByteArray, amount: Int) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect grant: PreservationGrant = data
-        grant.grant_id == grant_id &&
-        grant.baseline_survey == baseline &&
-        grant.amount == amount &&
-        grant.status == GrantActive
-      }
-      _ -> False
-    }
-  })
-}
-
-/// Verify treasury has funds for operation
-fn verify_treasury_funds(tx: Transaction, amount: Int, treasury: ByteArray) -> Bool {
-  list.any(tx.reference_inputs, fn(input) {
-    when input.output.address.payment_credential is {
-      Script(hash) -> if hash == treasury {
-        when input.output.datum is {
+/// Verify pNFT updated with surveyor certification
+fn verify_pnft_surveyor_added(
+  outputs: List<Output>,
+  pnft: AssetName,
+  surveyor_type: SurveyorType,
+  policy: PolicyId,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      let has_pnft =
+        list.any(
+          flatten(output.value),
+          fn(asset) {
+            let (p, name, qty) = asset
+            p == policy && name == pnft && qty > 0
+          },
+        )
+      if has_pnft {
+        when output.datum is {
           InlineDatum(data) -> {
-            expect treasury_datum: TreasuryDatum = data
-            treasury_datum.preservation_fund >= amount || treasury_datum.survey_fund >= amount
+            expect datum: PnftDatum = data
+            when datum.surveyor_certification is {
+              Some(cert) -> cert.cert_type == surveyor_type
+              None -> False
+            }
           }
           _ -> False
         }
       } else {
         False
       }
-      _ -> False
-    }
-  })
+    },
+  )
+}
+
+/// Verify survey record created
+fn verify_survey_created(
+  outputs: List<Output>,
+  surveyor: AssetName,
+  bioregion: ByteArray,
+  location: ByteArray,
+  survey_type: SurveyType,
+  measurements: List<SurveyMeasurement>,
+  evidence: ByteArray,
+  slot: Int,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect survey: SurveyRecord = data
+          survey.surveyor == surveyor && survey.bioregion == bioregion && survey.location_hash == location && survey.survey_type == survey_type && survey.measurements == measurements && survey.evidence_hash == evidence && survey.surveyed_at == slot && survey.status == SurveyPending
+        }
+        _ -> False
+      }
+    },
+  )
+}
+
+/// Verify surveyor received payment
+fn verify_survey_payment(
+  outputs: List<Output>,
+  recipient: AssetName,
+  policy: PolicyId,
+  name: AssetName,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      let has_tokens = quantity_of(output.value, policy, name) >= 50
+      // 50 tokens per survey
+      let has_pnft =
+        list.any(
+          flatten(output.value),
+          fn(asset) {
+            let (p, n, qty) = asset
+            p == policy && n == recipient && qty > 0
+          },
+        )
+      has_tokens
+    },
+  )
+}
+
+/// Verify verification added to survey
+fn verify_verification_added(
+  outputs: List<Output>,
+  survey_id: ByteArray,
+  verifier: AssetName,
+  confirms: Bool,
+  measurements: Option<List<SurveyMeasurement>>,
+  notes: Option<ByteArray>,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect survey: SurveyRecord = data
+          survey.survey_id == survey_id && list.any(
+            survey.verifications,
+            fn(v) { v.verifier == verifier && v.confirms == confirms },
+          )
+        }
+        _ -> False
+      }
+    },
+  )
+}
+
+/// Verify survey status updated based on verifications
+fn verify_survey_status_updated(
+  outputs: List<Output>,
+  survey_id: ByteArray,
+  confirmed: Bool,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect survey: SurveyRecord = data
+          survey.survey_id == survey_id && if confirmed {
+            survey.status == SurveyVerified
+          } else {
+            survey.status == SurveyRejected
+          }
+        }
+        _ -> False
+      }
+    },
+  )
+}
+
+/// Verify survey marked as disputed
+fn verify_survey_disputed(
+  outputs: List<Output>,
+  survey_id: ByteArray,
+  evidence: ByteArray,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect survey: SurveyRecord = data
+          survey.survey_id == survey_id && survey.status == SurveyDisputed
+        }
+        _ -> False
+      }
+    },
+  )
+}
+
+/// Verify preservation grant application created
+fn verify_grant_created(
+  outputs: List<Output>,
+  applicant: AssetName,
+  grant_type: GrantType,
+  location: ByteArray,
+  area: Int,
+  duration: Int,
+  targets: List<HealthTarget>,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect grant: PreservationGrant = data
+          grant.recipient == applicant && grant.grant_type == grant_type && grant.location_hash == location && grant.area_size == area && grant.duration_cycles == duration && grant.health_targets == targets && grant.status == GrantApplied
+        }
+        _ -> False
+      }
+    },
+  )
+}
+
+/// Verify grant approved with baseline and amount
+fn verify_grant_approved(
+  outputs: List<Output>,
+  grant_id: ByteArray,
+  baseline: ByteArray,
+  amount: Int,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect grant: PreservationGrant = data
+          grant.grant_id == grant_id && grant.baseline_survey == baseline && grant.amount == amount && grant.status == GrantActive
+        }
+        _ -> False
+      }
+    },
+  )
+}
+
+/// Verify treasury has funds for operation
+fn verify_treasury_funds(
+  tx: Transaction,
+  amount: Int,
+  treasury: ByteArray,
+) -> Bool {
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      when input.output.address.payment_credential is {
+        Script(hash) ->
+          if hash == treasury {
+            when input.output.datum is {
+              InlineDatum(data) -> {
+                expect treasury_datum: TreasuryDatum = data
+                treasury_datum.preservation_fund >= amount || treasury_datum.survey_fund >= amount
+              }
+              _ -> False
+            }
+          } else {
+            False
+          }
+        _ -> False
+      }
+    },
+  )
 }
 
 /// Verify grant payment sent to recipient
-fn verify_grant_payment(outputs: List<Output>, recipient: AssetName, amount: Int, policy: PolicyId, name: AssetName) -> Bool {
-  list.any(outputs, fn(output) {
-    let token_qty = quantity_of(output.value, policy, name)
-    token_qty >= amount
-  })
+fn verify_grant_payment(
+  outputs: List<Output>,
+  recipient: AssetName,
+  amount: Int,
+  policy: PolicyId,
+  name: AssetName,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      let token_qty = quantity_of(output.value, policy, name)
+      token_qty >= amount
+    },
+  )
 }
 
 /// Verify payment record added to grant
-fn verify_payment_recorded(outputs: List<Output>, grant_id: ByteArray, cycle: Int, amount: Int, survey: ByteArray, met: Bool, adjustment: Int) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect grant: PreservationGrant = data
-        grant.grant_id == grant_id &&
-        list.any(grant.payments, fn(p) {
-          p.cycle == cycle && p.amount == amount && p.verification_survey == survey
-        })
+fn verify_payment_recorded(
+  outputs: List<Output>,
+  grant_id: ByteArray,
+  cycle: Int,
+  amount: Int,
+  survey: ByteArray,
+  met: Bool,
+  adjustment: Int,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect grant: PreservationGrant = data
+          grant.grant_id == grant_id && list.any(
+            grant.payments,
+            fn(p) {
+              p.cycle == cycle && p.amount == amount && p.verification_survey == survey
+            },
+          )
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 /// Verify ecosystem health record updated
-fn verify_health_record_updated(outputs: List<Output>, location: ByteArray, measurements: List<SurveyMeasurement>) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect health: EcosystemHealthRecord = data
-        health.location_hash == location
+fn verify_health_record_updated(
+  outputs: List<Output>,
+  location: ByteArray,
+  measurements: List<SurveyMeasurement>,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect health: EcosystemHealthRecord = data
+          health.location_hash == location
+        }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
-
 // =============================================================================
 // DOCUMENTATION
 // =============================================================================

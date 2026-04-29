@@ -161,8 +161,8 @@ export class CardiacEngine {
 
   private extractMorphological(
     beats: Float64Array[],
-    signal: Float64Array,
-    peaks: number[],
+    _signal: Float64Array,
+    _peaks: number[],
   ): Float64Array {
     const features = new Float64Array(15);
     if (beats.length === 0) return features;
@@ -294,7 +294,7 @@ export class CardiacEngine {
     return features;
   }
 
-  private extractSpectral(signal: Float64Array, peaks: number[]): Float64Array {
+  private extractSpectral(signal: Float64Array, _peaks: number[]): Float64Array {
     const features = new Float64Array(8);
     const spectrum = magnitudeSpectrum(signal);
     const n = spectrum.length;

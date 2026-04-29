@@ -21,27 +21,22 @@
 // =============================================================================
 
 use aiken/collection/list
-use aiken/crypto.{VerificationKeyHash, Blake2b_256, Hash}
+use aiken/crypto.{Blake2b_256, Hash, VerificationKeyHash}
 use aiken/interval.{Finite}
-use cardano/assets.{PolicyId, AssetName, Value, quantity_of, flatten}
-use cardano/address.{Address, Credential, VerificationKey, Script}
+use cardano/address.{Address, Credential, Script, VerificationKey}
+use cardano/assets.{AssetName, PolicyId, Value, flatten, quantity_of}
 use cardano/transaction.{
-  Transaction, Input, Output, OutputReference, Mint,
-  InlineDatum, ScriptPurpose, Spend,
-}
-use ultralife/types.{
-  VerificationLevel, Basic, Standard, Verified, Steward,
-  PnftDatum, TransactionMeta, TransactionRecord,
-  ImpactCategory, CompoundFlow,
-  tx_type_code, can_transact,
-  TransactionType, UBI, GovernanceReward, Internal,
-  Labor, Goods, Services, Gift, Investment, Remediation,
-  StakeReward, ImpactTrade,
-}
-use ultralife/types_v2.{
-  BondDatum,
+  InlineDatum, Input, Mint, Output, OutputReference, ScriptPurpose, Spend,
+  Transaction,
 }
 use ultralife/prc37.{current_cycle}
+use ultralife/types.{
+  Basic, CompoundFlow, Gift, Goods, GovernanceReward, ImpactCategory,
+  ImpactTrade, Internal, Investment, Labor, PnftDatum, Remediation, Services,
+  StakeReward, Standard, Steward, TransactionMeta, TransactionRecord,
+  TransactionType, UBI, VerificationLevel, Verified, can_transact, tx_type_code,
+}
+use ultralife/types_v2.{BondDatum}
 
 // =============================================================================
 // CONFIGURATION
@@ -80,32 +75,24 @@ validator token(config: TokenConfig) {
   ) {
     let current_slot = get_slot(tx)
     let cycle = current_cycle(current_slot)
-    
     // =========================================================================
     // SPECIAL CASES: System distributions bypass normal rules
     // =========================================================================
-    
     when redeemer.tx_type is {
       // UBI distribution comes from system, not user
-      UBI { .. } -> {
-        verify_from_system_contract(tx.inputs, config.ubi_contract)
-      }
-      
+      UBI { .. } -> verify_from_system_contract(tx.inputs, config.ubi_contract)
       // Governance rewards come from system
-      GovernanceReward { .. } -> {
+      GovernanceReward { .. } ->
         verify_from_system_contract(tx.inputs, config.ubi_contract)
-      }
-      
       // Internal transfers (same owner reorganizing UTXOs)
-      Internal -> {
-        validate_internal_transfer(tx, config)
-      }
-      
+      Internal -> validate_internal_transfer(tx, config)
       // All other transaction types: FULL VALIDATION
-      _ -> {
-        validate_economic_transaction(tx, redeemer, config, cycle)
-      }
+      _ -> validate_economic_transaction(tx, redeemer, config, cycle)
     }
+  }
+
+  else(_) {
+    fail
   }
 }
 
@@ -124,59 +111,46 @@ fn validate_economic_transaction(
   // =========================================================================
   let sender_pnft = find_sender_pnft(tx, config.pnft_policy)
   expect Some(sender) = sender_pnft
-  
   // =========================================================================
   // RULE 2: SENDER MUST BE ABLE TO TRANSACT (Standard+)
   // =========================================================================
   expect can_transact(sender.level)
-  
   // =========================================================================
   // RULE 3: SENDER MUST HAVE BIOREGION ASSIGNMENT
   // =========================================================================
   expect Some(sender_bioregion) = sender.bioregion
-  
   // =========================================================================
   // RULE 4: SENDER MUST SIGN THE TRANSACTION
   // =========================================================================
   let sender_signed = list.has(tx.extra_signatories, sender.owner)
-  
   // =========================================================================
   // RULE 5: ALL TOKEN RECIPIENTS MUST HAVE pNFTs (NO ANONYMOUS TRANSFERS)
   // =========================================================================
-  let token_outputs = find_token_outputs(tx.outputs, config.policy_id, config.asset_name)
-  let all_recipients_valid = list.all(token_outputs, fn(output) {
-    verify_recipient_has_pnft(output, tx, config.pnft_policy, config)
-  })
-  
+  let token_outputs =
+    find_token_outputs(tx.outputs, config.policy_id, config.asset_name)
+  let all_recipients_valid =
+    list.all(
+      token_outputs,
+      fn(output) {
+        verify_recipient_has_pnft(output, tx, config.pnft_policy, config)
+      },
+    )
   // =========================================================================
   // RULE 6: TRANSACTION METADATA MUST BE VALID
   // =========================================================================
   let meta_valid = validate_metadata(meta)
-  
   // =========================================================================
   // RULE 7: NEGATIVE IMPACT REQUIRES REMEDIATION COMMITMENT
   // =========================================================================
   let remediation_valid = validate_remediation(meta, tx, config)
-  
   // =========================================================================
   // RULE 8: TRANSACTION RECORD MUST BE CREATED
   // =========================================================================
-  let record_created = verify_record_created(
-    tx,
-    sender,
-    meta,
-    cycle,
-    config,
-  )
-  
+  let record_created = verify_record_created(tx, sender, meta, cycle, config)
   // =========================================================================
   // ALL RULES MUST PASS
   // =========================================================================
-  sender_signed &&
-  all_recipients_valid &&
-  meta_valid &&
-  remediation_valid &&
-  record_created
+  sender_signed && all_recipients_valid && meta_valid && remediation_valid && record_created
 }
 
 // =============================================================================
@@ -191,22 +165,33 @@ type SenderData {
   bioregion: Option<ByteArray>,
 }
 
-fn find_sender_pnft(tx: Transaction, pnft_policy: PolicyId) -> Option<SenderData> {
+fn find_sender_pnft(
+  tx: Transaction,
+  pnft_policy: PolicyId,
+) -> Option<SenderData> {
   // Look through inputs and reference inputs for pNFT owned by a signer
-  
   // First check inputs (pNFT might be spent for update)
-  let from_inputs = list.find_map(tx.inputs, fn(input) {
-    extract_pnft_if_signer(input.output, pnft_policy, tx.extra_signatories)
-  })
-  
+  let from_inputs =
+    list.find_map(
+      tx.inputs,
+      fn(input) {
+        extract_pnft_if_signer(input.output, pnft_policy, tx.extra_signatories)
+      },
+    )
   when from_inputs is {
     Some(data) -> Some(data)
-    None -> {
+    None ->
       // Check reference inputs (pNFT just referenced, not spent)
-      list.find_map(tx.reference_inputs, fn(input) {
-        extract_pnft_if_signer(input.output, pnft_policy, tx.extra_signatories)
-      })
-    }
+      list.find_map(
+        tx.reference_inputs,
+        fn(input) {
+          extract_pnft_if_signer(
+            input.output,
+            pnft_policy,
+            tx.extra_signatories,
+          )
+        },
+      )
   }
 }
 
@@ -217,10 +202,9 @@ fn extract_pnft_if_signer(
 ) -> Option<SenderData> {
   // Check if output has pNFT
   let pnft_assets = get_assets_of_policy(output.value, pnft_policy)
-  
   when pnft_assets is {
     [] -> None
-    [(asset_name, quantity), ..] -> {
+    [(asset_name, quantity), ..] ->
       if quantity > 0 {
         // Extract datum
         when output.datum is {
@@ -228,12 +212,14 @@ fn extract_pnft_if_signer(
             expect datum: PnftDatum = data
             // Check if owner is a signer
             if list.has(signers, datum.owner) {
-              Some(SenderData {
-                pnft_id: asset_name,
-                owner: datum.owner,
-                level: datum.level,
-                bioregion: datum.bioregion,
-              })
+              Some(
+                SenderData {
+                  pnft_id: asset_name,
+                  owner: datum.owner,
+                  level: datum.level,
+                  bioregion: datum.bioregion,
+                },
+              )
             } else {
               None
             }
@@ -243,7 +229,6 @@ fn extract_pnft_if_signer(
       } else {
         None
       }
-    }
   }
 }
 
@@ -256,9 +241,10 @@ fn find_token_outputs(
   policy: PolicyId,
   name: AssetName,
 ) -> List<Output> {
-  list.filter(outputs, fn(output) {
-    quantity_of(output.value, policy, name) > 0
-  })
+  list.filter(
+    outputs,
+    fn(output) { quantity_of(output.value, policy, name) > 0 },
+  )
 }
 
 fn verify_recipient_has_pnft(
@@ -269,17 +255,14 @@ fn verify_recipient_has_pnft(
 ) -> Bool {
   // Get recipient address
   let recipient = output.address.payment_credential
-  
   when recipient is {
-    VerificationKey(key_hash) -> {
+    VerificationKey(key_hash) ->
       // Recipient is a regular address — must have pNFT
       find_pnft_for_key(tx, key_hash, pnft_policy)
-    }
-    Script(script_hash) -> {
+    Script(script_hash) ->
       // Recipient is a script address — must be a known contract
       // (marketplace, escrow, treasury, etc.)
       is_allowed_script(script_hash, config)
-    }
   }
 }
 
@@ -289,30 +272,29 @@ fn find_pnft_for_key(
   pnft_policy: PolicyId,
 ) -> Bool {
   // Look for pNFT owned by this key in reference inputs
-  list.any(tx.reference_inputs, fn(input) {
-    let has_pnft = has_policy_token(input.output.value, pnft_policy)
-    if has_pnft {
-      when input.output.datum is {
-        InlineDatum(data) -> {
-          expect datum: PnftDatum = data
-          datum.owner == key_hash
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      let has_pnft = has_policy_token(input.output.value, pnft_policy)
+      if has_pnft {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            datum.owner == key_hash
+          }
+          _ -> False
         }
-        _ -> False
+      } else {
+        False
       }
-    } else {
-      False
-    }
-  })
+    },
+  )
 }
 
 fn is_allowed_script(script_hash: ByteArray, config: TokenConfig) -> Bool {
   // Known contract addresses that can receive tokens
   // Treasury, UBI pool, governance escrow, remediation bonds, grants
-  script_hash == config.ubi_contract ||
-  script_hash == config.treasury_contract ||
-  script_hash == config.grants_contract ||
-  script_hash == config.remediation_contract ||
-  script_hash == config.record_contract
+  script_hash == config.ubi_contract || script_hash == config.treasury_contract || script_hash == config.grants_contract || script_hash == config.remediation_contract || script_hash == config.record_contract
 }
 
 // =============================================================================
@@ -334,7 +316,8 @@ fn validate_metadata(meta: TransactionMeta) -> Bool {
   let has_impacts = list.length(meta.activity_impact.compound_flows) > 0
 
   // All compound flows must be properly structured
-  let impacts_valid = list.all(meta.activity_impact.compound_flows, validate_single_compound_flow)
+  let impacts_valid =
+    list.all(meta.activity_impact.compound_flows, validate_single_compound_flow)
 
   // Evidence must be provided (IPFS hash of methodology/measurements)
   let has_evidence = meta.activity_impact.evidence_hash != ""
@@ -344,12 +327,11 @@ fn validate_metadata(meta: TransactionMeta) -> Bool {
 
 fn validate_tx_type(tx_type: TransactionType) -> Bool {
   when tx_type is {
-    Labor { hours, .. } -> {
+    Labor { hours, .. } ->
       when hours is {
         Some(h) -> h > 0
         None -> True
       }
-    }
     Goods { quantity, .. } -> quantity > 0
     Services { .. } -> True
     Gift -> True
@@ -372,16 +354,19 @@ fn validate_single_compound_flow(flow: CompoundFlow) -> Bool {
 
   // Quantity can be any integer (positive = released, negative = sequestered)
   // No artificial limits - let reality be measured honestly
-
   valid_confidence
 }
 
 /// Calculate net impact from all compound flows (weighted by confidence)
 fn calculate_net_impact(flows: List<CompoundFlow>) -> Int {
-  list.foldl(flows, 0, fn(flow, acc) {
-    let weighted = flow.quantity * flow.confidence / 100
-    acc + weighted
-  })
+  list.foldl(
+    flows,
+    0,
+    fn(flow, acc) {
+      let weighted = flow.quantity * flow.confidence / 100
+      acc + weighted
+    },
+  )
 }
 
 /// Check if transaction requires remediation (net negative impact)
@@ -408,15 +393,14 @@ fn validate_remediation(
   config: TokenConfig,
 ) -> Bool {
   let net_impact = calculate_net_impact(meta.activity_impact.compound_flows)
-  
   if net_impact >= 0 {
     // Net positive or zero — no remediation needed
     // (But note: true zero is rare. Most "neutral" is slightly positive or negative)
     True
   } else {
     // Net negative — MUST provide remediation
-    let required_remediation = -net_impact  // How much to offset
-    
+    let required_remediation = -net_impact
+    // How much to offset
     // Check that remediation is committed
     // This would be in a separate field in the metadata
     // For now, check that appropriate outputs exist
@@ -431,40 +415,54 @@ fn verify_remediation_commitment(
 ) -> Bool {
   // Check for impact token burns (immediate offset)
   let burned_offset = count_impact_token_burns(tx)
-  
   // Check for remediation bonds posted
   let bonded_offset = count_remediation_bonds(tx, config.remediation_contract)
-  
   // Total offset must cover required remediation
   burned_offset + bonded_offset >= required
 }
 
 fn count_impact_token_burns(tx: Transaction) -> Int {
   // Sum negative quantities in mint field (burns)
-  list.foldl(flatten(tx.mint), 0, fn(asset, acc) {
-    let (_, _, qty) = asset
-    if qty < 0 { acc + (-qty) } else { acc }
-  })
-}
-
-fn count_remediation_bonds(tx: Transaction, remediation_contract: ByteArray) -> Int {
-  // Sum bond amounts posted to remediation contract
-  list.foldl(tx.outputs, 0, fn(output, acc) {
-    when output.address.payment_credential is {
-      Script(hash) -> if hash == remediation_contract {
-        when output.datum is {
-          InlineDatum(data) -> {
-            expect bond: BondDatum = data
-            acc + bond.required_magnitude
-          }
-          _ -> acc
-        }
+  list.foldl(
+    flatten(tx.mint),
+    0,
+    fn(asset, acc) {
+      let (_, _, qty) = asset
+      if qty < 0 {
+        acc + -qty
       } else {
         acc
       }
-      _ -> acc
-    }
-  })
+    },
+  )
+}
+
+fn count_remediation_bonds(
+  tx: Transaction,
+  remediation_contract: ByteArray,
+) -> Int {
+  // Sum bond amounts posted to remediation contract
+  list.foldl(
+    tx.outputs,
+    0,
+    fn(output, acc) {
+      when output.address.payment_credential is {
+        Script(hash) ->
+          if hash == remediation_contract {
+            when output.datum is {
+              InlineDatum(data) -> {
+                expect bond: BondDatum = data
+                acc + bond.required_magnitude
+              }
+              _ -> acc
+            }
+          } else {
+            acc
+          }
+        _ -> acc
+      }
+    },
+  )
 }
 
 fn verify_bond_posted(
@@ -473,10 +471,16 @@ fn verify_bond_posted(
   deadline: Int,
   remediation_contract: ByteArray,
 ) -> Bool {
-  list.any(outputs, fn(output) {
-    is_remediation_contract(output.address, remediation_contract) &&
-    has_bond_datum(output, bond_id, deadline)
-  })
+  list.any(
+    outputs,
+    fn(output) {
+      is_remediation_contract(output.address, remediation_contract) && has_bond_datum(
+        output,
+        bond_id,
+        deadline,
+      )
+    },
+  )
 }
 
 fn verify_offset_applied(tx: Transaction, amount: Int) -> Bool {
@@ -484,10 +488,14 @@ fn verify_offset_applied(tx: Transaction, amount: Int) -> Bool {
   // Check mint field for negative quantity of impact tokens
   // Impact token policy would be configured separately
   // For now, verify some tokens are burned (negative in mint)
-  list.any(flatten(tx.mint), fn(asset) {
-    let (_, _, qty) = asset
-    qty < 0  // Something is burned
-  })
+  list.any(
+    flatten(tx.mint),
+    fn(asset) {
+      let (_, _, qty) = asset
+      qty < 0
+    },
+  )
+  // Something is burned
 }
 
 // =============================================================================
@@ -502,23 +510,25 @@ fn verify_record_created(
   config: TokenConfig,
 ) -> Bool {
   // Must have output to record contract with proper datum
-  list.any(tx.outputs, fn(output) {
-    if is_record_contract(output.address, config.record_contract) {
-      when output.datum is {
-        InlineDatum(data) -> {
-          expect record: TransactionRecord = data
-          // Verify record matches transaction
-          record.sender == sender.pnft_id &&
-          record.sender_bioregion == expect_some(sender.bioregion) &&
-          record.tx_type_code == tx_type_code(meta.tx_type) &&
-          record.cycle == cycle
+  list.any(
+    tx.outputs,
+    fn(output) {
+      if is_record_contract(output.address, config.record_contract) {
+        when output.datum is {
+          InlineDatum(data) -> {
+            expect record: TransactionRecord = data
+            // Verify record matches transaction
+            record.sender == sender.pnft_id && record.sender_bioregion == expect_some(
+              sender.bioregion,
+            ) && record.tx_type_code == tx_type_code(meta.tx_type) && record.cycle == cycle
+          }
+          _ -> False
         }
-        _ -> False
+      } else {
+        False
       }
-    } else {
-      False
-    }
-  })
+    },
+  )
 }
 
 // =============================================================================
@@ -528,20 +538,21 @@ fn verify_record_created(
 fn validate_internal_transfer(tx: Transaction, config: TokenConfig) -> Bool {
   // Internal transfer = same owner reorganizing UTXOs
   // Relaxed rules but still need identity
-  
   // 1. Find sender pNFT
   let sender_pnft = find_sender_pnft(tx, config.pnft_policy)
   expect Some(sender) = sender_pnft
-  
   // 2. Sender must sign
   let sender_signed = list.has(tx.extra_signatories, sender.owner)
-  
   // 3. All token outputs must go to sender's address
-  let token_outputs = find_token_outputs(tx.outputs, config.policy_id, config.asset_name)
-  let all_to_sender = list.all(token_outputs, fn(output) {
-    output.address.payment_credential == VerificationKey(sender.owner)
-  })
-  
+  let token_outputs =
+    find_token_outputs(tx.outputs, config.policy_id, config.asset_name)
+  let all_to_sender =
+    list.all(
+      token_outputs,
+      fn(output) {
+        output.address.payment_credential == VerificationKey(sender.owner)
+      },
+    )
   sender_signed && all_to_sender
 }
 
@@ -550,12 +561,15 @@ fn validate_internal_transfer(tx: Transaction, config: TokenConfig) -> Bool {
 // =============================================================================
 
 fn verify_from_system_contract(inputs: List<Input>, contract: ByteArray) -> Bool {
-  list.any(inputs, fn(input) {
-    when input.output.address.payment_credential is {
-      Script(hash) -> hash == contract
-      _ -> False
-    }
-  })
+  list.any(
+    inputs,
+    fn(input) {
+      when input.output.address.payment_credential is {
+        Script(hash) -> hash == contract
+        _ -> False
+      }
+    },
+  )
 }
 
 // =============================================================================
@@ -570,16 +584,22 @@ fn get_slot(tx: Transaction) -> Int {
   slot
 }
 
-fn get_assets_of_policy(value: Value, policy: PolicyId) -> List<(AssetName, Int)> {
+fn get_assets_of_policy(
+  value: Value,
+  policy: PolicyId,
+) -> List<(AssetName, Int)> {
   // Flatten value and filter by policy
-  list.filter_map(flatten(value), fn(asset) {
-    let (p, name, qty) = asset
-    if p == policy {
-      Some((name, qty))
-    } else {
-      None
-    }
-  })
+  list.filter_map(
+    flatten(value),
+    fn(asset) {
+      let (p, name, qty) = asset
+      if p == policy {
+        Some((name, qty))
+      } else {
+        None
+      }
+    },
+  )
 }
 
 fn has_policy_token(value: Value, policy: PolicyId) -> Bool {
@@ -596,12 +616,12 @@ fn is_remediation_contract(address: Address, contract: ByteArray) -> Bool {
 fn has_bond_datum(output: Output, bond_id: ByteArray, deadline: Int) -> Bool {
   // Check output has bond datum with matching ID and deadline
   when output.datum is {
-    InlineDatum(data) -> {
+    InlineDatum(data) ->
       // Bond datum structure: { bond_id, deadline, ... }
       // We check the data contains expected values
       // This is a simplified check - full implementation would parse BondDatum
-      True  // Datum exists, detailed validation in remediation contract
-    }
+      True
+    // Datum exists, detailed validation in remediation contract
     _ -> False
   }
 }
@@ -637,35 +657,43 @@ pub type GenesisConfig {
 validator token_policy(genesis: GenesisConfig) {
   mint(redeemer: Data, policy_id: PolicyId, tx: Transaction) {
     // Genesis mint: 400 billion tokens, one time only
-    
     // 1. Genesis UTXO must be spent
-    let genesis_spent = list.any(tx.inputs, fn(input) {
-      input.output_reference == genesis.genesis_utxo
-    })
-    
+    let genesis_spent =
+      list.any(
+        tx.inputs,
+        fn(input) { input.output_reference == genesis.genesis_utxo },
+      )
     // 2. Must mint exactly total_supply
     let mint_amount = get_mint_amount(tx.mint, policy_id)
     let amount_correct = mint_amount == genesis.total_supply
-    
     // 3. Half to treasury, half to grants
     let half = genesis.total_supply / 2
-    let treasury_correct = verify_tokens_to(tx.outputs, policy_id, genesis.treasury, half)
-    let grants_correct = verify_tokens_to(tx.outputs, policy_id, genesis.grants_pool, half)
-    
+    let treasury_correct =
+      verify_tokens_to(tx.outputs, policy_id, genesis.treasury, half)
+    let grants_correct =
+      verify_tokens_to(tx.outputs, policy_id, genesis.grants_pool, half)
     genesis_spent && amount_correct && treasury_correct && grants_correct
+  }
+
+  else(_) {
+    fail
   }
 }
 
 fn get_mint_amount(mint: Value, policy: PolicyId) -> Int {
   // Sum all minted under this policy
-  list.foldl(flatten(mint), 0, fn(asset, acc) {
-    let (p, _, qty) = asset
-    if p == policy {
-      acc + qty
-    } else {
-      acc
-    }
-  })
+  list.foldl(
+    flatten(mint),
+    0,
+    fn(asset, acc) {
+      let (p, _, qty) = asset
+      if p == policy {
+        acc + qty
+      } else {
+        acc
+      }
+    },
+  )
 }
 
 fn verify_tokens_to(
@@ -675,23 +703,37 @@ fn verify_tokens_to(
   amount: Int,
 ) -> Bool {
   // Sum tokens sent to the script address
-  let total = list.foldl(outputs, 0, fn(output, acc) {
-    when output.address.payment_credential is {
-      Script(hash) -> if hash == address {
-        let tokens = list.foldl(flatten(output.value), 0, fn(asset, a) {
-          let (p, _, qty) = asset
-          if p == policy { a + qty } else { a }
-        })
-        acc + tokens
-      } else {
-        acc
-      }
-      _ -> acc
-    }
-  })
+  let total =
+    list.foldl(
+      outputs,
+      0,
+      fn(output, acc) {
+        when output.address.payment_credential is {
+          Script(hash) ->
+            if hash == address {
+              let tokens =
+                list.foldl(
+                  flatten(output.value),
+                  0,
+                  fn(asset, a) {
+                    let (p, _, qty) = asset
+                    if p == policy {
+                      a + qty
+                    } else {
+                      a
+                    }
+                  },
+                )
+              acc + tokens
+            } else {
+              acc
+            }
+          _ -> acc
+        }
+      },
+    )
   total >= amount
 }
-
 // =============================================================================
 // DOCUMENTATION
 // =============================================================================

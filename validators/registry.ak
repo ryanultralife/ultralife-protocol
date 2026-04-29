@@ -24,9 +24,9 @@
 
 use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
-use cardano/assets.{PolicyId, AssetName}
-use cardano/transaction.{Transaction, OutputReference, InlineDatum}
-use ultralife/types.{VerificationLevel, Verified, Steward}
+use cardano/assets.{AssetName, PolicyId}
+use cardano/transaction.{InlineDatum, OutputReference, Transaction}
+use ultralife/types.{Steward, VerificationLevel, Verified}
 
 /// Result of finding a signer pNFT
 pub type SignerPnftInfo {
@@ -111,7 +111,11 @@ pub type RegistryRedeemer {
   /// Create root category (Steward only)
   CreateRoot { name_hash: ByteArray, spec_hash: ByteArray }
   /// Create child under existing category
-  CreateChild { parent_id: ByteArray, name_hash: ByteArray, spec_hash: ByteArray }
+  CreateChild {
+    parent_id: ByteArray,
+    name_hash: ByteArray,
+    spec_hash: ByteArray,
+  }
   /// Add delegate to a category
   AddDelegate { entry_id: ByteArray, delegate: AssetName }
   /// Remove delegate
@@ -126,9 +130,18 @@ pub type RegistryRedeemer {
 
 pub type ThingRedeemer {
   /// Register new thing (origin point in supply chain)
-  Register { category_id: ByteArray, metadata_hash: ByteArray, impact: ImpactSummary }
+  Register {
+    category_id: ByteArray,
+    metadata_hash: ByteArray,
+    impact: ImpactSummary,
+  }
   /// Transform thing(s) into new thing
-  Transform { inputs: List<ByteArray>, process_id: ByteArray, output_category: ByteArray, impact: ImpactSummary }
+  Transform {
+    inputs: List<ByteArray>,
+    process_id: ByteArray,
+    output_category: ByteArray,
+    impact: ImpactSummary,
+  }
   /// Transfer ownership
   Transfer { new_owner: AssetName }
   /// Update metadata
@@ -161,16 +174,15 @@ validator registry(config: RegistryConfig) {
         expect Some(c) = creator
         c.level == Steward && list.has(tx.extra_signatories, c.owner)
       }
-      
       // Children require governor or delegate of parent
       CreateChild { parent_id, name_hash, spec_hash } -> {
         expect Some(parent) = datum
         let actor = get_signer_pnft(tx, config.pnft_policy)
         expect Some(a) = actor
-        let authorized = a.pnft == parent.governor || list.has(parent.delegates, a.pnft)
+        let authorized =
+          a.pnft == parent.governor || list.has(parent.delegates, a.pnft)
         authorized && list.has(tx.extra_signatories, a.owner)
       }
-      
       // Only governor can add delegates
       AddDelegate { entry_id, delegate } -> {
         expect Some(entry) = datum
@@ -178,7 +190,6 @@ validator registry(config: RegistryConfig) {
         expect Some(a) = actor
         a.pnft == entry.governor && list.has(tx.extra_signatories, a.owner)
       }
-      
       // Only governor can remove delegates
       RemoveDelegate { entry_id, delegate } -> {
         expect Some(entry) = datum
@@ -186,16 +197,15 @@ validator registry(config: RegistryConfig) {
         expect Some(a) = actor
         a.pnft == entry.governor && list.has(tx.extra_signatories, a.owner)
       }
-      
       // Governor or delegate can update spec
       UpdateSpec { entry_id, new_spec_hash } -> {
         expect Some(entry) = datum
         let actor = get_signer_pnft(tx, config.pnft_policy)
         expect Some(a) = actor
-        let authorized = a.pnft == entry.governor || list.has(entry.delegates, a.pnft)
+        let authorized =
+          a.pnft == entry.governor || list.has(entry.delegates, a.pnft)
         authorized && list.has(tx.extra_signatories, a.owner)
       }
-      
       // Only governor can transfer governance
       TransferGovernance { entry_id, new_governor } -> {
         expect Some(entry) = datum
@@ -203,7 +213,6 @@ validator registry(config: RegistryConfig) {
         expect Some(a) = actor
         a.pnft == entry.governor && list.has(tx.extra_signatories, a.owner)
       }
-      
       // Only governor can deactivate
       Deactivate { entry_id } -> {
         expect Some(entry) = datum
@@ -212,6 +221,10 @@ validator registry(config: RegistryConfig) {
         a.pnft == entry.governor && list.has(tx.extra_signatories, a.owner)
       }
     }
+  }
+
+  else(_) {
+    fail
   }
 }
 
@@ -234,7 +247,6 @@ validator thing(config: RegistryConfig) {
         let level_ok = r.level == Verified || r.level == Steward
         level_ok && list.has(tx.extra_signatories, r.owner)
       }
-      
       // Transform — must own all inputs
       Transform { inputs, process_id, output_category, impact } -> {
         let transformer = get_signer_pnft(tx, config.pnft_policy)
@@ -242,7 +254,6 @@ validator thing(config: RegistryConfig) {
         // Verify ownership of inputs would be checked here
         list.has(tx.extra_signatories, t.owner)
       }
-      
       // Transfer — current owner must sign
       Transfer { new_owner } -> {
         expect Some(thing_datum) = datum
@@ -260,6 +271,10 @@ validator thing(config: RegistryConfig) {
       }
     }
   }
+
+  else(_) {
+    fail
+  }
 }
 
 // =============================================================================
@@ -267,13 +282,18 @@ validator thing(config: RegistryConfig) {
 // =============================================================================
 
 fn get_signer_pnft(tx: Transaction, policy: PolicyId) -> Option<SignerPnftInfo> {
-  None  // Implementation would find pNFT in inputs
+  None
+  // Implementation would find pNFT in inputs
 }
 
-fn get_owner_key(tx: Transaction, pnft: AssetName, policy: PolicyId) -> Option<VerificationKeyHash> {
-  None  // Implementation would look up owner from pNFT datum
+fn get_owner_key(
+  tx: Transaction,
+  pnft: AssetName,
+  policy: PolicyId,
+) -> Option<VerificationKeyHash> {
+  None
+  // Implementation would look up owner from pNFT datum
 }
-
 // =============================================================================
 // HOW IT WORKS
 // =============================================================================

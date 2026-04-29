@@ -24,11 +24,13 @@ use aiken/crypto.{VerificationKeyHash, blake2b_256}
 use aiken/interval
 use aiken/primitive/bytearray
 use cardano/address
-use cardano/assets.{PolicyId, AssetName, Value, quantity_of}
-use cardano/transaction.{Transaction, Input, Output, OutputReference, InlineDatum}
+use cardano/assets.{AssetName, PolicyId, Value, quantity_of}
+use cardano/transaction.{
+  InlineDatum, Input, Output, OutputReference, Transaction,
+}
 use ultralife/types.{
-  PnftDatum, VerificationLevel, Basic, Ward, Standard, Verified, Steward,
-  CompoundFlow, CompoundCode, MassUnit,
+  Basic, CompoundCode, CompoundFlow, MassUnit, PnftDatum, Standard, Steward,
+  VerificationLevel, Verified, Ward,
 }
 
 // =============================================================================
@@ -38,52 +40,35 @@ use ultralife/types.{
 /// Types of care work
 pub type CareType {
   // === CHILDCARE ===
-  Childcare { 
-    age_group: ChildAgeGroup,
-    activities: List<ChildcareActivity>,
-  }
-  
+  Childcare { age_group: ChildAgeGroup, activities: List<ChildcareActivity> }
   // === ELDER CARE ===
-  ElderCare {
-    care_level: ElderCareLevel,
-    activities: List<ElderCareActivity>,
-  }
-  
+  ElderCare { care_level: ElderCareLevel, activities: List<ElderCareActivity> }
   // === DISABILITY CARE ===
-  DisabilityCare {
-    support_type: DisabilitySupportType,
-  }
-  
+  DisabilityCare { support_type: DisabilitySupportType }
   // === HEALTH SUPPORT ===
-  HealthSupport {
-    support_type: HealthSupportType,
-  }
-  
+  HealthSupport { support_type: HealthSupportType }
   // === HOUSEHOLD ===
-  Household {
-    activities: List<HouseholdActivity>,
-    household_size: Int,
-  }
-  
+  Household { activities: List<HouseholdActivity>, household_size: Int }
   // === COMMUNITY SERVICE ===
-  CommunityService {
-    service_type: CommunityServiceType,
-    beneficiaries: Int,  // Approximate number helped
-  }
-  
+  CommunityService { service_type: CommunityServiceType, beneficiaries: Int }
+  // Approximate number helped
   // === FAMILY SUPPORT ===
-  FamilySupport {
-    support_type: FamilySupportType,
-  }
+  FamilySupport { support_type: FamilySupportType }
 }
 
 pub type ChildAgeGroup {
-  Infant      // 0-1
-  Toddler     // 1-3
-  Preschool   // 3-5
-  SchoolAge   // 5-12
-  Adolescent  // 12-18
+  Infant
+  // 0-1
+  Toddler
+  // 1-3
+  Preschool
+  // 3-5
+  SchoolAge
+  // 5-12
+  Adolescent
 }
+
+// 12-18
 
 pub type ChildcareActivity {
   Feeding
@@ -97,12 +82,18 @@ pub type ChildcareActivity {
 }
 
 pub type ElderCareLevel {
-  Independent    // Mostly self-sufficient, check-ins
-  Assisted       // Help with some daily activities
-  FullTime       // Significant daily assistance
-  Medical        // Medical care needs
-  Palliative     // End-of-life care
+  Independent
+  // Mostly self-sufficient, check-ins
+  Assisted
+  // Help with some daily activities
+  FullTime
+  // Significant daily assistance
+  Medical
+  // Medical care needs
+  Palliative
 }
+
+// End-of-life care
 
 pub type ElderCareActivity {
   ElderCompanionship
@@ -171,29 +162,17 @@ pub type FamilySupportType {
 /// Who receives the care
 pub type CareRecipient {
   /// Family member (same household)
-  Family { 
+  Family {
     relationship: FamilyRelationship,
     /// Optional: specific person's pNFT if they have one
     person_pnft: Option<AssetName>,
   }
-  
   /// Extended family
-  ExtendedFamily {
-    relationship: ByteArray,
-    person_pnft: Option<AssetName>,
-  }
-  
+  ExtendedFamily { relationship: ByteArray, person_pnft: Option<AssetName> }
   /// Neighbor or community member
-  Neighbor {
-    pnft: Option<AssetName>,
-    proximity: Proximity,
-  }
-  
+  Neighbor { pnft: Option<AssetName>, proximity: Proximity }
   /// General community (volunteer work)
-  Community {
-    community_type: ByteArray,
-  }
-  
+  Community { community_type: ByteArray }
   /// Public good (benefits everyone)
   PublicGood
 }
@@ -259,16 +238,18 @@ pub type CareAttestation {
 }
 
 pub type AttestorRole {
+  /// The caregiver themselves (self-report)
+  Caregiver
   /// The care recipient themselves
   Recipient
   /// Family member of recipient
   RecipientFamily
   /// Neighbor who observed
   NeighborAttestor
-  /// Community member
-  CommunityMember
+  /// Community member (witness)
+  Witness
   /// Healthcare professional
-  HealthProfessional
+  Professional
   /// Social worker
   SocialWorker
 }
@@ -313,7 +294,8 @@ pub type CaregiverCreditRecord {
 }
 
 /// Simplified care type code for aggregation
-pub type CareTypeCode = ByteArray
+pub type CareTypeCode =
+  ByteArray
 
 /// Bioregion care statistics
 pub type BioregionCareData {
@@ -344,17 +326,14 @@ pub type CareRedeemer {
     ended_at: Int,
     notes_hash: Option<ByteArray>,
   }
-  
   /// Update existing record (before attested)
   UpdateRecord {
     record_id: ByteArray,
     new_hours: Option<Int>,
     new_notes: Option<ByteArray>,
   }
-  
   /// Cancel record (before attested)
   CancelRecord { record_id: ByteArray }
-  
   // === Attestation ===
   /// Attest that care was provided
   AttestCare {
@@ -362,30 +341,16 @@ pub type CareRedeemer {
     attestor_role: AttestorRole,
     note: Option<ByteArray>,
   }
-  
   /// Dispute a care record
-  DisputeRecord {
-    record_id: ByteArray,
-    reason: ByteArray,
-  }
-  
+  DisputeRecord { record_id: ByteArray, reason: ByteArray }
   // === Credits ===
   /// Claim care credits (after sufficient attestation)
-  ClaimCredits {
-    record_ids: List<ByteArray>,
-  }
-  
+  ClaimCredits { record_ids: List<ByteArray> }
   /// Apply credits to UBI calculation
-  ApplyToUBI {
-    amount: Int,
-  }
-  
+  ApplyToUBI { amount: Int }
   // === Statistics ===
   /// Aggregate care data for bioregion
-  AggregateBioregion {
-    bioregion: ByteArray,
-    cycle: Int,
-  }
+  AggregateBioregion { bioregion: ByteArray, cycle: Int }
 }
 
 // =============================================================================
@@ -421,38 +386,49 @@ validator care(config: CareConfig) {
     tx: Transaction,
   ) {
     when redeemer is {
-      RecordCare { care_type, recipient, hours, started_at, ended_at, notes_hash } -> {
-        validate_record_care(tx, care_type, recipient, hours, started_at, ended_at, notes_hash, config)
-      }
-      
-      UpdateRecord { record_id, new_hours, new_notes } -> {
-        validate_update_record(tx, datum, record_id, new_hours, new_notes, config)
-      }
-      
-      CancelRecord { record_id } -> {
+      RecordCare {
+        care_type,
+        recipient,
+        hours,
+        started_at,
+        ended_at,
+        notes_hash,
+      } ->
+        validate_record_care(
+          tx,
+          care_type,
+          recipient,
+          hours,
+          started_at,
+          ended_at,
+          notes_hash,
+          config,
+        )
+      UpdateRecord { record_id, new_hours, new_notes } ->
+        validate_update_record(
+          tx,
+          datum,
+          record_id,
+          new_hours,
+          new_notes,
+          config,
+        )
+      CancelRecord { record_id } ->
         validate_cancel_record(tx, datum, record_id, config)
-      }
-      
-      AttestCare { record_id, attestor_role, note } -> {
+      AttestCare { record_id, attestor_role, note } ->
         validate_attest_care(tx, datum, record_id, attestor_role, note, config)
-      }
-      
-      DisputeRecord { record_id, reason } -> {
+      DisputeRecord { record_id, reason } ->
         validate_dispute_record(tx, datum, record_id, reason, config)
-      }
-      
-      ClaimCredits { record_ids } -> {
+      ClaimCredits { record_ids } ->
         validate_claim_credits(tx, datum, record_ids, config)
-      }
-      
-      ApplyToUBI { amount } -> {
-        validate_apply_to_ubi(tx, datum, amount, config)
-      }
-      
-      AggregateBioregion { bioregion, cycle } -> {
+      ApplyToUBI { amount } -> validate_apply_to_ubi(tx, datum, amount, config)
+      AggregateBioregion { bioregion, cycle } ->
         validate_aggregate_bioregion(tx, datum, bioregion, cycle, config)
-      }
     }
+  }
+
+  else(_) {
+    fail
   }
 }
 
@@ -474,40 +450,36 @@ fn validate_record_care(
   let caregiver_pnft = find_signer_pnft(tx, config.pnft_policy)
   expect Some(caregiver) = caregiver_pnft
   expect list.has(tx.extra_signatories, caregiver.owner)
-  
   // 2. Caregiver must be Standard+ verified
   expect verification_level_gte(caregiver.level, Standard)
-  
   // 3. Hours must be reasonable
   expect hours > 0
   expect hours <= config.max_daily_hours * days_between(started_at, ended_at)
-  
   // 4. Time range must be valid
   expect ended_at > started_at
   let current_slot = get_current_slot(tx)
-  expect ended_at <= current_slot  // Can't claim future care
-  
+  expect ended_at <= current_slot
+  // Can't claim future care
   // 5. Create care record
-  let record = CareRecord {
-    record_id: generate_record_id(caregiver.pnft_id, started_at),
-    caregiver: caregiver.pnft_id,
-    care_type: care_type,
-    recipient: recipient,
-    hours: hours,
-    started_at: started_at,
-    ended_at: ended_at,
-    bioregion: get_bioregion(caregiver),
-    notes_hash: notes_hash,
-    attestations: [],
-    status: Pending,
-    credits_earned: 0,
-  }
-  
+  let record =
+    CareRecord {
+      record_id: generate_record_id(caregiver.pnft_id, started_at),
+      caregiver: caregiver.pnft_id,
+      care_type,
+      recipient,
+      hours,
+      started_at,
+      ended_at,
+      bioregion: get_bioregion(caregiver),
+      notes_hash,
+      attestations: [],
+      status: Pending,
+      credits_earned: 0,
+    }
   // 6. Verify record output created
   expect Some(out) = find_care_record_output(tx.outputs)
   expect InlineDatum(data) = out.datum
   expect Record(created): CareDatum = data
-  
   created == record
 }
 
@@ -527,49 +499,39 @@ fn validate_attest_care(
   expect Some(Record(record)) = datum
   expect record.record_id == record_id
   expect is_attestable(record.status)
-  
   // 2. Attestor must sign
   let attestor_pnft = find_signer_pnft(tx, config.pnft_policy)
   expect Some(attestor) = attestor_pnft
   expect list.has(tx.extra_signatories, attestor.owner)
-  
   // 3. Attestor cannot be the caregiver
   expect attestor.pnft_id != record.caregiver
-  
   // 4. Attestor role must be valid for their relationship
   expect validate_attestor_role(attestor, record, attestor_role)
-  
   // 5. Attestor hasn't already attested
   expect !has_attested(record.attestations, attestor.pnft_id)
-  
   // 6. Create attestation
-  let attestation = CareAttestation {
-    attestor: attestor.pnft_id,
-    attestor_role: attestor_role,
-    attested_at: get_current_slot(tx),
-    note: note,
-  }
-  
+  let attestation =
+    CareAttestation {
+      attestor: attestor.pnft_id,
+      attestor_role,
+      attested_at: get_current_slot(tx),
+      note,
+    }
   // 7. Update record
   let new_attestations = list.concat(record.attestations, [attestation])
-  let new_status = if list.length(new_attestations) >= config.min_attestations {
-    Attested { attestation_count: list.length(new_attestations) }
-  } else {
-    Pending
-  }
-  
-  let updated_record = CareRecord {
-    ..record,
-    attestations: new_attestations,
-    status: new_status,
-  }
-  
+  let new_status =
+    if list.length(new_attestations) >= config.min_attestations {
+      Attested { attestation_count: list.length(new_attestations) }
+    } else {
+      Pending
+    }
+  let updated_record =
+    CareRecord { ..record, attestations: new_attestations, status: new_status }
   // 8. Verify output
   let output = find_care_record_output(tx.outputs)
   expect Some(out) = output
   expect InlineDatum(data) = out.datum
   expect Record(result): CareDatum = data
-  
   result == updated_record
 }
 
@@ -587,31 +549,28 @@ fn validate_claim_credits(
   let claimer_pnft = find_signer_pnft(tx, config.pnft_policy)
   expect Some(claimer) = claimer_pnft
   expect list.has(tx.extra_signatories, claimer.owner)
-  
   // 2. All records must be for this claimer and properly attested
   let records = find_all_care_records(tx, record_ids)
-  expect list.all(records, fn(r) {
-    r.caregiver == claimer.pnft_id &&
-    is_attested(r.status) &&
-    is_not_credited(r.status)
-  })
-  
+  expect
+    list.all(
+      records,
+      fn(r) {
+        r.caregiver == claimer.pnft_id && is_attested(r.status) && is_not_credited(
+          r.status,
+        )
+      },
+    )
   // 3. Calculate credits
-  let total_credits = list.foldl(records, 0, fn(r, acc) {
-    acc + calculate_credits(r, config)
-  })
-  
+  let total_credits =
+    list.foldl(records, 0, fn(r, acc) { acc + calculate_credits(r, config) })
   // 4. Update records to Credited status
   // (Verified through output checking)
-  
   // 5. Update caregiver credit record
   let credit_output = find_credit_record_output(tx.outputs, claimer.pnft_id)
   expect Some(c_out) = credit_output
   expect InlineDatum(c_data) = c_out.datum
   expect CaregiverCredits(credits): CareDatum = c_data
-  
-  credits.caregiver == claimer.pnft_id &&
-  credits.total_credits >= total_credits
+  credits.caregiver == claimer.pnft_id && credits.total_credits >= total_credits
 }
 
 // =============================================================================
@@ -626,20 +585,17 @@ fn validate_apply_to_ubi(
 ) -> Bool {
   // 1. Must have credit record
   expect Some(CaregiverCredits(credits)) = datum
-  
   // 2. Must have enough unapplied credits
   let available = credits.total_credits - credits.credits_applied
   expect amount <= available
-  
   // 3. UBI contract must be called
   expect verify_ubi_contract_called(tx, config.ubi_contract)
-  
   // 4. Update credit record
-  let updated = CaregiverCreditRecord {
-    ..credits,
-    credits_applied: credits.credits_applied + amount,
-  }
-  
+  let updated =
+    CaregiverCreditRecord {
+      ..credits,
+      credits_applied: credits.credits_applied + amount,
+    }
   // 5. Verify output
   True
 }
@@ -650,50 +606,66 @@ fn validate_apply_to_ubi(
 
 fn find_signer_pnft(tx: Transaction, pnft_policy: PolicyId) -> Option<PnftData> {
   // Find a pNFT in inputs or reference inputs whose owner has signed the transaction
-  let from_inputs = list.find_map(tx.inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect datum: PnftDatum = data
-        if list.has(tx.extra_signatories, datum.owner) &&
-           quantity_of(input.output.value, pnft_policy, datum.pnft_id) == 1 {
-          Some(PnftData {
-            pnft_id: datum.pnft_id,
-            owner: datum.owner,
-            level: datum.level,
-            bioregion: datum.bioregion,
-          })
-        } else {
-          None
-        }
-      }
-      _ -> None
-    }
-  })
-
-  when from_inputs is {
-    Some(d) -> Some(d)
-    None -> {
-      // Also check reference inputs
-      list.find_map(tx.reference_inputs, fn(input) {
+  let from_inputs =
+    list.find_map(
+      tx.inputs,
+      fn(input) {
         when input.output.datum is {
           InlineDatum(data) -> {
             expect datum: PnftDatum = data
-            if list.has(tx.extra_signatories, datum.owner) &&
-               quantity_of(input.output.value, pnft_policy, datum.pnft_id) == 1 {
-              Some(PnftData {
-                pnft_id: datum.pnft_id,
-                owner: datum.owner,
-                level: datum.level,
-                bioregion: datum.bioregion,
-              })
+            if list.has(tx.extra_signatories, datum.owner) && quantity_of(
+              input.output.value,
+              pnft_policy,
+              datum.pnft_id,
+            ) == 1 {
+              Some(
+                PnftData {
+                  pnft_id: datum.pnft_id,
+                  owner: datum.owner,
+                  level: datum.level,
+                  bioregion: datum.bioregion,
+                },
+              )
             } else {
               None
             }
           }
           _ -> None
         }
-      })
-    }
+      },
+    )
+
+  when from_inputs is {
+    Some(d) -> Some(d)
+    None ->
+      // Also check reference inputs
+      list.find_map(
+        tx.reference_inputs,
+        fn(input) {
+          when input.output.datum is {
+            InlineDatum(data) -> {
+              expect datum: PnftDatum = data
+              if list.has(tx.extra_signatories, datum.owner) && quantity_of(
+                input.output.value,
+                pnft_policy,
+                datum.pnft_id,
+              ) == 1 {
+                Some(
+                  PnftData {
+                    pnft_id: datum.pnft_id,
+                    owner: datum.owner,
+                    level: datum.level,
+                    bioregion: datum.bioregion,
+                  },
+                )
+              } else {
+                None
+              }
+            }
+            _ -> None
+          }
+        },
+      )
   }
 }
 
@@ -706,33 +678,33 @@ type PnftData {
 
 fn verification_level_gte(a: VerificationLevel, b: VerificationLevel) -> Bool {
   // Compare verification levels: Basic < Ward < Standard < Verified < Steward
-  let level_to_int = fn(level: VerificationLevel) -> Int {
-    when level is {
-      Basic -> 0
-      Ward -> 1
-      Standard -> 2
-      Verified -> 3
-      Steward -> 4
+  let level_to_int =
+    fn(level: VerificationLevel) -> Int {
+      when level is {
+        Basic -> 0
+        Ward -> 1
+        Standard -> 2
+        Verified -> 3
+        Steward -> 4
+      }
     }
-  }
   level_to_int(a) >= level_to_int(b)
 }
 
 fn days_between(start: Int, end: Int) -> Int {
-  (end - start) / 86400 + 1
+  ( end - start ) / 86400 + 1
 }
 
 fn get_current_slot(tx: Transaction) -> Int {
   // Extract current slot from transaction validity range
   when tx.validity_range.lower_bound.bound_type is {
     interval.Finite(slot) -> slot
-    _ -> {
+    _ ->
       // Fallback to upper bound if lower is unbounded
       when tx.validity_range.upper_bound.bound_type is {
         interval.Finite(slot) -> slot
         _ -> 0
       }
-    }
   }
 }
 
@@ -750,18 +722,21 @@ fn get_bioregion(pnft: PnftData) -> ByteArray {
 }
 
 fn find_care_record_output(outputs: List<Output>) -> Option<Output> {
-  list.find(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect care_datum: CareDatum = data
-        when care_datum is {
-          Record(_) -> True
-          _ -> False
+  list.find(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect care_datum: CareDatum = data
+          when care_datum is {
+            Record(_) -> True
+            _ -> False
+          }
         }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn is_attestable(status: CareRecordStatus) -> Bool {
@@ -781,92 +756,160 @@ fn is_attested(status: CareRecordStatus) -> Bool {
 
 fn is_not_credited(status: CareRecordStatus) -> Bool {
   when status is {
-    Credited { credited_at } -> False
+    Credited { .. } -> False
     _ -> True
   }
 }
 
-fn validate_attestor_role(attestor: PnftData, record: CareRecord, role: AttestorRole) -> Bool {
+/// Extract pNFT from CareRecipient if one exists
+fn recipient_pnft(recipient: CareRecipient) -> Option<AssetName> {
+  when recipient is {
+    Family { person_pnft, .. } -> person_pnft
+    ExtendedFamily { person_pnft, .. } -> person_pnft
+    Neighbor { pnft, .. } -> pnft
+    Community { .. } -> None
+    PublicGood -> None
+  }
+}
+
+/// Check if attestor's pNFT matches recipient (if recipient has pNFT)
+fn is_recipient(attestor_pnft: AssetName, recipient: CareRecipient) -> Bool {
+  when recipient_pnft(recipient) is {
+    Some(rpnft) -> attestor_pnft == rpnft
+    None -> False
+  }
+}
+
+/// Check if attestor is NOT the recipient (for third-party attestors)
+fn is_not_recipient(attestor_pnft: AssetName, recipient: CareRecipient) -> Bool {
+  when recipient_pnft(recipient) is {
+    Some(rpnft) -> attestor_pnft != rpnft
+    None -> True
+  }
+}
+
+fn validate_attestor_role(
+  attestor: PnftData,
+  record: CareRecord,
+  role: AttestorRole,
+) -> Bool {
   // Validate that the attestor has the appropriate role for this care record
   when role is {
-    Caregiver -> {
+    Caregiver ->
       // Caregiver must be the one who provided the care
-      attestor.id == record.caregiver
+      attestor.pnft_id == record.caregiver
+    Recipient ->
+      // Recipient must be who received the care (if they have pNFT)
+      is_recipient(attestor.pnft_id, record.recipient)
+    RecipientFamily -> {
+      // Family member - must not be caregiver or the recipient
+      attestor.pnft_id != record.caregiver && is_not_recipient(attestor.pnft_id, record.recipient)
     }
-    Recipient -> {
-      // Recipient must be who received the care
-      attestor.id == record.recipient
+    NeighborAttestor -> {
+      // Neighbor - must not be caregiver or the recipient
+      attestor.pnft_id != record.caregiver && is_not_recipient(attestor.pnft_id, record.recipient)
     }
     Witness -> {
       // Witness must be Verified+ level and not caregiver or recipient
       let is_verified = attestor.level == Verified || attestor.level == Steward
-      let not_participant = attestor.id != record.caregiver && attestor.id != record.recipient
+      let not_participant =
+        attestor.pnft_id != record.caregiver && is_not_recipient(attestor.pnft_id, record.recipient)
       is_verified && not_participant
     }
-    Professional -> {
+    Professional ->
       // Professional must be Steward level
       attestor.level == Steward
-    }
+    SocialWorker ->
+      // Social worker must be Steward level
+      attestor.level == Steward
   }
 }
 
-fn has_attested(attestations: List<CareAttestation>, attestor: AssetName) -> Bool {
+fn has_attested(
+  attestations: List<CareAttestation>,
+  attestor: AssetName,
+) -> Bool {
   list.any(attestations, fn(a) { a.attestor == attestor })
 }
 
-fn find_all_care_records(tx: Transaction, ids: List<ByteArray>) -> List<CareRecord> {
+fn find_all_care_records(
+  tx: Transaction,
+  ids: List<ByteArray>,
+) -> List<CareRecord> {
   // Find all care records from inputs that match the given IDs
-  list.filter_map(tx.inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect care_datum: CareDatum = data
-        when care_datum is {
-          Record(record) -> {
-            if list.has(ids, record.record_id) {
-              Some(record)
-            } else {
-              None
-            }
+  list.filter_map(
+    tx.inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect care_datum: CareDatum = data
+          when care_datum is {
+            Record(record) ->
+              if list.has(ids, record.record_id) {
+                Some(record)
+              } else {
+                None
+              }
+            _ -> None
           }
-          _ -> None
         }
+        _ -> None
       }
-      _ -> None
-    }
-  })
+    },
+  )
 }
 
 fn calculate_credits(record: CareRecord, config: CareConfig) -> Int {
   // Hours × credits_per_hour for care type
-  record.hours * 10 // Simplified
+  record.hours * 10
+  // Simplified
 }
 
-fn find_credit_record_output(outputs: List<Output>, _caregiver: AssetName) -> Option<Output> {
-  list.head(outputs) // Simplified - returns first output
+fn find_credit_record_output(
+  outputs: List<Output>,
+  _caregiver: AssetName,
+) -> Option<Output> {
+  list.head(outputs)
+  // Simplified - returns first output
 }
 
 fn verify_ubi_contract_called(tx: Transaction, ubi_contract: ByteArray) -> Bool {
   // Verify that the UBI contract is being called in this transaction
   // Check if UBI contract is in inputs (being spent)
-  let in_inputs = list.any(tx.inputs, fn(input) {
-    when input.output.address.payment_credential is {
-      address.Script(hash) -> hash == ubi_contract
-      _ -> False
-    }
-  })
+  let in_inputs =
+    list.any(
+      tx.inputs,
+      fn(input) {
+        when input.output.address.payment_credential is {
+          address.Script(hash) -> hash == ubi_contract
+          _ -> False
+        }
+      },
+    )
 
   // Also check if UBI contract is in reference inputs
-  let in_ref_inputs = list.any(tx.reference_inputs, fn(input) {
-    when input.output.address.payment_credential is {
-      address.Script(hash) -> hash == ubi_contract
-      _ -> False
-    }
-  })
+  let in_ref_inputs =
+    list.any(
+      tx.reference_inputs,
+      fn(input) {
+        when input.output.address.payment_credential is {
+          address.Script(hash) -> hash == ubi_contract
+          _ -> False
+        }
+      },
+    )
 
   in_inputs || in_ref_inputs
 }
 
-fn validate_update_record(tx: Transaction, datum: Option<CareDatum>, record_id: ByteArray, new_hours: Option<Int>, new_notes: Option<ByteArray>, config: CareConfig) -> Bool {
+fn validate_update_record(
+  tx: Transaction,
+  datum: Option<CareDatum>,
+  record_id: ByteArray,
+  new_hours: Option<Int>,
+  new_notes: Option<ByteArray>,
+  config: CareConfig,
+) -> Bool {
   // 1. Get existing record
   expect Some(Record(record)) = datum
   expect record.record_id == record_id
@@ -881,18 +924,24 @@ fn validate_update_record(tx: Transaction, datum: Option<CareDatum>, record_id: 
   expect list.has(tx.extra_signatories, caregiver.owner)
 
   // 4. Apply updates
-  let updated_hours = when new_hours is {
-    Some(h) -> h
-    None -> record.hours
-  }
-  let updated_notes = when new_notes is {
-    Some(n) -> Some(n)
-    None -> record.notes_hash
-  }
+  let updated_hours =
+    when new_hours is {
+      Some(h) -> h
+      None -> record.hours
+    }
+  let updated_notes =
+    when new_notes is {
+      Some(n) -> Some(n)
+      None -> record.notes_hash
+    }
 
   // 5. Hours must still be valid
   expect updated_hours > 0
-  expect updated_hours <= config.max_daily_hours * days_between(record.started_at, record.ended_at)
+  expect
+    updated_hours <= config.max_daily_hours * days_between(
+      record.started_at,
+      record.ended_at,
+    )
 
   // 6. Verify output has updated record
   let output = find_care_record_output(tx.outputs)
@@ -900,13 +949,15 @@ fn validate_update_record(tx: Transaction, datum: Option<CareDatum>, record_id: 
   expect InlineDatum(data) = out.datum
   expect Record(result): CareDatum = data
 
-  result.record_id == record_id &&
-  result.hours == updated_hours &&
-  result.notes_hash == updated_notes &&
-  result.caregiver == record.caregiver
+  result.record_id == record_id && result.hours == updated_hours && result.notes_hash == updated_notes && result.caregiver == record.caregiver
 }
 
-fn validate_cancel_record(tx: Transaction, datum: Option<CareDatum>, record_id: ByteArray, config: CareConfig) -> Bool {
+fn validate_cancel_record(
+  tx: Transaction,
+  datum: Option<CareDatum>,
+  record_id: ByteArray,
+  config: CareConfig,
+) -> Bool {
   // 1. Get existing record
   expect Some(Record(record)) = datum
   expect record.record_id == record_id
@@ -921,23 +972,33 @@ fn validate_cancel_record(tx: Transaction, datum: Option<CareDatum>, record_id: 
   expect list.has(tx.extra_signatories, caregiver.owner)
 
   // 4. Record should not be recreated (UTxO is consumed without replacement)
-  let no_record_output = !list.any(tx.outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect care_datum: CareDatum = data
-        when care_datum is {
-          Record(r) -> r.record_id == record_id
+  let no_record_output =
+    !list.any(
+      tx.outputs,
+      fn(output) {
+        when output.datum is {
+          InlineDatum(data) -> {
+            expect care_datum: CareDatum = data
+            when care_datum is {
+              Record(r) -> r.record_id == record_id
+              _ -> False
+            }
+          }
           _ -> False
         }
-      }
-      _ -> False
-    }
-  })
+      },
+    )
 
   no_record_output
 }
 
-fn validate_dispute_record(tx: Transaction, datum: Option<CareDatum>, record_id: ByteArray, reason: ByteArray, config: CareConfig) -> Bool {
+fn validate_dispute_record(
+  tx: Transaction,
+  datum: Option<CareDatum>,
+  record_id: ByteArray,
+  reason: ByteArray,
+  config: CareConfig,
+) -> Bool {
   // 1. Get existing record
   expect Some(Record(record)) = datum
   expect record.record_id == record_id
@@ -962,16 +1023,22 @@ fn validate_dispute_record(tx: Transaction, datum: Option<CareDatum>, record_id:
   expect InlineDatum(data) = out.datum
   expect Record(result): CareDatum = data
 
-  result.record_id == record_id &&
-  result.status == Disputed { reason: reason }
+  result.record_id == record_id && result.status == Disputed { reason }
 }
 
-fn validate_aggregate_bioregion(tx: Transaction, datum: Option<CareDatum>, bioregion: ByteArray, cycle: Int, config: CareConfig) -> Bool {
+fn validate_aggregate_bioregion(
+  tx: Transaction,
+  datum: Option<CareDatum>,
+  bioregion: ByteArray,
+  cycle: Int,
+  config: CareConfig,
+) -> Bool {
   // 1. Must have existing bioregion stats or create new
-  let existing_stats = when datum is {
-    Some(BioregionCareStats(stats)) -> Some(stats)
-    _ -> None
-  }
+  let existing_stats =
+    when datum is {
+      Some(BioregionCareStats(stats)) -> Some(stats)
+      _ -> None
+    }
 
   // 2. Aggregator must be Steward level in this bioregion
   let aggregator_pnft = find_signer_pnft(tx, config.pnft_policy)
@@ -981,24 +1048,27 @@ fn validate_aggregate_bioregion(tx: Transaction, datum: Option<CareDatum>, biore
   expect list.has(tx.extra_signatories, aggregator.owner)
 
   // 3. Gather all care records for this bioregion from inputs
-  let care_records = list.filter_map(tx.inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect care_datum: CareDatum = data
-        when care_datum is {
-          Record(record) -> {
-            if record.bioregion == bioregion {
-              Some(record)
-            } else {
-              None
+  let care_records =
+    list.filter_map(
+      tx.inputs,
+      fn(input) {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect care_datum: CareDatum = data
+            when care_datum is {
+              Record(record) ->
+                if record.bioregion == bioregion {
+                  Some(record)
+                } else {
+                  None
+                }
+              _ -> None
             }
           }
           _ -> None
         }
-      }
-      _ -> None
-    }
-  })
+      },
+    )
 
   // 4. Calculate aggregated stats
   let total_hours = list.foldl(care_records, 0, fn(r, acc) { acc + r.hours })
@@ -1007,36 +1077,42 @@ fn validate_aggregate_bioregion(tx: Transaction, datum: Option<CareDatum>, biore
   let active_caregivers = count_unique(caregivers)
 
   // 5. Verify output has correct aggregated data
-  let output = list.find(tx.outputs, fn(out) {
-    when out.datum is {
-      InlineDatum(data) -> {
-        expect result: CareDatum = data
-        when result is {
-          BioregionCareStats(stats) -> stats.bioregion == bioregion && stats.cycle == cycle
+  let output =
+    list.find(
+      tx.outputs,
+      fn(out) {
+        when out.datum is {
+          InlineDatum(data) -> {
+            expect result: CareDatum = data
+            when result is {
+              BioregionCareStats(stats) ->
+                stats.bioregion == bioregion && stats.cycle == cycle
+              _ -> False
+            }
+          }
           _ -> False
         }
-      }
-      _ -> False
-    }
-  })
+      },
+    )
   expect Some(out) = output
   expect InlineDatum(out_data) = out.datum
   expect BioregionCareStats(result_stats): CareDatum = out_data
 
-  result_stats.bioregion == bioregion &&
-  result_stats.cycle == cycle &&
-  result_stats.total_hours >= total_hours &&
-  result_stats.active_caregivers >= active_caregivers
+  result_stats.bioregion == bioregion && result_stats.cycle == cycle && result_stats.total_hours >= total_hours && result_stats.active_caregivers >= active_caregivers
 }
 
 /// Count unique items in a list
 fn count_unique(items: List<AssetName>) -> Int {
-  list.foldl(items, ([], 0), fn(item, acc) {
-    let (seen, count) = acc
-    if list.has(seen, item) {
-      (seen, count)
-    } else {
-      (list.concat(seen, [item]), count + 1)
-    }
-  }).2nd
+  list.foldl(
+    items,
+    ([], 0),
+    fn(item, acc) {
+      let (seen, count) = acc
+      if list.has(seen, item) {
+        (seen, count)
+      } else {
+        (list.concat(seen, [item]), count + 1)
+      }
+    },
+  ).2nd
 }

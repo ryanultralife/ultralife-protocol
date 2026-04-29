@@ -15,8 +15,7 @@ use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use cardano/assets.{AssetName}
 use ultralife/types.{
-  VerificationLevel, Basic, Ward, Standard, Verified, Steward,
-  can_transact,
+  Basic, Standard, Steward, VerificationLevel, Verified, Ward, can_transact,
 }
 
 // =============================================================================
@@ -91,7 +90,9 @@ type Impact {
 // =============================================================================
 
 const min_area = 100
+
 const default_steward_share = 7000
+
 const default_bioregion_share = 2000
 
 // =============================================================================
@@ -122,17 +123,22 @@ fn mock_right_holder(
   expires: Option<Int>,
 ) -> RightHolder {
   RightHolder {
-    holder: holder,
-    acquisition: acquisition,
+    holder,
+    acquisition,
     acquired_at: 1000,
     transferable: True,
-    expires: expires,
+    expires,
     steward_share: default_steward_share,
     bioregion_share: default_bioregion_share,
   }
 }
 
-fn mock_land_health(overall: Int, soil: Int, water: Int, biodiversity: Int) -> LandHealth {
+fn mock_land_health(
+  overall: Int,
+  soil: Int,
+  water: Int,
+  biodiversity: Int,
+) -> LandHealth {
   LandHealth {
     overall_index: overall,
     soil_health: soil,
@@ -147,9 +153,9 @@ fn mock_impact(magnitude: Int, confidence: Int) -> Impact {
   Impact {
     category: #"636172626f6e",
     compound_code: #"0101",
-    magnitude: magnitude,
+    magnitude,
     unit: #"6b67",
-    confidence: confidence,
+    confidence,
     locality: Site,
   }
 }
@@ -200,27 +206,63 @@ fn validate_registration(
 }
 
 test valid_land_registration() {
-  validate_registration(Verified, Some(#"62696f726567696f6e31"), #"62696f726567696f6e31", 500, True)
+  validate_registration(
+    Verified,
+    Some(#"62696f726567696f6e31"),
+    #"62696f726567696f6e31",
+    500,
+    True,
+  )
 }
 
 test registration_fails_with_standard_level() {
-  !validate_registration(Standard, Some(#"62696f726567696f6e31"), #"62696f726567696f6e31", 500, True)
+  !validate_registration(
+    Standard,
+    Some(#"62696f726567696f6e31"),
+    #"62696f726567696f6e31",
+    500,
+    True,
+  )
 }
 
 test registration_fails_with_different_bioregion() {
-  !validate_registration(Verified, Some(#"62696f726567696f6e32"), #"62696f726567696f6e31", 500, True)
+  !validate_registration(
+    Verified,
+    Some(#"62696f726567696f6e32"),
+    #"62696f726567696f6e31",
+    500,
+    True,
+  )
 }
 
 test registration_fails_with_small_area() {
-  !validate_registration(Verified, Some(#"62696f726567696f6e31"), #"62696f726567696f6e31", 50, True)
+  !validate_registration(
+    Verified,
+    Some(#"62696f726567696f6e31"),
+    #"62696f726567696f6e31",
+    50,
+    True,
+  )
 }
 
 test registration_fails_without_survey() {
-  !validate_registration(Verified, Some(#"62696f726567696f6e31"), #"62696f726567696f6e31", 500, False)
+  !validate_registration(
+    Verified,
+    Some(#"62696f726567696f6e31"),
+    #"62696f726567696f6e31",
+    500,
+    False,
+  )
 }
 
 test registration_with_minimum_area_valid() {
-  validate_registration(Verified, Some(#"62696f726567696f6e31"), #"62696f726567696f6e31", 100, True)
+  validate_registration(
+    Verified,
+    Some(#"62696f726567696f6e31"),
+    #"62696f726567696f6e31",
+    100,
+    True,
+  )
 }
 
 test registration_with_no_bioregion_fails() {
@@ -231,7 +273,10 @@ test registration_with_no_bioregion_fails() {
 // RIGHT HOLDER QUALIFICATION TESTS
 // =============================================================================
 
-fn holder_qualified_for_right(level: VerificationLevel, right_type: RightType) -> Bool {
+fn holder_qualified_for_right(
+  level: VerificationLevel,
+  right_type: RightType,
+) -> Bool {
   when right_type is {
     SubsurfaceRight -> can_steward_land(level)
     WaterRight -> can_steward_land(level)
@@ -265,15 +310,20 @@ test verified_can_hold_water_right() {
 }
 
 test basic_cannot_hold_any_right() {
-  !holder_qualified_for_right(Basic, SurfaceRight) &&
-  !holder_qualified_for_right(Basic, CarbonRight)
+  !holder_qualified_for_right(Basic, SurfaceRight) && !holder_qualified_for_right(
+    Basic,
+    CarbonRight,
+  )
 }
 
 test steward_can_hold_all_rights() {
-  holder_qualified_for_right(Steward, SurfaceRight) &&
-  holder_qualified_for_right(Steward, SubsurfaceRight) &&
-  holder_qualified_for_right(Steward, WaterRight) &&
-  holder_qualified_for_right(Steward, CarbonRight)
+  holder_qualified_for_right(Steward, SurfaceRight) && holder_qualified_for_right(
+    Steward,
+    SubsurfaceRight,
+  ) && holder_qualified_for_right(Steward, WaterRight) && holder_qualified_for_right(
+    Steward,
+    CarbonRight,
+  )
 }
 
 // =============================================================================
@@ -286,9 +336,7 @@ fn validate_transfer(
   transferable: Bool,
   new_holder_qualified: Bool,
 ) -> Bool {
-  current_holder == signer &&
-  transferable &&
-  new_holder_qualified
+  current_holder == signer && transferable && new_holder_qualified
 }
 
 test valid_right_transfer() {
@@ -323,10 +371,7 @@ fn validate_lease(
   duration_cycles: Int,
   payment: Int,
 ) -> Bool {
-  current_holder == signer &&
-  lessee_qualified &&
-  duration_cycles > 0 &&
-  payment > 0
+  current_holder == signer && lessee_qualified && duration_cycles > 0 && payment > 0
 }
 
 test valid_lease_creation() {
@@ -361,9 +406,7 @@ fn validate_lease_return(
   expiry: Option<Int>,
 ) -> Bool {
   when expiry is {
-    Some(exp) -> {
-      current_slot >= exp || current_holder == signer
-    }
+    Some(exp) -> current_slot >= exp || current_holder == signer
     None -> False
   }
 }
@@ -406,24 +449,25 @@ fn calculate_payment_distribution(
 }
 
 test default_payment_distribution() {
-  let (steward, bioregion, holder) = calculate_payment_distribution(10000, 7000, 2000)
+  let (steward, bioregion, holder) =
+    calculate_payment_distribution(10000, 7000, 2000)
   steward == 7000 && bioregion == 2000 && holder == 1000
 }
 
 test equal_share_distribution() {
-  let (steward, bioregion, _holder) = calculate_payment_distribution(9000, 3333, 3333)
+  let (steward, bioregion, _holder) =
+    calculate_payment_distribution(9000, 3333, 3333)
   steward == 2999 && bioregion == 2999
 }
 
 test zero_bioregion_share() {
-  let (steward, bioregion, holder) = calculate_payment_distribution(10000, 8000, 0)
+  let (steward, bioregion, holder) =
+    calculate_payment_distribution(10000, 8000, 0)
   steward == 8000 && bioregion == 0 && holder == 2000
 }
 
 fn validate_share_update(steward_share: Int, bioregion_share: Int) -> Bool {
-  steward_share >= 0 &&
-  bioregion_share >= 0 &&
-  steward_share + bioregion_share <= 10000
+  steward_share >= 0 && bioregion_share >= 0 && steward_share + bioregion_share <= 10000
 }
 
 test valid_share_update() {
@@ -447,10 +491,14 @@ test share_update_allows_zero_shares() {
 // =============================================================================
 
 fn calculate_net_impact(impacts: List<Impact>) -> Int {
-  list.foldl(impacts, 0, fn(impact, acc) {
-    let weighted = impact.magnitude * impact.confidence / 100
-    acc + weighted
-  })
+  list.foldl(
+    impacts,
+    0,
+    fn(impact, acc) {
+      let weighted = impact.magnitude * impact.confidence / 100
+      acc + weighted
+    },
+  )
 }
 
 fn requires_remediation(net_impact: Int) -> Bool {
@@ -470,10 +518,7 @@ test negative_impact_requires_remediation() {
 }
 
 test mixed_impact_calculation() {
-  let impacts = [
-    mock_impact(100, 80),
-    mock_impact(-50, 100),
-  ]
+  let impacts = [mock_impact(100, 80), mock_impact(-50, 100)]
   let net = calculate_net_impact(impacts)
   net == 30
 }
@@ -505,14 +550,20 @@ fn validate_stewardship_transfer(
 ) -> Bool {
   let steward_signed = current_steward == signer
   let new_qualified = can_steward_land(new_steward_level)
-  let bioregion_valid = new_steward_bioregion == Some(land_bioregion) || governance_approved
+  let bioregion_valid =
+    new_steward_bioregion == Some(land_bioregion) || governance_approved
   steward_signed && new_qualified && bioregion_valid
 }
 
 test valid_stewardship_transfer() {
   let old = mock_pnft_name(1)
   validate_stewardship_transfer(
-    old, old, Verified, Some(#"62696f726567696f6e31"), #"62696f726567696f6e31", False
+    old,
+    old,
+    Verified,
+    Some(#"62696f726567696f6e31"),
+    #"62696f726567696f6e31",
+    False,
   )
 }
 
@@ -520,28 +571,48 @@ test transfer_fails_without_steward_signature() {
   let old = mock_pnft_name(1)
   let other = mock_pnft_name(2)
   !validate_stewardship_transfer(
-    old, other, Verified, Some(#"62696f726567696f6e31"), #"62696f726567696f6e31", False
+    old,
+    other,
+    Verified,
+    Some(#"62696f726567696f6e31"),
+    #"62696f726567696f6e31",
+    False,
   )
 }
 
 test transfer_fails_with_standard_new_steward() {
   let old = mock_pnft_name(1)
   !validate_stewardship_transfer(
-    old, old, Standard, Some(#"62696f726567696f6e31"), #"62696f726567696f6e31", False
+    old,
+    old,
+    Standard,
+    Some(#"62696f726567696f6e31"),
+    #"62696f726567696f6e31",
+    False,
   )
 }
 
 test cross_bioregion_transfer_needs_governance() {
   let old = mock_pnft_name(1)
   !validate_stewardship_transfer(
-    old, old, Verified, Some(#"62696f726567696f6e32"), #"62696f726567696f6e31", False
+    old,
+    old,
+    Verified,
+    Some(#"62696f726567696f6e32"),
+    #"62696f726567696f6e31",
+    False,
   )
 }
 
 test cross_bioregion_transfer_with_governance_approved() {
   let old = mock_pnft_name(1)
   validate_stewardship_transfer(
-    old, old, Verified, Some(#"62696f726567696f6e32"), #"62696f726567696f6e31", True
+    old,
+    old,
+    Verified,
+    Some(#"62696f726567696f6e32"),
+    #"62696f726567696f6e31",
+    True,
   )
 }
 
@@ -549,7 +620,10 @@ test cross_bioregion_transfer_with_governance_approved() {
 // TRADITIONAL RIGHTS TESTS
 // =============================================================================
 
-fn validate_traditional_claim(governance_approved: Bool, has_evidence: Bool) -> Bool {
+fn validate_traditional_claim(
+  governance_approved: Bool,
+  has_evidence: Bool,
+) -> Bool {
   governance_approved && has_evidence
 }
 
@@ -570,7 +644,7 @@ test traditional_claim_fails_without_evidence() {
 // =============================================================================
 
 fn calculate_overall_health(soil: Int, water: Int, biodiversity: Int) -> Int {
-  (soil + water + biodiversity) / 3
+  ( soil + water + biodiversity ) / 3
 }
 
 fn determine_trend(current: Int, previous: Int) -> HealthTrend {
@@ -669,8 +743,13 @@ test private_access_denied_for_non_allowed() {
 // =============================================================================
 
 test minimum_area_boundary() {
-  validate_registration(Verified, Some(#"62696f31"), #"62696f31", 100, True) &&
-  !validate_registration(Verified, Some(#"62696f31"), #"62696f31", 99, True)
+  validate_registration(Verified, Some(#"62696f31"), #"62696f31", 100, True) && !validate_registration(
+    Verified,
+    Some(#"62696f31"),
+    #"62696f31",
+    99,
+    True,
+  )
 }
 
 test all_right_types_have_holder() {
@@ -678,9 +757,7 @@ test all_right_types_have_holder() {
   let surface = mock_right_holder(holder, Original, None)
   let subsurface = mock_right_holder(holder, Original, None)
   let water = mock_right_holder(holder, Original, None)
-  surface.holder == holder &&
-  subsurface.holder == holder &&
-  water.holder == holder
+  surface.holder == holder && subsurface.holder == holder && water.holder == holder
 }
 
 test lease_expiry_exactly_at_slot() {
@@ -690,7 +767,8 @@ test lease_expiry_exactly_at_slot() {
 }
 
 test share_sums_correctly() {
-  let (steward, bioregion, holder) = calculate_payment_distribution(10000, 7000, 2000)
+  let (steward, bioregion, holder) =
+    calculate_payment_distribution(10000, 7000, 2000)
   steward + bioregion + holder == 10000
 }
 

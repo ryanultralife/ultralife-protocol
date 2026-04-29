@@ -3,13 +3,12 @@
 // =============================================================================
 
 use ultralife/prc37.{
-  CYCLE_SLOTS, GENESIS_SLOT, QUORUM_BPS, SUPERMAJORITY_BPS, RESONANCE_THRESHOLD,
-  current_cycle, cycle_start, cycle_end, in_cycle, cycle_position, cycle_progress,
-  MIN_VOTING_PERIOD, EMERGENCY_VOTING_PERIOD, CONSTITUTIONAL_VOTING_PERIOD,
-  UBI_WINDOW, in_ubi_window, next_ubi_start,
-  HEALTH_UPDATE_START, in_health_update_window,
-  VITALITY_DECAY_PER_CYCLE, calculate_vitality,
-  quorum_reached, supermajority_reached, majority_reached,
+  CONSTITUTIONAL_VOTING_PERIOD, CYCLE_SLOTS, EMERGENCY_VOTING_PERIOD,
+  GENESIS_SLOT, HEALTH_UPDATE_START, MIN_VOTING_PERIOD, QUORUM_BPS,
+  RESONANCE_THRESHOLD, SUPERMAJORITY_BPS, UBI_WINDOW, VITALITY_DECAY_PER_CYCLE,
+  calculate_vitality, current_cycle, cycle_end, cycle_position, cycle_progress,
+  cycle_start, in_cycle, in_health_update_window, in_ubi_window,
+  majority_reached, next_ubi_start, quorum_reached, supermajority_reached,
 }
 
 // =============================================================================
@@ -218,8 +217,7 @@ test resonance_threshold_is_37() {
 }
 
 test voting_periods_relationship() {
-  EMERGENCY_VOTING_PERIOD < MIN_VOTING_PERIOD &&
-  MIN_VOTING_PERIOD < CONSTITUTIONAL_VOTING_PERIOD
+  EMERGENCY_VOTING_PERIOD < MIN_VOTING_PERIOD && MIN_VOTING_PERIOD < CONSTITUTIONAL_VOTING_PERIOD
 }
 
 test emergency_is_tenth_of_cycle() {

@@ -13,17 +13,14 @@
 use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use cardano/assets.{AssetName}
-use ultralife/types.{
-  VerificationLevel, Basic, Ward, Standard, Verified, Steward,
-  ProposalType, Budget, Policy, Emergency, Constitutional,
-  ProposalStatus, Active, Passed, Failed, Executed, Expired,
-  ProposalDatum, VoteDatum,
-  voting_weight, can_propose,
-}
 use ultralife/prc37.{
-  cycle_slots, genesis_slot,
-  quorum_reached, supermajority_reached, majority_reached,
-  current_cycle, cycle_start, cycle_end,
+  current_cycle, cycle_end, cycle_slots, cycle_start, genesis_slot,
+  majority_reached, quorum_reached, supermajority_reached,
+}
+use ultralife/types.{
+  Active, Basic, Budget, Constitutional, Emergency, Executed, Expired, Failed,
+  Passed, Policy, ProposalDatum, ProposalStatus, ProposalType, Standard, Steward,
+  VerificationLevel, Verified, VoteDatum, Ward, can_propose, voting_weight,
 }
 
 // =============================================================================
@@ -31,7 +28,9 @@ use ultralife/prc37.{
 // =============================================================================
 
 const min_voting_period = 604800
+
 const emergency_voting_period = 86400
+
 const constitutional_voting_period = 3196800
 
 // =============================================================================
@@ -68,15 +67,15 @@ fn mock_proposal(
 ) -> ProposalDatum {
   ProposalDatum {
     proposal_id: #"70726f70303031",
-    proposer: proposer,
-    bioregion: bioregion,
-    proposal_type: proposal_type,
+    proposer,
+    bioregion,
+    proposal_type,
     content_hash: #"636f6e74656e745f68617368",
     voting_start: start,
     voting_end: end,
-    votes_for: votes_for,
-    votes_against: votes_against,
-    status: status,
+    votes_for,
+    votes_against,
+    status,
   }
 }
 
@@ -87,13 +86,7 @@ fn mock_vote(
   weight: Int,
   slot: Int,
 ) -> VoteDatum {
-  VoteDatum {
-    proposal_id: proposal_id,
-    voter: voter,
-    vote_for: vote_for,
-    weight: weight,
-    slot: slot,
-  }
+  VoteDatum { proposal_id, voter, vote_for, weight, slot }
 }
 
 // =============================================================================
@@ -121,9 +114,9 @@ test steward_has_voting_weight_3() {
 }
 
 test voting_weights_are_ordered() {
-  voting_weight(Basic) < voting_weight(Standard) &&
-  voting_weight(Standard) < voting_weight(Verified) &&
-  voting_weight(Verified) < voting_weight(Steward)
+  voting_weight(Basic) < voting_weight(Standard) && voting_weight(Standard) < voting_weight(
+    Verified,
+  ) && voting_weight(Verified) < voting_weight(Steward)
 }
 
 // =============================================================================
@@ -151,11 +144,9 @@ test steward_can_propose() {
 }
 
 test only_verified_and_steward_can_propose() {
-  !can_propose(Basic) &&
-  !can_propose(Ward) &&
-  !can_propose(Standard) &&
-  can_propose(Verified) &&
-  can_propose(Steward)
+  !can_propose(Basic) && !can_propose(Ward) && !can_propose(Standard) && can_propose(
+    Verified,
+  ) && can_propose(Steward)
 }
 
 // =============================================================================
@@ -327,7 +318,11 @@ test cannot_vote_on_expired_proposal() {
 // VOTING PERIOD VALIDATION TESTS
 // =============================================================================
 
-fn in_voting_period(current_slot: Int, voting_start: Int, voting_end: Int) -> Bool {
+fn in_voting_period(
+  current_slot: Int,
+  voting_start: Int,
+  voting_end: Int,
+) -> Bool {
   current_slot >= voting_start && current_slot <= voting_end
 }
 
@@ -360,8 +355,7 @@ fn validate_create_proposal(
   stake_amount: Int,
   required_stake: Int,
 ) -> Bool {
-  can_propose(proposer_level) &&
-  stake_amount >= required_stake
+  can_propose(proposer_level) && stake_amount >= required_stake
 }
 
 test verified_can_create_proposal_with_stake() {
@@ -435,7 +429,11 @@ test steward_vote_adds_weight_3() {
 // DUPLICATE VOTE PREVENTION TESTS
 // =============================================================================
 
-fn has_voted(votes: List<VoteDatum>, voter: AssetName, proposal_id: ByteArray) -> Bool {
+fn has_voted(
+  votes: List<VoteDatum>,
+  voter: AssetName,
+  proposal_id: ByteArray,
+) -> Bool {
   list.any(votes, fn(v) { v.voter == voter && v.proposal_id == proposal_id })
 }
 
@@ -479,10 +477,11 @@ fn proposal_passed(
   eligible_voters: Int,
 ) -> Bool {
   let has_quorum = quorum_reached(total_votes, eligible_voters)
-  let has_approval = when proposal_type is {
-    Constitutional { .. } -> supermajority_reached(votes_for, total_votes)
-    _ -> majority_reached(votes_for, votes_against)
-  }
+  let has_approval =
+    when proposal_type is {
+      Constitutional { .. } -> supermajority_reached(votes_for, total_votes)
+      _ -> majority_reached(votes_for, votes_against)
+    }
   has_quorum && has_approval
 }
 
@@ -544,7 +543,10 @@ test stake_forfeited_without_quorum() {
 // BIOREGION SCOPING TESTS
 // =============================================================================
 
-fn voter_in_bioregion(voter_bioregion: Option<ByteArray>, proposal_bioregion: ByteArray) -> Bool {
+fn voter_in_bioregion(
+  voter_bioregion: Option<ByteArray>,
+  proposal_bioregion: ByteArray,
+) -> Bool {
   voter_bioregion == Some(proposal_bioregion)
 }
 
@@ -570,9 +572,7 @@ fn can_execute(
   voting_end: Int,
   passed: Bool,
 ) -> Bool {
-  status == Active &&
-  current_slot > voting_end &&
-  passed
+  status == Active && current_slot > voting_end && passed
 }
 
 test can_execute_passed_proposal_after_voting() {
@@ -601,9 +601,7 @@ fn can_close(
   voting_end: Int,
   passed: Bool,
 ) -> Bool {
-  status == Active &&
-  current_slot > voting_end &&
-  !passed
+  status == Active && current_slot > voting_end && !passed
 }
 
 test can_close_failed_proposal_after_voting() {
@@ -646,26 +644,20 @@ test mixed_level_votes_sum_correctly() {
 
 test proposal_datum_preserved_on_vote() {
   let proposer = mock_pnft_name(1)
-  let proposal = mock_proposal(
-    proposer,
-    #"62696f726567696f6e31",
-    Budget { amount: 100, recipient: #"74726561737572" },
-    1000,
-    2000,
-    Active,
-    0,
-    0,
-  )
-  let (new_for, new_against) = update_vote_totals(
-    proposal.votes_for,
-    proposal.votes_against,
-    True,
-    2,
-  )
-  new_for == 2 && new_against == 0 &&
-  proposal.proposal_id == #"70726f70303031" &&
-  proposal.bioregion == #"62696f726567696f6e31" &&
-  proposal.status == Active
+  let proposal =
+    mock_proposal(
+      proposer,
+      #"62696f726567696f6e31",
+      Budget { amount: 100, recipient: #"74726561737572" },
+      1000,
+      2000,
+      Active,
+      0,
+      0,
+    )
+  let (new_for, new_against) =
+    update_vote_totals(proposal.votes_for, proposal.votes_against, True, 2)
+  new_for == 2 && new_against == 0 && proposal.proposal_id == #"70726f70303031" && proposal.bioregion == #"62696f726567696f6e31" && proposal.status == Active
 }
 
 test cycle_timing_for_proposals() {

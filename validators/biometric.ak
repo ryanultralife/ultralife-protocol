@@ -4,20 +4,21 @@
 // Manages biometric identity registration and authentication gates.
 // Raw biometric data NEVER appears on-chain. Only hashes and confidence scores.
 
-use aiken/hash.{Blake2b_256, Hash}
-use aiken/list
-use aiken/transaction.{ScriptContext, Spend, Transaction, InlineDatum}
+use aiken/crypto.{Blake2b_256, Hash, Signature, VerificationKey, blake2b_256, verify_ed25519_signature}
 use aiken/interval.{Finite}
+use aiken/collection/list
+use aiken/primitive/bytearray
+use cardano/transaction.{Transaction}
 
 // === Types ===
 
-type IdentityStatus {
+pub type IdentityStatus {
   Active
   Suspended
   Revoked
 }
 
-type IdentityDatum {
+pub type IdentityDatum {
   // Hash of the enrolled biometric feature vector
   enrollment_hash: Hash<Blake2b_256, ByteArray>,
   // Device public key hash (which device holds this identity)
@@ -25,14 +26,15 @@ type IdentityDatum {
   // Enrollment timestamp (POSIX milliseconds)
   enrollment_time: Int,
   // Minimum confidence required for this identity's transactions
-  min_confidence: Int, // 80-98, representing 0.80-0.98
+  min_confidence: Int,
+  // 80-98, representing 0.80-0.98
   // Status
   status: IdentityStatus,
   // Version (for upgrade path)
   version: Int,
 }
 
-type IdentityAction {
+pub type IdentityAction {
   // Authenticate: prove live biometric matches enrollment
   Authenticate {
     // Hash of the live biometric reading
@@ -41,17 +43,24 @@ type IdentityAction {
     confidence: Int,
     // Timestamp of authentication
     auth_time: Int,
-    // Device signature (proves this came from enrolled device)
-    device_sig: ByteArray,
+    // Device public key (verifies against stored hash)
+    device_pubkey: VerificationKey,
+    // Device signature over (live_hash ++ confidence ++ auth_time)
+    device_sig: Signature,
   }
   // Update enrollment (slow drift for aging)
   UpdateEnrollment {
     new_hash: Hash<Blake2b_256, ByteArray>,
     confidence: Int,
-    device_sig: ByteArray,
+    // Device public key (verifies against stored hash)
+    device_pubkey: VerificationKey,
+    device_sig: Signature,
   }
   // Suspend identity (temporary lock)
-  Suspend { device_sig: ByteArray }
+  Suspend {
+    device_pubkey: VerificationKey,
+    device_sig: Signature,
+  }
   // Revoke identity (permanent — for device loss/compromise)
   Revoke { recovery_proof: ByteArray }
 }
@@ -68,7 +77,7 @@ validator identity {
     expect Some(d) = datum
 
     when redeemer is {
-      Authenticate { live_hash, confidence, auth_time, device_sig } -> {
+      Authenticate { live_hash, confidence, auth_time, device_pubkey, device_sig } -> {
         // 1. Identity must be active
         expect d.status == Active
 
@@ -78,24 +87,35 @@ validator identity {
         // 3. Authentication must be recent (within 5 minutes)
         let validity = self.validity_range
         expect Finite(lower_bound) = validity.lower_bound.bound_type
-        expect auth_time >= lower_bound - 300_000 // 5 min tolerance
+        expect auth_time >= lower_bound - 300_000
 
-        // 4. Device signature must be from enrolled device
-        // In production: verify ed25519 signature against device_pubkey
-        expect verify_device_sig(d.device_pubkey, device_sig)
+        // 5 min tolerance
+        // 4. Verify provided pubkey matches enrolled device
+        expect verify_pubkey_matches(d.device_pubkey, device_pubkey)
 
-        // 5. Live hash must not equal enrollment hash
+        // 5. Build message from auth data and verify signature
+        let message = build_auth_message(live_hash, confidence, auth_time)
+        expect verify_ed25519_signature(device_pubkey, message, device_sig)
+
+        // 6. Live hash must not equal enrollment hash
         //    (exact match = replay attack with enrollment data)
         expect live_hash != d.enrollment_hash
 
         True
       }
 
-      UpdateEnrollment { new_hash, confidence, device_sig } -> {
+      UpdateEnrollment { new_hash, confidence, device_pubkey, device_sig } -> {
         // Only allow updates with very high confidence
         expect d.status == Active
-        expect confidence >= 92 // 0.92 threshold for enrollment evolution
-        expect verify_device_sig(d.device_pubkey, device_sig)
+        expect confidence >= 92
+        // 0.92 threshold for enrollment evolution
+
+        // Verify pubkey matches enrolled device
+        expect verify_pubkey_matches(d.device_pubkey, device_pubkey)
+
+        // Build message and verify signature
+        let message = build_update_message(new_hash, confidence)
+        expect verify_ed25519_signature(device_pubkey, message, device_sig)
 
         // New hash must be different (actual update occurred)
         expect new_hash != d.enrollment_hash
@@ -103,9 +123,16 @@ validator identity {
         True
       }
 
-      Suspend { device_sig } -> {
+      Suspend { device_pubkey, device_sig } -> {
         expect d.status == Active
-        expect verify_device_sig(d.device_pubkey, device_sig)
+
+        // Verify pubkey matches enrolled device
+        expect verify_pubkey_matches(d.device_pubkey, device_pubkey)
+
+        // Verify signature over "suspend" action
+        let message = "suspend"
+        expect verify_ed25519_signature(device_pubkey, message, device_sig)
+
         True
       }
 
@@ -117,90 +144,143 @@ validator identity {
       }
     }
   }
+
+  else(_) {
+    fail
+  }
 }
 
 // === Helper functions ===
 
-fn verify_device_sig(
-  _device_pubkey: Hash<Blake2b_256, ByteArray>,
-  _sig: ByteArray,
+/// Verify that the provided public key hashes to the stored device pubkey hash
+fn verify_pubkey_matches(
+  stored_hash: Hash<Blake2b_256, ByteArray>,
+  provided_key: VerificationKey,
 ) -> Bool {
-  // TODO: Implement ed25519 signature verification
-  // In production, this verifies the device's signature
-  // against the enrolled public key
-  True
+  // Hash the provided public key and compare to stored hash
+  blake2b_256(provided_key) == stored_hash
+}
+
+/// Build the message for authentication signature
+/// Message = live_hash ++ confidence_bytes ++ auth_time_bytes
+fn build_auth_message(
+  live_hash: Hash<Blake2b_256, ByteArray>,
+  confidence: Int,
+  auth_time: Int,
+) -> ByteArray {
+  // Concatenate hash with serialized confidence and time
+  bytearray.concat(live_hash, bytearray.concat(int_to_bytes(confidence), int_to_bytes(auth_time)))
+}
+
+/// Build the message for enrollment update signature
+/// Message = new_hash ++ confidence_bytes
+fn build_update_message(
+  new_hash: Hash<Blake2b_256, ByteArray>,
+  confidence: Int,
+) -> ByteArray {
+  bytearray.concat(new_hash, int_to_bytes(confidence))
+}
+
+/// Convert integer to 8-byte big-endian representation
+fn int_to_bytes(n: Int) -> ByteArray {
+  // Simple serialization: 8 bytes, big-endian
+  // For on-chain use, we use a deterministic encoding
+  bytearray.from_int_big_endian(n, 8)
 }
 
 fn verify_recovery_proof(_proof: ByteArray) -> Bool {
   // TODO: Implement social recovery verification
   // Checks M-of-N attestation from recovery contacts
+  // This would verify signatures from N guardians
   True
 }
 
 // === Tests ===
 
-test authenticate_success() {
-  let datum = IdentityDatum {
-    enrollment_hash: #"aabb",
-    device_pubkey: #"ccdd",
-    enrollment_time: 1000000,
-    min_confidence: 90,
-    status: Active,
-    version: 1,
-  }
+// Test public key (32 bytes for Ed25519)
+const test_pubkey: ByteArray =
+  #"0102030405060708091011121314151617181920212223242526272829303132"
 
-  let redeemer = Authenticate {
-    live_hash: #"eeff",  // Different from enrollment (not replay)
-    confidence: 95,       // Above threshold
-    auth_time: 1001000,
-    device_sig: #"1234",
-  }
+// Test signature (64 bytes for Ed25519)
+const test_sig: ByteArray =
+  #"01020304050607080910111213141516171819202122232425262728293031320102030405060708091011121314151617181920212223242526272829303132"
 
-  // Should pass all checks
-  True
+test pubkey_hash_verification() {
+  // Test that pubkey hashing and verification works
+  let pubkey_hash = blake2b_256(test_pubkey)
+  verify_pubkey_matches(pubkey_hash, test_pubkey)
 }
 
-test authenticate_fail_low_confidence() {
-  let datum = IdentityDatum {
-    enrollment_hash: #"aabb",
-    device_pubkey: #"ccdd",
-    enrollment_time: 1000000,
-    min_confidence: 90,
-    status: Active,
-    version: 1,
-  }
-
-  // Confidence 80 < min_confidence 90
-  // This should fail validation
-  let redeemer = Authenticate {
-    live_hash: #"eeff",
-    confidence: 80,
-    auth_time: 1001000,
-    device_sig: #"1234",
-  }
-
-  // Would fail: confidence < min_confidence
-  True
+test int_to_bytes_works() {
+  // Test integer serialization
+  let bytes = int_to_bytes(1000000)
+  bytearray.length(bytes) == 8
 }
 
-test authenticate_fail_replay() {
-  let datum = IdentityDatum {
-    enrollment_hash: #"aabb",
-    device_pubkey: #"ccdd",
-    enrollment_time: 1000000,
-    min_confidence: 90,
-    status: Active,
-    version: 1,
-  }
+test build_auth_message_works() {
+  // Test message building for authentication
+  let live_hash: Hash<Blake2b_256, ByteArray> =
+    #"aabbccdd00112233445566778899aabbccdd00112233445566778899aabbccdd"
+  let message = build_auth_message(live_hash, 95, 1001000)
+  // Message should be: 32-byte hash + 8-byte confidence + 8-byte time = 48 bytes
+  bytearray.length(message) == 48
+}
 
-  // live_hash == enrollment_hash → replay attack
-  let redeemer = Authenticate {
-    live_hash: #"aabb",  // Same as enrollment!
-    confidence: 95,
-    auth_time: 1001000,
-    device_sig: #"1234",
-  }
+test datum_structure_valid() {
+  // Test that datum structure is correctly formed
+  let pubkey_hash = blake2b_256(test_pubkey)
+  let datum =
+    IdentityDatum {
+      enrollment_hash: #"aabbccdd00112233445566778899aabbccdd00112233445566778899aabbccdd",
+      device_pubkey: pubkey_hash,
+      enrollment_time: 1000000,
+      min_confidence: 90,
+      status: Active,
+      version: 1,
+    }
 
-  // Would fail: live_hash == enrollment_hash
-  True
+  datum.min_confidence == 90 && datum.status == Active && datum.version == 1
+}
+
+test redeemer_structure_authenticate() {
+  // Test that Authenticate redeemer is correctly formed
+  let redeemer =
+    Authenticate {
+      live_hash: #"eeff00112233445566778899aabbccdd00112233445566778899aabbccddeeff",
+      confidence: 95,
+      auth_time: 1001000,
+      device_pubkey: test_pubkey,
+      device_sig: test_sig,
+    }
+
+  when redeemer is {
+    Authenticate { confidence, .. } -> confidence == 95
+    _ -> False
+  }
+}
+
+test redeemer_structure_update() {
+  // Test that UpdateEnrollment redeemer is correctly formed
+  let redeemer =
+    UpdateEnrollment {
+      new_hash: #"eeff00112233445566778899aabbccdd00112233445566778899aabbccddeeff",
+      confidence: 93,
+      device_pubkey: test_pubkey,
+      device_sig: test_sig,
+    }
+
+  when redeemer is {
+    UpdateEnrollment { confidence, .. } -> confidence == 93
+    _ -> False
+  }
+}
+
+test redeemer_structure_suspend() {
+  // Test that Suspend redeemer is correctly formed
+  let redeemer = Suspend { device_pubkey: test_pubkey, device_sig: test_sig }
+
+  when redeemer is {
+    Suspend { .. } -> True
+    _ -> False
+  }
 }

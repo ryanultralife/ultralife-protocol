@@ -17,13 +17,14 @@
 use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use cardano/address
-use cardano/assets.{PolicyId, AssetName, Value, quantity_of}
-use cardano/transaction.{Transaction, Input, Output, OutputReference, InlineDatum}
+use cardano/assets.{AssetName, PolicyId, Value, quantity_of}
+use cardano/transaction.{
+  InlineDatum, Input, Output, OutputReference, Transaction,
+}
 use ultralife/types.{
-  PnftDatum, VerificationLevel, Steward,
-  CompoundFlow, CompoundCode, MassUnit, CompoundBalance,
-  AssetActivityRecord, AssetImpactHistory, ImpactTransferRecord,
-  ConsumerImpactRecord,
+  AssetActivityRecord, AssetImpactHistory, CompoundBalance, CompoundCode,
+  CompoundFlow, ConsumerImpactRecord, ImpactTransferRecord, MassUnit, PnftDatum,
+  Steward, VerificationLevel,
 }
 
 // =============================================================================
@@ -50,19 +51,13 @@ pub type AssetImpactRedeemer {
     asset_type: AssetType,
     initial_owner: AssetName,
   }
-  
   /// Record activity impacts to asset (called by work_auction)
-  RecordActivity {
-    asset_id: AssetName,
-    activity: AssetActivityRecord,
-  }
-  
+  RecordActivity { asset_id: AssetName, activity: AssetActivityRecord }
   /// Batch record multiple activities
   RecordActivities {
     asset_id: AssetName,
     activities: List<AssetActivityRecord>,
   }
-  
   // === Transfer ===
   /// Transfer accumulated impacts to consumer on purchase
   TransferToConsumer {
@@ -70,13 +65,9 @@ pub type AssetImpactRedeemer {
     consumer_pnft: AssetName,
     purchase_tx_hash: ByteArray,
   }
-  
   // === Query (spending for proof) ===
   /// Prove accumulated impacts for an asset
-  ProveImpacts {
-    asset_id: AssetName,
-  }
-  
+  ProveImpacts { asset_id: AssetName }
   // === Corrections ===
   /// Correct recorded impacts (requires governance approval)
   CorrectImpacts {
@@ -98,18 +89,21 @@ pub type AssetType {
   Harvest { land_nft: AssetName, crop_type: ByteArray, harvest_id: ByteArray }
   /// Generic tracked asset
   Generic { category: ByteArray }
-  
   // === MACHINERY & VEHICLES ===
   /// Vehicle (car, truck, boat, plane, etc.)
-  Vehicle { 
-    vin_hash: ByteArray,          // Vehicle ID hash
+  Vehicle {
+    vin_hash: ByteArray,
+    // Vehicle ID hash
     vehicle_class: VehicleClass,
-    manufacturer: AssetName,      // Manufacturer's pNFT
-    model_spec: ByteArray,        // Model specification hash
+    manufacturer: AssetName,
+    // Manufacturer's pNFT
+    model_spec: ByteArray,
   }
+  // Model specification hash
   /// Heavy machinery (construction, mining, agriculture)
   Machinery {
-    serial_hash: ByteArray,       // Serial number hash
+    serial_hash: ByteArray,
+    // Serial number hash
     machinery_class: MachineryClass,
     manufacturer: AssetName,
     model_spec: ByteArray,
@@ -325,21 +319,11 @@ pub type RecommendedAction {
 /// Impact correction (requires governance)
 pub type ImpactCorrection {
   /// Adjust specific compound
-  AdjustCompound {
-    compound: CompoundCode,
-    adjustment: Int,
-    reason: ByteArray,
-  }
+  AdjustCompound { compound: CompoundCode, adjustment: Int, reason: ByteArray }
   /// Remove erroneous activity
-  RemoveActivity {
-    activity_index: Int,
-    reason: ByteArray,
-  }
+  RemoveActivity { activity_index: Int, reason: ByteArray }
   /// Add missing activity
-  AddActivity {
-    activity: AssetActivityRecord,
-    reason: ByteArray,
-  }
+  AddActivity { activity: AssetActivityRecord, reason: ByteArray }
 }
 
 // =============================================================================
@@ -354,13 +338,8 @@ pub type MachineryRedeemer {
     owner: AssetName,
     purchase_price: Int,
   }
-  
   /// Record operational use (fuel, hours, emissions)
-  RecordOperation {
-    machine_id: AssetName,
-    operation: OperationalImpact,
-  }
-  
+  RecordOperation { machine_id: AssetName, operation: OperationalImpact }
   /// Record maintenance event
   RecordMaintenance {
     machine_id: AssetName,
@@ -369,30 +348,25 @@ pub type MachineryRedeemer {
     impact: List<CompoundFlow>,
     extends_life: Int,
   }
-  
   /// Transfer machinery ownership
   TransferMachinery {
     machine_id: AssetName,
     from_owner: AssetName,
     to_owner: AssetName,
     sale_price: Int,
-    // Remaining embodied transfers to new owner
   }
-  
+  // Remaining embodied transfers to new owner
   /// Retire/scrap machinery
   RetireMachinery {
     machine_id: AssetName,
-    scrap_compounds: List<CompoundFlow>,  // Recycling impact
-    remaining_embodied: List<CompoundBalance>,  // "Wasted" embodied
+    scrap_compounds: List<CompoundFlow>,
+    // Recycling impact
+    remaining_embodied: List<CompoundBalance>,
+    // "Wasted" embodied
     scrap_value: Int,
   }
-  
   /// Compare fleet efficiency
-  CompareFleet {
-    fleet_id: ByteArray,
-    machine_ids: List<AssetName>,
-  }
-  
+  CompareFleet { fleet_id: ByteArray, machine_ids: List<AssetName> }
   /// Generate replacement recommendation
   GetRecommendation {
     machine_id: AssetName,
@@ -428,11 +402,9 @@ pub type MachineryNftDatum {
   manufactured_at: Int,
   /// Manufacturing location bioregion
   manufacturing_bioregion: ByteArray,
-  
   // === ACCUMULATED SUPPLY CHAIN IMPACT ===
   /// All impact from extraction through completion
   supply_chain_impact: SupplyChainImpact,
-  
   // === OWNERSHIP & LIFECYCLE ===
   /// Current owner pNFT
   current_owner: AssetName,
@@ -449,23 +421,18 @@ pub type SupplyChainImpact {
   // === EXTRACTION PHASE ===
   /// Raw material extraction (ore, oil, timber, etc.)
   extraction: List<MaterialImpact>,
-  
   // === PROCESSING PHASE ===
   /// Material processing (refining, smelting, milling)
   processing: List<ProcessingImpact>,
-  
   // === COMPONENT PHASE ===
   /// Component manufacturing
   components: List<ComponentImpact>,
-  
   // === ASSEMBLY PHASE ===
   /// Final assembly
   assembly: AssemblyImpact,
-  
   // === TRANSPORT ===
   /// Transport between phases + to point of sale
   transport: List<TransportImpact>,
-  
   // === TOTALS ===
   /// Total embodied impact (sum of all phases)
   total_embodied: List<CompoundBalance>,
@@ -590,14 +557,12 @@ pub type MachineryNftRedeemer {
     /// Manufacturing attestation
     manufacturer_attestation: ByteArray,
   }
-  
   /// Update operational stats (called after operations)
   UpdateStats {
     machine_id: AssetName,
     new_stats: LifetimeStats,
     new_condition: Int,
   }
-  
   /// Transfer ownership
   Transfer {
     machine_id: AssetName,
@@ -605,7 +570,6 @@ pub type MachineryNftRedeemer {
     to_owner: AssetName,
     transfer_price: Int,
   }
-  
   /// Burn NFT on retirement/scrapping
   NftRetire {
     machine_id: AssetName,
@@ -647,30 +611,37 @@ validator asset_impact(config: AssetImpactConfig) {
     tx: Transaction,
   ) {
     when redeemer is {
-      InitializeAsset { asset_id, asset_type, initial_owner } -> {
+      InitializeAsset { asset_id, asset_type, initial_owner } ->
         validate_initialize(tx, asset_id, asset_type, initial_owner, config)
-      }
-      
-      RecordActivity { asset_id, activity } -> {
+      RecordActivity { asset_id, activity } ->
         validate_record_activity(tx, datum, asset_id, activity, config)
-      }
-      
-      RecordActivities { asset_id, activities } -> {
+      RecordActivities { asset_id, activities } ->
         validate_record_activities(tx, datum, asset_id, activities, config)
-      }
-      
-      TransferToConsumer { asset_id, consumer_pnft, purchase_tx_hash } -> {
-        validate_transfer_to_consumer(tx, datum, asset_id, consumer_pnft, purchase_tx_hash, config)
-      }
-      
-      ProveImpacts { asset_id } -> {
+      TransferToConsumer { asset_id, consumer_pnft, purchase_tx_hash } ->
+        validate_transfer_to_consumer(
+          tx,
+          datum,
+          asset_id,
+          consumer_pnft,
+          purchase_tx_hash,
+          config,
+        )
+      ProveImpacts { asset_id } ->
         validate_prove_impacts(tx, datum, asset_id, config)
-      }
-      
-      CorrectImpacts { asset_id, correction, governance_approval } -> {
-        validate_correct_impacts(tx, datum, asset_id, correction, governance_approval, config)
-      }
+      CorrectImpacts { asset_id, correction, governance_approval } ->
+        validate_correct_impacts(
+          tx,
+          datum,
+          asset_id,
+          correction,
+          governance_approval,
+          config,
+        )
     }
+  }
+
+  else(_) {
+    fail
   }
 }
 
@@ -687,26 +658,20 @@ fn validate_initialize(
 ) -> Bool {
   // 1. Asset must exist and be owned by initial_owner
   expect verify_asset_ownership(tx, asset_id, asset_type, initial_owner, config)
-  
   // 2. Owner must sign
   let owner_pnft = find_pnft_in_tx(tx, initial_owner, config.pnft_policy)
   expect Some(owner) = owner_pnft
   expect list.has(tx.extra_signatories, owner.owner)
-  
   // 3. No existing impact history for this asset
   expect !has_existing_history(tx, asset_id)
-  
   // 4. Create initial empty history
   let output = find_asset_impact_output(tx.outputs)
   expect Some(out) = output
   expect InlineDatum(data) = out.datum
   expect AssetHistory(history): AssetImpactDatum = data
-  
-  history.asset_id == asset_id &&
-  list.length(history.activities) == 0 &&
-  list.length(history.accumulated_totals) == 0 &&
-  history.transferred_to_consumer == False &&
-  history.consumer == None
+  history.asset_id == asset_id && list.length(history.activities) == 0 && list.length(
+    history.accumulated_totals,
+  ) == 0 && history.transferred_to_consumer == False && history.consumer == None
 }
 
 // =============================================================================
@@ -723,33 +688,28 @@ fn validate_record_activity(
   // 1. Must have existing asset history
   expect Some(AssetHistory(history)) = datum
   expect history.asset_id == asset_id
-  
   // 2. Asset must not be transferred yet
   expect history.transferred_to_consumer == False
-  
   // 3. Caller must be authorized (work_auction contract or Steward)
   expect verify_authorized_recorder(tx, config)
-  
   // 4. Activity must have valid compound flows
   expect list.length(activity.compound_flows) >= 1
   expect list.all(activity.compound_flows, is_valid_compound_flow)
-  
   // 5. Worker must be valid pNFT
-  let worker_pnft = find_pnft_in_tx(tx, activity.worker_pnft, config.pnft_policy)
+  let worker_pnft =
+    find_pnft_in_tx(tx, activity.worker_pnft, config.pnft_policy)
   expect Some(_) = worker_pnft
-  
   // 6. Verify output has updated history
   let output = find_asset_impact_output(tx.outputs)
   expect Some(out) = output
   expect InlineDatum(data) = out.datum
   expect AssetHistory(updated): AssetImpactDatum = data
-  
   // 7. Activity should be appended
   let expected_activities = list.concat(history.activities, [activity])
   expect updated.activities == expected_activities
-  
   // 8. Accumulated totals should be updated
-  let new_totals = merge_compound_totals(history.accumulated_totals, activity.compound_flows)
+  let new_totals =
+    merge_compound_totals(history.accumulated_totals, activity.compound_flows)
   updated.accumulated_totals == new_totals
 }
 
@@ -765,25 +725,27 @@ fn validate_record_activities(
   expect history.asset_id == asset_id
   expect history.transferred_to_consumer == False
   expect verify_authorized_recorder(tx, config)
-  
   // All activities must be valid
-  expect list.all(activities, fn(a) { 
-    list.length(a.compound_flows) >= 1 &&
-    list.all(a.compound_flows, is_valid_compound_flow)
-  })
-  
+  expect
+    list.all(
+      activities,
+      fn(a) {
+        list.length(a.compound_flows) >= 1 && list.all(
+          a.compound_flows,
+          is_valid_compound_flow,
+        )
+      },
+    )
   // Verify output has all activities appended and totals updated
   let output = find_asset_impact_output(tx.outputs)
   expect Some(out) = output
   expect InlineDatum(data) = out.datum
   expect AssetHistory(updated): AssetImpactDatum = data
-  
   let expected_activities = list.concat(history.activities, activities)
   let all_new_flows = list.flat_map(activities, fn(a) { a.compound_flows })
-  let new_totals = merge_compound_totals(history.accumulated_totals, all_new_flows)
-  
-  updated.activities == expected_activities &&
-  updated.accumulated_totals == new_totals
+  let new_totals =
+    merge_compound_totals(history.accumulated_totals, all_new_flows)
+  updated.activities == expected_activities && updated.accumulated_totals == new_totals
 }
 
 // =============================================================================
@@ -801,51 +763,41 @@ fn validate_transfer_to_consumer(
   // 1. Must have existing asset history
   expect Some(AssetHistory(history)) = datum
   expect history.asset_id == asset_id
-  
   // 2. Must not already be transferred
   expect history.transferred_to_consumer == False
-  
   // 3. Purchase must be occurring in this transaction
   // (Verify token transfer from seller to consumer for this asset)
   expect verify_purchase_transaction(tx, asset_id, consumer_pnft, config)
-  
   // 4. Consumer must be valid pNFT
   let consumer = find_pnft_in_tx(tx, consumer_pnft, config.pnft_policy)
   expect Some(consumer_data) = consumer
-  
   // 5. Consumer must sign (accepting the impacts)
   expect list.has(tx.extra_signatories, consumer_data.owner)
-  
   // 6. Asset history must be marked as transferred
   let history_output = find_asset_impact_output(tx.outputs)
   expect Some(h_out) = history_output
   expect InlineDatum(h_data) = h_out.datum
   expect AssetHistory(updated_history): AssetImpactDatum = h_data
-  
   expect updated_history.transferred_to_consumer == True
   expect updated_history.consumer == Some(consumer_pnft)
-  
   // 7. Consumer's pNFT must be updated with accrued impacts
   // (The accumulated_totals transfer to consumer's consumer_impact)
-  let consumer_pnft_output = find_pnft_output(tx.outputs, consumer_pnft, config.pnft_policy)
+  let consumer_pnft_output =
+    find_pnft_output(tx.outputs, consumer_pnft, config.pnft_policy)
   expect Some(c_out) = consumer_pnft_output
   expect InlineDatum(c_data) = c_out.datum
   expect updated_consumer: PnftDatum = c_data
-  
   // Verify consumer's impact record includes these compounds
   expect Some(impact_record) = updated_consumer.consumer_impact
-  expect True = verify_compounds_accrued(impact_record, history.accumulated_totals)
-  
+  expect verify_compounds_accrued(impact_record, history.accumulated_totals)
   // 8. Create transfer record for audit trail
   let transfer_output = find_transfer_record_output(tx.outputs)
   expect Some(t_out) = transfer_output
   expect InlineDatum(t_data) = t_out.datum
   expect TransferRecord(record): AssetImpactDatum = t_data
-  
-  record.asset_id == asset_id &&
-  record.consumer_pnft == consumer_pnft &&
-  record.compounds == convert_to_balances(history.accumulated_totals) &&
-  record.purchase_tx == purchase_tx_hash
+  record.asset_id == asset_id && record.consumer_pnft == consumer_pnft && record.compounds == convert_to_balances(
+    history.accumulated_totals,
+  ) && record.purchase_tx == purchase_tx_hash
 }
 
 // =============================================================================
@@ -861,13 +813,11 @@ fn validate_prove_impacts(
   // Simply proves the impacts exist — datum is spent and recreated unchanged
   expect Some(AssetHistory(history)) = datum
   expect history.asset_id == asset_id
-  
   // Must recreate identical
   let output = find_asset_impact_output(tx.outputs)
   expect Some(out) = output
   expect InlineDatum(data) = out.datum
   expect AssetHistory(recreated): AssetImpactDatum = data
-  
   recreated == history
 }
 
@@ -882,19 +832,20 @@ fn validate_correct_impacts(
   // 1. Must have existing history
   expect Some(AssetHistory(history)) = datum
   expect history.asset_id == asset_id
-  
   // 2. Must have valid governance approval
-  expect verify_governance_approval(tx, governance_approval, config.governance_contract)
-  
+  expect
+    verify_governance_approval(
+      tx,
+      governance_approval,
+      config.governance_contract,
+    )
   // 3. Apply correction
   let corrected = apply_correction(history, correction)
-  
   // 4. Verify output has corrected history
   let output = find_asset_impact_output(tx.outputs)
   expect Some(out) = output
   expect InlineDatum(data) = out.datum
   expect AssetHistory(updated): AssetImpactDatum = data
-  
   updated == corrected
 }
 
@@ -902,25 +853,35 @@ fn validate_correct_impacts(
 // HELPER FUNCTIONS
 // =============================================================================
 
-fn verify_authorized_recorder(tx: Transaction, config: AssetImpactConfig) -> Bool {
+fn verify_authorized_recorder(
+  tx: Transaction,
+  config: AssetImpactConfig,
+) -> Bool {
   // Either from work_auction contract or Steward-level pNFT
   let from_work_auction = verify_from_contract(tx, config.work_auction_contract)
-  
-  let steward_signing = list.any(tx.reference_inputs, fn(input) {
-    is_steward_pnft(input.output, config.pnft_policy, tx.extra_signatories)
-  })
-  
+  let steward_signing =
+    list.any(
+      tx.reference_inputs,
+      fn(input) {
+        is_steward_pnft(input.output, config.pnft_policy, tx.extra_signatories)
+      },
+    )
   from_work_auction || steward_signing
 }
 
 fn verify_from_contract(tx: Transaction, contract_hash: ByteArray) -> Bool {
   // Check if transaction is from specified contract
-  list.any(tx.inputs, fn(input) {
-    get_script_hash(input.output) == Some(contract_hash)
-  })
+  list.any(
+    tx.inputs,
+    fn(input) { get_script_hash(input.output) == Some(contract_hash) },
+  )
 }
 
-fn is_steward_pnft(output: Output, policy: PolicyId, signers: List<VerificationKeyHash>) -> Bool {
+fn is_steward_pnft(
+  output: Output,
+  policy: PolicyId,
+  signers: List<VerificationKeyHash>,
+) -> Bool {
   when output.datum is {
     InlineDatum(data) -> {
       expect datum: PnftDatum = data
@@ -932,8 +893,7 @@ fn is_steward_pnft(output: Output, policy: PolicyId, signers: List<VerificationK
 
 fn is_valid_compound_flow(flow: CompoundFlow) -> Bool {
   // Compound code must be valid
-  flow.compound != #"" &&
-  // Confidence must be 0-100
+  flow.compound != #"" && // Confidence must be 0-100
   flow.confidence >= 0 && flow.confidence <= 100
 }
 
@@ -942,14 +902,17 @@ fn merge_compound_totals(
   new_flows: List<CompoundFlow>,
 ) -> List<CompoundBalance> {
   // Convert flows to balances and merge
-  let new_balances = list.map(new_flows, fn(f) {
-    CompoundBalance {
-      compound: f.compound,
-      quantity: f.quantity,
-      unit: f.unit,
-    }
-  })
-  
+  let new_balances =
+    list.map(
+      new_flows,
+      fn(f) {
+        CompoundBalance {
+          compound: f.compound,
+          quantity: f.quantity,
+          unit: f.unit,
+        }
+      },
+    )
   // Merge same compounds by summing quantities
   merge_balance_lists(existing, new_balances)
 }
@@ -971,11 +934,12 @@ fn verify_compounds_accrued(
   compounds: List<CompoundBalance>,
 ) -> Bool {
   // Verify all compounds are in the record
-  list.all(compounds, fn(c) {
-    list.any(record.lifetime_compounds, fn(lc) {
-      lc.compound == c.compound
-    })
-  })
+  list.all(
+    compounds,
+    fn(c) {
+      list.any(record.lifetime_compounds, fn(lc) { lc.compound == c.compound })
+    },
+  )
 }
 
 fn verify_purchase_transaction(
@@ -987,21 +951,32 @@ fn verify_purchase_transaction(
   // Verify token transfer occurring for this asset
   // Consumer receiving asset ownership
   // 1. Check that consumer is receiving the asset token in outputs
-  let consumer_receiving = list.any(tx.outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect pnft_datum: PnftDatum = data
-        pnft_datum.pnft_id == consumer &&
-        quantity_of(output.value, config.token_policy, asset_id) >= 1
-      }
-      _ -> False
-    }
-  })
+  let consumer_receiving =
+    list.any(
+      tx.outputs,
+      fn(output) {
+        when output.datum is {
+          InlineDatum(data) -> {
+            expect pnft_datum: PnftDatum = data
+            pnft_datum.pnft_id == consumer && quantity_of(
+              output.value,
+              config.token_policy,
+              asset_id,
+            ) >= 1
+          }
+          _ -> False
+        }
+      },
+    )
 
   // 2. Check that asset is being transferred from a previous owner in inputs
-  let asset_in_inputs = list.any(tx.inputs, fn(input) {
-    quantity_of(input.output.value, config.token_policy, asset_id) >= 1
-  })
+  let asset_in_inputs =
+    list.any(
+      tx.inputs,
+      fn(input) {
+        quantity_of(input.output.value, config.token_policy, asset_id) >= 1
+      },
+    )
 
   consumer_receiving && asset_in_inputs
 }
@@ -1015,80 +990,109 @@ fn verify_asset_ownership(
 ) -> Bool {
   // Verify that owner has control over the asset based on asset type
   when asset_type is {
-    Land { land_nft } -> {
+    Land { land_nft } ->
       // Verify land NFT ownership
-      list.any(tx.inputs, fn(input) {
-        quantity_of(input.output.value, config.land_policy, land_nft) == 1 &&
-        when input.output.datum is {
-          InlineDatum(data) -> {
-            expect pnft: PnftDatum = data
-            pnft.pnft_id == owner
+      list.any(
+        tx.inputs,
+        fn(input) {
+          quantity_of(input.output.value, config.land_policy, land_nft) == 1 && when
+            input.output.datum
+          is {
+            InlineDatum(data) -> {
+              expect pnft: PnftDatum = data
+              pnft.pnft_id == owner
+            }
+            _ -> False
           }
-          _ -> False
-        }
-      })
-    }
-    Structure { land_nft, .. } -> {
+        },
+      )
+    Structure { land_nft, .. } ->
       // Structure ownership tied to land
-      list.any(tx.inputs, fn(input) {
-        quantity_of(input.output.value, config.land_policy, land_nft) == 1
-      })
-    }
-    Product { .. } -> {
+      list.any(
+        tx.inputs,
+        fn(input) {
+          quantity_of(input.output.value, config.land_policy, land_nft) == 1
+        },
+      )
+    Product { .. } ->
       // Product ownership verified by owner pNFT holding token
-      list.any(tx.inputs, fn(input) {
-        quantity_of(input.output.value, config.pnft_policy, owner) == 1
-      })
-    }
-    Harvest { land_nft, .. } -> {
+      list.any(
+        tx.inputs,
+        fn(input) {
+          quantity_of(input.output.value, config.pnft_policy, owner) == 1
+        },
+      )
+    Harvest { land_nft, .. } ->
       // Harvest tied to land ownership
-      list.any(tx.inputs, fn(input) {
-        quantity_of(input.output.value, config.land_policy, land_nft) == 1
-      })
-    }
-    Vehicle { manufacturer, .. } -> {
+      list.any(
+        tx.inputs,
+        fn(input) {
+          quantity_of(input.output.value, config.land_policy, land_nft) == 1
+        },
+      )
+    Vehicle { manufacturer, .. } ->
       // Vehicle ownership verified by manufacturer or current owner
-      list.any(tx.inputs, fn(input) {
-        quantity_of(input.output.value, config.pnft_policy, owner) == 1 ||
-        quantity_of(input.output.value, config.pnft_policy, manufacturer) == 1
-      })
-    }
-    Machinery { manufacturer, .. } -> {
+      list.any(
+        tx.inputs,
+        fn(input) {
+          quantity_of(input.output.value, config.pnft_policy, owner) == 1 || quantity_of(
+            input.output.value,
+            config.pnft_policy,
+            manufacturer,
+          ) == 1
+        },
+      )
+    Machinery { manufacturer, .. } ->
       // Machinery ownership verified similarly
-      list.any(tx.inputs, fn(input) {
-        quantity_of(input.output.value, config.pnft_policy, owner) == 1 ||
-        quantity_of(input.output.value, config.pnft_policy, manufacturer) == 1
-      })
-    }
-    Equipment { manufacturer, .. } -> {
-      list.any(tx.inputs, fn(input) {
-        quantity_of(input.output.value, config.pnft_policy, owner) == 1 ||
-        quantity_of(input.output.value, config.pnft_policy, manufacturer) == 1
-      })
-    }
-    Generic { .. } -> {
+      list.any(
+        tx.inputs,
+        fn(input) {
+          quantity_of(input.output.value, config.pnft_policy, owner) == 1 || quantity_of(
+            input.output.value,
+            config.pnft_policy,
+            manufacturer,
+          ) == 1
+        },
+      )
+    Equipment { manufacturer, .. } ->
+      list.any(
+        tx.inputs,
+        fn(input) {
+          quantity_of(input.output.value, config.pnft_policy, owner) == 1 || quantity_of(
+            input.output.value,
+            config.pnft_policy,
+            manufacturer,
+          ) == 1
+        },
+      )
+    Generic { .. } ->
       // Generic asset - owner pNFT must be in inputs
-      list.any(tx.inputs, fn(input) {
-        quantity_of(input.output.value, config.pnft_policy, owner) == 1
-      })
-    }
+      list.any(
+        tx.inputs,
+        fn(input) {
+          quantity_of(input.output.value, config.pnft_policy, owner) == 1
+        },
+      )
   }
 }
 
 fn has_existing_history(tx: Transaction, asset_id: AssetName) -> Bool {
   // Check if there's already an impact history for this asset in reference inputs
-  list.any(tx.reference_inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect datum: AssetImpactDatum = data
-        when datum is {
-          AssetHistory(history) -> history.asset_id == asset_id
-          TransferRecord(record) -> record.asset_id == asset_id
+  list.any(
+    tx.reference_inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect datum: AssetImpactDatum = data
+          when datum is {
+            AssetHistory(history) -> history.asset_id == asset_id
+            TransferRecord(record) -> record.asset_id == asset_id
+          }
         }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn verify_governance_approval(
@@ -1098,11 +1102,14 @@ fn verify_governance_approval(
 ) -> Bool {
   // Verify governance contract has approved this action
   // 1. Check that the governance contract is being spent (or in reference inputs)
-  let governance_involved = list.any(tx.inputs, fn(input) {
-    get_script_hash(input.output) == Some(governance)
-  }) || list.any(tx.reference_inputs, fn(input) {
-    get_script_hash(input.output) == Some(governance)
-  })
+  let governance_involved =
+    list.any(
+      tx.inputs,
+      fn(input) { get_script_hash(input.output) == Some(governance) },
+    ) || list.any(
+      tx.reference_inputs,
+      fn(input) { get_script_hash(input.output) == Some(governance) },
+    )
 
   // 2. Verify the approval signature/hash matches
   let approval_valid = approval != #""
@@ -1117,41 +1124,47 @@ fn apply_correction(
   when correction is {
     AdjustCompound { compound, adjustment, .. } -> {
       // Adjust specific compound balance in accumulated totals
-      let new_totals = list.map(history.accumulated_totals, fn(balance) {
-        if balance.compound == compound {
-          CompoundBalance {
-            ..balance,
-            quantity: balance.quantity + adjustment,
-          }
-        } else {
-          balance
-        }
-      })
-      AssetImpactHistory {
-        ..history,
-        accumulated_totals: new_totals,
-      }
+      let new_totals =
+        list.map(
+          history.accumulated_totals,
+          fn(balance) {
+            if balance.compound == compound {
+              CompoundBalance {
+                ..balance,
+                quantity: balance.quantity + adjustment,
+              }
+            } else {
+              balance
+            }
+          },
+        )
+      AssetImpactHistory { ..history, accumulated_totals: new_totals }
     }
     RemoveActivity { activity_index, .. } -> {
       // Remove activity at specified index
-      let new_activities = list.filter_map(list.indexed_map(history.activities, fn(i, a) { (i, a) }), fn(pair) {
-        let (idx, activity) = pair
-        if idx == activity_index {
-          None
-        } else {
-          Some(activity)
-        }
-      })
+      let new_activities =
+        list.filter_map(
+          list.indexed_map(history.activities, fn(i, a) { (i, a) }),
+          fn(pair) {
+            let (idx, activity) = pair
+            if idx == activity_index {
+              None
+            } else {
+              Some(activity)
+            }
+          },
+        )
       // Recalculate totals would be needed in full impl
-      AssetImpactHistory {
-        ..history,
-        activities: new_activities,
-      }
+      AssetImpactHistory { ..history, activities: new_activities }
     }
     AddActivity { activity, .. } -> {
       // Add the missing activity
       let new_activities = list.concat(history.activities, [activity])
-      let new_totals = merge_compound_totals(history.accumulated_totals, activity.compound_flows)
+      let new_totals =
+        merge_compound_totals(
+          history.accumulated_totals,
+          activity.compound_flows,
+        )
       AssetImpactHistory {
         ..history,
         activities: new_activities,
@@ -1162,35 +1175,41 @@ fn apply_correction(
 }
 
 fn find_asset_impact_output(outputs: List<Output>) -> Option<Output> {
-  list.find(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        // Try to parse as AssetImpactDatum with AssetHistory variant
-        expect datum: AssetImpactDatum = data
-        when datum is {
-          AssetHistory(_) -> True
-          _ -> False
+  list.find(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          // Try to parse as AssetImpactDatum with AssetHistory variant
+          expect datum: AssetImpactDatum = data
+          when datum is {
+            AssetHistory(_) -> True
+            _ -> False
+          }
         }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn find_transfer_record_output(outputs: List<Output>) -> Option<Output> {
-  list.find(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        // Try to parse as AssetImpactDatum with TransferRecord variant
-        expect datum: AssetImpactDatum = data
-        when datum is {
-          TransferRecord(_) -> True
-          _ -> False
+  list.find(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          // Try to parse as AssetImpactDatum with TransferRecord variant
+          expect datum: AssetImpactDatum = data
+          when datum is {
+            TransferRecord(_) -> True
+            _ -> False
+          }
         }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn find_pnft_in_tx(
@@ -1199,29 +1218,10 @@ fn find_pnft_in_tx(
   policy: PolicyId,
 ) -> Option<PnftDatum> {
   // Search in inputs first
-  let from_inputs = list.find_map(tx.inputs, fn(input) {
-    if quantity_of(input.output.value, policy, pnft_id) == 1 {
-      when input.output.datum is {
-        InlineDatum(data) -> {
-          expect datum: PnftDatum = data
-          if datum.pnft_id == pnft_id {
-            Some(datum)
-          } else {
-            None
-          }
-        }
-        _ -> None
-      }
-    } else {
-      None
-    }
-  })
-
-  // If not in inputs, check reference inputs
-  when from_inputs is {
-    Some(d) -> Some(d)
-    None -> {
-      list.find_map(tx.reference_inputs, fn(input) {
+  let from_inputs =
+    list.find_map(
+      tx.inputs,
+      fn(input) {
         if quantity_of(input.output.value, policy, pnft_id) == 1 {
           when input.output.datum is {
             InlineDatum(data) -> {
@@ -1237,8 +1237,33 @@ fn find_pnft_in_tx(
         } else {
           None
         }
-      })
-    }
+      },
+    )
+
+  // If not in inputs, check reference inputs
+  when from_inputs is {
+    Some(d) -> Some(d)
+    None ->
+      list.find_map(
+        tx.reference_inputs,
+        fn(input) {
+          if quantity_of(input.output.value, policy, pnft_id) == 1 {
+            when input.output.datum is {
+              InlineDatum(data) -> {
+                expect datum: PnftDatum = data
+                if datum.pnft_id == pnft_id {
+                  Some(datum)
+                } else {
+                  None
+                }
+              }
+              _ -> None
+            }
+          } else {
+            None
+          }
+        },
+      )
   }
 }
 
@@ -1247,20 +1272,23 @@ fn find_pnft_output(
   pnft_id: AssetName,
   policy: PolicyId,
 ) -> Option<Output> {
-  list.find(outputs, fn(output) {
-    // Check that output contains the pNFT token
-    if quantity_of(output.value, policy, pnft_id) == 1 {
-      when output.datum is {
-        InlineDatum(data) -> {
-          expect datum: PnftDatum = data
-          datum.pnft_id == pnft_id
+  list.find(
+    outputs,
+    fn(output) {
+      // Check that output contains the pNFT token
+      if quantity_of(output.value, policy, pnft_id) == 1 {
+        when output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            datum.pnft_id == pnft_id
+          }
+          _ -> False
         }
-        _ -> False
+      } else {
+        False
       }
-    } else {
-      False
-    }
-  })
+    },
+  )
 }
 
 fn get_script_hash(output: Output) -> Option<ByteArray> {

@@ -14,13 +14,15 @@
 use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use aiken/interval.{Finite}
-use cardano/assets.{PolicyId, AssetName, flatten}
-use cardano/transaction.{Transaction, Input, Output, OutputReference, InlineDatum}
-use ultralife/types.{
-  TransactionRecord, AvatarCycleStats, BioregionCycleStats,
-  tx_type_code, impact_sign, RecordsDatum, Record, AvatarStats, BioregionStats,
+use cardano/assets.{AssetName, PolicyId, flatten}
+use cardano/transaction.{
+  InlineDatum, Input, Output, OutputReference, Transaction,
 }
 use ultralife/prc37.{current_cycle, cycle_end}
+use ultralife/types.{
+  AvatarCycleStats, AvatarStats, BioregionCycleStats, BioregionStats, Record,
+  RecordsDatum, TransactionRecord, impact_sign, tx_type_code,
+}
 
 // =============================================================================
 // REDEEMERS
@@ -28,27 +30,13 @@ use ultralife/prc37.{current_cycle, cycle_end}
 
 pub type RecordsRedeemer {
   /// Record a transaction (called by token validator)
-  CreateRecord {
-    record: TransactionRecord,
-  }
-  
+  CreateRecord { record: TransactionRecord }
   /// Aggregate records into avatar stats
-  AggregateAvatar {
-    pnft: AssetName,
-    bioregion: ByteArray,
-    cycle: Int,
-  }
-  
+  AggregateAvatar { pnft: AssetName, bioregion: ByteArray, cycle: Int }
   /// Aggregate avatar stats into bioregion stats
-  AggregateBioregion {
-    bioregion: ByteArray,
-    cycle: Int,
-  }
-  
+  AggregateBioregion { bioregion: ByteArray, cycle: Int }
   /// Finalize cycle stats (lock for UBI calculations)
-  FinalizeCycle {
-    cycle: Int,
-  }
+  FinalizeCycle { cycle: Int }
 }
 
 // =============================================================================
@@ -76,22 +64,17 @@ validator records(config: RecordsConfig) {
     tx: Transaction,
   ) {
     when redeemer is {
-      CreateRecord { record } -> {
-        validate_create_record(tx, record, config)
-      }
-      
-      AggregateAvatar { pnft, bioregion, cycle } -> {
+      CreateRecord { record } -> validate_create_record(tx, record, config)
+      AggregateAvatar { pnft, bioregion, cycle } ->
         validate_aggregate_avatar(tx, pnft, bioregion, cycle, config)
-      }
-      
-      AggregateBioregion { bioregion, cycle } -> {
+      AggregateBioregion { bioregion, cycle } ->
         validate_aggregate_bioregion(tx, bioregion, cycle, config)
-      }
-      
-      FinalizeCycle { cycle } -> {
-        validate_finalize_cycle(tx, cycle, config)
-      }
+      FinalizeCycle { cycle } -> validate_finalize_cycle(tx, cycle, config)
     }
+  }
+
+  else(_) {
+    fail
   }
 }
 
@@ -111,18 +94,14 @@ fn validate_create_record(
 ) -> Bool {
   // 1. Must be called from token spend (verify token validator is being executed)
   let from_token_spend = verify_token_spend(tx, config.token_policy)
-  
   // 2. Record slot must match transaction
   let current_slot = get_slot(tx)
   let slot_valid = record.slot == current_slot
-  
   // 3. Record cycle must be correct
   let expected_cycle = current_cycle(current_slot)
   let cycle_valid = record.cycle == expected_cycle
-  
   // 4. Record datum output created
   let record_created = verify_record_output(tx.outputs, record)
-  
   from_token_spend && slot_valid && cycle_valid && record_created
 }
 
@@ -144,13 +123,10 @@ fn validate_aggregate_avatar(
 
   // 2. Calculate aggregated stats
   let stats = calculate_avatar_stats(records, pnft, bioregion, cycle)
-  
   // 3. Verify stats output created
   let stats_created = verify_avatar_stats_output(tx.outputs, stats)
-  
   // 4. All consumed records must be from this pnft and cycle
   let records_valid = verify_records_match(records, pnft, cycle)
-  
   stats_created && records_valid
 }
 
@@ -160,54 +136,93 @@ fn calculate_avatar_stats(
   bioregion: ByteArray,
   cycle: Int,
 ) -> AvatarCycleStats {
-  list.foldl(records, initial_avatar_stats(pnft, bioregion, cycle), fn(record, acc) {
-    // Count transactions
-    let tx_sent = if record.sender == pnft { acc.tx_sent + 1 } else { acc.tx_sent }
-    let tx_received = if record.recipient == pnft { acc.tx_received + 1 } else { acc.tx_received }
+  list.foldl(
+    records,
+    initial_avatar_stats(pnft, bioregion, cycle),
+    fn(record, acc) {
+      // Count transactions
+      let tx_sent =
+        if record.sender == pnft {
+          acc.tx_sent + 1
+        } else {
+          acc.tx_sent
+        }
+      let tx_received =
+        if record.recipient == pnft {
+          acc.tx_received + 1
+        } else {
+          acc.tx_received
+        }
 
-    // Track volume
-    let volume_sent = if record.sender == pnft { acc.volume_sent + record.amount } else { acc.volume_sent }
-    let volume_received = if record.recipient == pnft { acc.volume_received + record.amount } else { acc.volume_received }
+      // Track volume
+      let volume_sent =
+        if record.sender == pnft {
+          acc.volume_sent + record.amount
+        } else {
+          acc.volume_sent
+        }
+      let volume_received =
+        if record.recipient == pnft {
+          acc.volume_received + record.amount
+        } else {
+          acc.volume_received
+        }
 
-    // Count unique counterparties (simplified - tracks if counterparty is different)
-    let is_new_counterparty =
-      if record.sender == pnft && record.recipient != pnft {
-        1
-      } else if record.recipient == pnft && record.sender != pnft {
-        1
-      } else {
-        0
+      // Count unique counterparties (simplified - tracks if counterparty is different)
+      let is_new_counterparty =
+        if record.sender == pnft && record.recipient != pnft {
+          1
+        } else if record.recipient == pnft && record.sender != pnft {
+          1
+        } else {
+          0
+        }
+      let unique_counterparties =
+        acc.unique_counterparties + is_new_counterparty
+
+      // Count by type using tx_type_code: 0=Labor, 5=Remediation
+      let labor_count =
+        if record.tx_type_code == 0 && record.sender == pnft {
+          acc.labor_count + 1
+        } else {
+          acc.labor_count
+        }
+      let remediation_count =
+        if record.tx_type_code == 5 {
+          acc.remediation_count + 1
+        } else {
+          acc.remediation_count
+        }
+
+      // Net impact from compound flows (simplified)
+      let net_impact = acc.net_impact
+
+      AvatarCycleStats {
+        pnft,
+        bioregion,
+        cycle,
+        tx_sent,
+        volume_sent,
+        tx_received,
+        volume_received,
+        unique_counterparties,
+        net_impact,
+        labor_count,
+        remediation_count,
       }
-    let unique_counterparties = acc.unique_counterparties + is_new_counterparty
-
-    // Count by type using tx_type_code: 0=Labor, 5=Remediation
-    let labor_count = if record.tx_type_code == 0 && record.sender == pnft { acc.labor_count + 1 } else { acc.labor_count }
-    let remediation_count = if record.tx_type_code == 5 { acc.remediation_count + 1 } else { acc.remediation_count }
-
-    // Net impact from compound flows (simplified)
-    let net_impact = acc.net_impact
-
-    AvatarCycleStats {
-      pnft: pnft,
-      bioregion: bioregion,
-      cycle: cycle,
-      tx_sent: tx_sent,
-      volume_sent: volume_sent,
-      tx_received: tx_received,
-      volume_received: volume_received,
-      unique_counterparties: unique_counterparties,
-      net_impact: net_impact,
-      labor_count: labor_count,
-      remediation_count: remediation_count,
-    }
-  })
+    },
+  )
 }
 
-fn initial_avatar_stats(pnft: AssetName, bioregion: ByteArray, cycle: Int) -> AvatarCycleStats {
+fn initial_avatar_stats(
+  pnft: AssetName,
+  bioregion: ByteArray,
+  cycle: Int,
+) -> AvatarCycleStats {
   AvatarCycleStats {
-    pnft: pnft,
-    bioregion: bioregion,
-    cycle: cycle,
+    pnft,
+    bioregion,
+    cycle,
     tx_sent: 0,
     volume_sent: 0,
     tx_received: 0,
@@ -231,13 +246,10 @@ fn validate_aggregate_bioregion(
 ) -> Bool {
   // 1. Find all AvatarCycleStats for this bioregion and cycle
   let avatar_stats = find_bioregion_avatar_stats(tx.inputs, bioregion, cycle)
-  
   // 2. Calculate bioregion aggregates
   let stats = calculate_bioregion_stats(avatar_stats, bioregion, cycle)
-  
   // 3. Verify stats output created
   let stats_created = verify_bioregion_stats_output(tx.outputs, stats)
-  
   stats_created
 }
 
@@ -246,26 +258,33 @@ fn calculate_bioregion_stats(
   bioregion: ByteArray,
   cycle: Int,
 ) -> BioregionCycleStats {
-  list.foldl(avatar_stats, initial_bioregion_stats(bioregion, cycle), fn(avatar, acc) {
-    BioregionCycleStats {
-      bioregion: bioregion,
-      cycle: cycle,
-      internal_volume: acc.internal_volume + avatar.volume_sent,
-      export_volume: acc.export_volume,
-      import_volume: acc.import_volume,
-      total_volume: acc.total_volume + avatar.volume_sent + avatar.volume_received,
-      unique_participants: acc.unique_participants + avatar.unique_counterparties,
-      labor_transactions: acc.labor_transactions + avatar.labor_count,
-      net_impact: acc.net_impact + avatar.net_impact,
-      active_count: acc.active_count + 1,
-    }
-  })
+  list.foldl(
+    avatar_stats,
+    initial_bioregion_stats(bioregion, cycle),
+    fn(avatar, acc) {
+      BioregionCycleStats {
+        bioregion,
+        cycle,
+        internal_volume: acc.internal_volume + avatar.volume_sent,
+        export_volume: acc.export_volume,
+        import_volume: acc.import_volume,
+        total_volume: acc.total_volume + avatar.volume_sent + avatar.volume_received,
+        unique_participants: acc.unique_participants + avatar.unique_counterparties,
+        labor_transactions: acc.labor_transactions + avatar.labor_count,
+        net_impact: acc.net_impact + avatar.net_impact,
+        active_count: acc.active_count + 1,
+      }
+    },
+  )
 }
 
-fn initial_bioregion_stats(bioregion: ByteArray, cycle: Int) -> BioregionCycleStats {
+fn initial_bioregion_stats(
+  bioregion: ByteArray,
+  cycle: Int,
+) -> BioregionCycleStats {
   BioregionCycleStats {
-    bioregion: bioregion,
-    cycle: cycle,
+    bioregion,
+    cycle,
     internal_volume: 0,
     export_volume: 0,
     import_volume: 0,
@@ -290,10 +309,8 @@ fn validate_finalize_cycle(
   let current_slot = get_slot(tx)
   let end = cycle_end(cycle)
   let after_cycle = current_slot > end
-  
   // 2. Stats must be marked finalized
   let stats_finalized = verify_stats_finalized(tx.outputs, cycle)
-  
   after_cycle && stats_finalized
 }
 
@@ -310,122 +327,167 @@ fn get_slot(tx: Transaction) -> Int {
 
 fn verify_token_spend(tx: Transaction, policy: PolicyId) -> Bool {
   // Verify token is being spent in this transaction
-  list.any(tx.inputs, fn(input) {
-    list.any(flatten(input.output.value), fn(asset) {
-      let (p, _, qty) = asset
-      p == policy && qty > 0
-    })
-  })
+  list.any(
+    tx.inputs,
+    fn(input) {
+      list.any(
+        flatten(input.output.value),
+        fn(asset) {
+          let (p, _, qty) = asset
+          p == policy && qty > 0
+        },
+      )
+    },
+  )
 }
 
-fn verify_record_output(outputs: List<Output>, record: TransactionRecord) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect datum: RecordsDatum = data
-        when datum is {
-          Record(r) -> r == record
-          _ -> False
-        }
-      }
-      _ -> False
-    }
-  })
-}
-
-fn find_avatar_records(inputs: List<Input>, pnft: AssetName, cycle: Int) -> List<TransactionRecord> {
-  list.filter_map(inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect datum: RecordsDatum = data
-        when datum is {
-          Record(r) -> {
-            if (r.sender == pnft || r.recipient == pnft) && r.cycle == cycle {
-              Some(r)
-            } else {
-              None
-            }
+fn verify_record_output(
+  outputs: List<Output>,
+  record: TransactionRecord,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect datum: RecordsDatum = data
+          when datum is {
+            Record(r) -> r == record
+            _ -> False
           }
-          _ -> None
         }
+        _ -> False
       }
-      _ -> None
-    }
-  })
+    },
+  )
 }
 
-fn verify_records_match(records: List<TransactionRecord>, pnft: AssetName, cycle: Int) -> Bool {
-  list.all(records, fn(r) { (r.sender == pnft || r.recipient == pnft) && r.cycle == cycle })
-}
-
-fn verify_avatar_stats_output(outputs: List<Output>, stats: AvatarCycleStats) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect datum: RecordsDatum = data
-        when datum is {
-          AvatarStats(s) -> s == stats
-          _ -> False
+fn find_avatar_records(
+  inputs: List<Input>,
+  pnft: AssetName,
+  cycle: Int,
+) -> List<TransactionRecord> {
+  list.filter_map(
+    inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect datum: RecordsDatum = data
+          when datum is {
+            Record(r) ->
+              if ( r.sender == pnft || r.recipient == pnft ) && r.cycle == cycle {
+                Some(r)
+              } else {
+                None
+              }
+            _ -> None
+          }
         }
+        _ -> None
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
-fn find_bioregion_avatar_stats(inputs: List<Input>, bioregion: ByteArray, cycle: Int) -> List<AvatarCycleStats> {
+fn verify_records_match(
+  records: List<TransactionRecord>,
+  pnft: AssetName,
+  cycle: Int,
+) -> Bool {
+  list.all(
+    records,
+    fn(r) { ( r.sender == pnft || r.recipient == pnft ) && r.cycle == cycle },
+  )
+}
+
+fn verify_avatar_stats_output(
+  outputs: List<Output>,
+  stats: AvatarCycleStats,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect datum: RecordsDatum = data
+          when datum is {
+            AvatarStats(s) -> s == stats
+            _ -> False
+          }
+        }
+        _ -> False
+      }
+    },
+  )
+}
+
+fn find_bioregion_avatar_stats(
+  inputs: List<Input>,
+  bioregion: ByteArray,
+  cycle: Int,
+) -> List<AvatarCycleStats> {
   // Filter avatar stats for this bioregion and cycle
-  list.filter_map(inputs, fn(input) {
-    when input.output.datum is {
-      InlineDatum(data) -> {
-        expect datum: RecordsDatum = data
-        when datum is {
-          AvatarStats(s) -> {
-            if s.bioregion == bioregion && s.cycle == cycle {
-              Some(s)
-            } else {
-              None
-            }
+  list.filter_map(
+    inputs,
+    fn(input) {
+      when input.output.datum is {
+        InlineDatum(data) -> {
+          expect datum: RecordsDatum = data
+          when datum is {
+            AvatarStats(s) ->
+              if s.bioregion == bioregion && s.cycle == cycle {
+                Some(s)
+              } else {
+                None
+              }
+            _ -> None
           }
-          _ -> None
         }
+        _ -> None
       }
-      _ -> None
-    }
-  })
+    },
+  )
 }
 
-fn verify_bioregion_stats_output(outputs: List<Output>, stats: BioregionCycleStats) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect datum: RecordsDatum = data
-        when datum is {
-          BioregionStats(s) -> s == stats
-          _ -> False
+fn verify_bioregion_stats_output(
+  outputs: List<Output>,
+  stats: BioregionCycleStats,
+) -> Bool {
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect datum: RecordsDatum = data
+          when datum is {
+            BioregionStats(s) -> s == stats
+            _ -> False
+          }
         }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
 
 fn verify_stats_finalized(outputs: List<Output>, cycle: Int) -> Bool {
-  list.any(outputs, fn(output) {
-    when output.datum is {
-      InlineDatum(data) -> {
-        expect datum: RecordsDatum = data
-        when datum is {
-          // Check cycle match - stats present for this cycle means finalized
-          BioregionStats(s) -> s.cycle == cycle
-          _ -> False
+  list.any(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect datum: RecordsDatum = data
+          when datum is {
+            // Check cycle match - stats present for this cycle means finalized
+            BioregionStats(s) -> s.cycle == cycle
+            _ -> False
+          }
         }
+        _ -> False
       }
-      _ -> False
-    }
-  })
+    },
+  )
 }
-
 // =============================================================================
 // DOCUMENTATION
 // =============================================================================

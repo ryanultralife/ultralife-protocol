@@ -3,11 +3,11 @@
 // =============================================================================
 
 use ultralife/types.{
-  VerificationLevel, Basic, Standard, Verified, Steward,
-  TransactionType, Labor, Goods, Services, Gift, Investment, Remediation, UBI, GovernanceReward, Internal,
-  ImpactClass, Positive, Negative,
-  RemediationType, Immediate,
-  voting_weight, can_transact, can_propose, tx_type_code, impact_sign, impact_magnitude,
+  Basic, Gift, Goods, GovernanceReward, Immediate, ImpactClass, Internal,
+  Investment, Labor, Negative, Positive, Remediation, RemediationType, Services,
+  Standard, Steward, TransactionType, UBI, VerificationLevel, Verified,
+  can_propose, can_transact, impact_magnitude, impact_sign, tx_type_code,
+  voting_weight,
 }
 
 // =============================================================================
@@ -119,12 +119,14 @@ test impact_sign_positive_is_1() {
 }
 
 test impact_sign_negative_is_minus_1() {
-  impact_sign(Negative {
-    impact_code: "",
-    magnitude: 100,
-    unit_code: None,
-    remediation: Immediate { output_index: 0 }
-  }) == -1
+  impact_sign(
+    Negative {
+      impact_code: "",
+      magnitude: 100,
+      unit_code: None,
+      remediation: Immediate { output_index: 0 },
+    },
+  ) == -1
 }
 
 // =============================================================================
@@ -132,16 +134,20 @@ test impact_sign_negative_is_minus_1() {
 // =============================================================================
 
 test impact_magnitude_positive() {
-  impact_magnitude(Positive { impact_code: "", magnitude: 500, unit_code: None }) == 500
+  impact_magnitude(
+    Positive { impact_code: "", magnitude: 500, unit_code: None },
+  ) == 500
 }
 
 test impact_magnitude_negative() {
-  impact_magnitude(Negative {
-    impact_code: "",
-    magnitude: 750,
-    unit_code: None,
-    remediation: Immediate { output_index: 0 }
-  }) == 750
+  impact_magnitude(
+    Negative {
+      impact_code: "",
+      magnitude: 750,
+      unit_code: None,
+      remediation: Immediate { output_index: 0 },
+    },
+  ) == 750
 }
 
 // =============================================================================
@@ -149,16 +155,18 @@ test impact_magnitude_negative() {
 // =============================================================================
 
 test verification_levels_ordered_by_weight() {
-  voting_weight(Basic) < voting_weight(Standard) &&
-  voting_weight(Standard) < voting_weight(Verified) &&
-  voting_weight(Verified) < voting_weight(Steward)
+  voting_weight(Basic) < voting_weight(Standard) && voting_weight(Standard) < voting_weight(
+    Verified,
+  ) && voting_weight(Verified) < voting_weight(Steward)
 }
 
 test transact_implies_vote() {
   // If you can transact, you should have voting weight
-  can_transact(Standard) && voting_weight(Standard) > 0 &&
-  can_transact(Verified) && voting_weight(Verified) > 0 &&
-  can_transact(Steward) && voting_weight(Steward) > 0
+  can_transact(Standard) && voting_weight(Standard) > 0 && can_transact(
+    Verified,
+  ) && voting_weight(Verified) > 0 && can_transact(Steward) && voting_weight(
+    Steward,
+  ) > 0
 }
 
 test propose_requires_higher_level() {

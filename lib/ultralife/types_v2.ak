@@ -27,8 +27,6 @@ use cardano/assets.{AssetName}
 //
 // =============================================================================
 
-/// Impact Category — physical systems affecting planetary vitality
-/// Codes are hierarchical: 0x05XX where XX identifies subcategory
 // =============================================================================
 // IMPACT COMPOUNDS — The Chemistry of Activity
 // =============================================================================
@@ -37,36 +35,31 @@ use cardano/assets.{AssetName}
 // When a forest grows, it fixes CO₂ into cellulose — real chemistry.
 // =============================================================================
 
+/// Impact Category — physical systems affecting planetary vitality
+/// Codes are hierarchical: 0x05XX where XX identifies subcategory
 /// Compound codes — actual chemical formulas
 /// First byte: Element group, remaining bytes: specific compound
-pub type CompoundCode = ByteArray
+pub type CompoundCode =
+  ByteArray
 
 /// Carbon compounds (0x01xx)
 /// CO2 = #"0101", CH4 = #"0102", CO = #"0103", Glucose = #"0104"
 /// Cellulose = #"0105", Lignin = #"0106", Humus = #"0107", Biochar = #"0108"
-
 /// Nitrogen compounds (0x02xx)
 /// N2 = #"0201", NO = #"0202", NO2 = #"0203", N2O = #"0204"
 /// NH3 = #"0205", NO3 = #"0206", N_organic = #"0207"
-
 /// Sulfur compounds (0x03xx)
 /// SO2 = #"0301", SO3 = #"0302", H2S = #"0303", SO4 = #"0304"
-
 /// Water & oxygen (0x04xx)
 /// H2O = #"0401", O2 = #"0402", O3 = #"0403"
-
 /// Phosphorus (0x05xx)
 /// PO4 = #"0501", P_organic = #"0502"
-
 /// Particulates (0x06xx)
 /// PM10 = #"0601", PM25 = #"0602", BlackCarbon = #"0603", Dust = #"0604"
-
 /// Metals (0x07xx)
 /// Fe = #"0701", Al = #"0702", Pb = #"0703", Hg = #"0704", Cd = #"0705", As = #"0706"
-
 /// Calcium (0x08xx)
 /// CaCO3 = #"0801", Ca(OH)2 = #"0802"
-
 /// System domains affected by compound flows
 pub type SystemDomain {
   /// Carbon cycle: atmosphere, biosphere, pedosphere
@@ -96,25 +89,13 @@ pub type MassUnit {
 /// How was this compound flow measured?
 pub type MeasurementMethod {
   /// Direct measurement (sensor, lab test)
-  Direct { 
-    instrument: ByteArray,
-    calibration_date: Int,
-  }
+  Direct { instrument: ByteArray, calibration_date: Int }
   /// Calculated from activity data
-  Calculated {
-    formula: ByteArray,
-    input_sources: List<ByteArray>,
-  }
+  Calculated { formula: ByteArray, input_sources: List<ByteArray> }
   /// Estimated from similar activities
-  Estimated {
-    reference: ByteArray,
-    similarity: Int,
-  }
+  Estimated { reference: ByteArray, similarity: Int }
   /// Certified by surveyor (pNFT)
-  Surveyed {
-    surveyor_pnft: AssetName,
-    survey_date: Int,
-  }
+  Surveyed { surveyor_pnft: AssetName, survey_date: Int }
 }
 
 /// A single compound flow — what actually moved in the physical world
@@ -141,31 +122,24 @@ pub type ImpactCategory {
   /// Carbon cycle: CO2, CH4, soil carbon, biomass
   /// Subcodes: 0x0500 (general), 0x0501 (CO2), 0x0502 (CH4), 0x0503 (soil), 0x0504 (biomass)
   Carbon
-  
   /// Water cycle: aquifer, watershed, contamination, evapotranspiration
   /// Subcodes: 0x0510 (general), 0x0511 (aquifer), 0x0512 (watershed), 0x0513 (quality)
   Water
-  
   /// Biodiversity: habitat, species, genetics, pollinators
   /// Subcodes: 0x0520 (general), 0x0521 (habitat), 0x0522 (species), 0x0523 (genetic)
   BiodiversityImpact
-  
   /// Soil biology: microbes, fungi, organic matter, erosion
   /// Subcodes: 0x0530 (general), 0x0531 (microbial), 0x0532 (fungal), 0x0533 (organic)
   Soil
-  
   /// Atmospheric: oxygen, particulates, ozone, NOx/SOx
   /// Subcodes: 0x0540 (general), 0x0541 (O2), 0x0542 (particulate), 0x0543 (ozone)
   Air
-  
   /// Material flows: waste, toxins, resources, entropy
   /// Subcodes: 0x0550 (general), 0x0551 (waste), 0x0552 (toxin), 0x0553 (resource)
   Waste
-  
   /// Energy: renewable, fossil, efficiency, storage
   /// Subcodes: 0x0560 (general), 0x0561 (renewable), 0x0562 (fossil), 0x0563 (efficiency)
   Energy
-  
   /// Land use: conversion, restoration, fragmentation
   /// Subcodes: 0x0570 (general), 0x0571 (agriculture), 0x0572 (forest), 0x0573 (urban)
   LandUse
@@ -226,50 +200,27 @@ pub type TransactionMeta {
 /// Types of economic transactions
 pub type TransactionType {
   /// Payment for labor/work
-  Labor { 
-    work_code: ByteArray,
-    hours: Option<Int>,
-  }
+  Labor { work_code: ByteArray, hours: Option<Int> }
   /// Payment for physical goods
-  Goods { 
-    product_code: ByteArray,
-    quantity: Int,
-    unit_code: ByteArray,
-  }
+  Goods { product_code: ByteArray, quantity: Int, unit_code: ByteArray }
   /// Payment for services
-  Services { 
-    service_code: ByteArray,
-  }
+  Services { service_code: ByteArray }
   /// Gift or donation
   Gift
   /// Investment or loan
-  Investment { 
-    terms_hash: ByteArray,
-  }
+  Investment { terms_hash: ByteArray }
   /// Remediation payment (offsetting negative impact)
-  Remediation { 
-    bond_id: ByteArray,
-  }
+  Remediation { bond_id: ByteArray }
   /// UBI distribution
-  UBI { 
-    cycle: Int,
-  }
+  UBI { cycle: Int }
   /// Governance reward
-  GovernanceReward { 
-    proposal_id: ByteArray,
-  }
+  GovernanceReward { proposal_id: ByteArray }
   /// Internal transfer (same owner, different UTXOs)
   Internal
   /// Stake pool delegation reward
-  StakeReward {
-    pool_id: ByteArray,
-    epoch: Int,
-  }
+  StakeReward { pool_id: ByteArray, epoch: Int }
   /// Impact token trade (buying/selling offsets)
-  ImpactTrade {
-    impact_token_id: ByteArray,
-    direction: TradeDirection,
-  }
+  ImpactTrade { impact_token_id: ByteArray, direction: TradeDirection }
 }
 
 /// Direction of impact token trade
@@ -316,9 +267,7 @@ pub type BioregionDatum {
   created_at: Int,
   /// Last health update cycle
   last_health_update: Int,
-  
   // === STAKE POOL ECONOMICS ===
-  
   /// Registered stake pools in this bioregion
   stake_pools: List<BioregionPool>,
   /// Total UltraLife tokens staked to bioregion pools
@@ -333,9 +282,7 @@ pub type BioregionDatum {
   cumulative_impact: Int,
   /// Economic velocity (transactions per cycle)
   tx_velocity: Int,
-  
   // === PRESERVATION METRICS ===
-  
   /// Total area under active preservation grants (m²)
   preserved_area: Int,
   /// Active preservation grants count
@@ -350,9 +297,7 @@ pub type BioregionDatum {
   average_ecosystem_health: Int,
   /// Ecosystem health trend
   health_trend: HealthTrend,
-  
   // === BIODIVERSITY INDICATORS ===
-  
   /// Species count (from surveys)
   documented_species: Int,
   /// Habitat connectivity score (0-100)
@@ -466,24 +411,18 @@ pub type PnftDatum {
   created_at: Int,
   /// Last level upgrade slot
   upgraded_at: Option<Int>,
-  
   // === STAKE VISIBILITY ===
   // Shows exactly where this person's economic commitment lies
-  
   /// Detailed stake delegations (visible to all)
   stake_portfolio: StakePortfolio,
-  
   // === IMPACT TRACKING ===
-  
   /// Cumulative lifetime impact score
   lifetime_impact: Int,
   /// Current cycle impact score
   cycle_impact: Int,
   /// Impact breakdown by category (lifetime)
   impact_by_category: List<(ImpactCategory, Int)>,
-  
   // === SURVEYOR/VERIFIER CREDENTIALS ===
-  
   /// Is this pNFT a certified surveyor?
   surveyor_certification: Option<SurveyorCert>,
   /// Bioregions this person can survey (if certified)
@@ -678,13 +617,13 @@ pub type Attestation {
 /// How negative impact will be remediated
 pub type RemediationType {
   /// Immediate: offset in same transaction using impact tokens
-  Immediate { 
+  Immediate {
     /// Impact tokens being burned
     impact_tokens: List<AssetName>,
   }
   /// Bonded: commit tokens as collateral, remediate later
-  Bonded { 
-    bond_id: ByteArray, 
+  Bonded {
+    bond_id: ByteArray,
     deadline: Int,
     /// Collateral amount (tokens locked)
     collateral: Int,
@@ -1188,7 +1127,8 @@ pub type RecordsDatum {
 pub fn voting_weight(level: VerificationLevel) -> Int {
   when level is {
     Basic -> 0
-    Ward -> 0  // Guardian-linked, same as Basic
+    Ward -> 0
+    // Guardian-linked, same as Basic
     Standard -> 1
     Verified -> 2
     Steward -> 3
@@ -1204,7 +1144,8 @@ pub fn can_transact(level: VerificationLevel) -> Bool {
 pub fn can_propose(level: VerificationLevel) -> Bool {
   when level is {
     Basic -> False
-    Ward -> False  // Guardian-linked, same as Basic
+    Ward -> False
+    // Guardian-linked, same as Basic
     Standard -> False
     Verified -> True
     Steward -> True
@@ -1215,7 +1156,8 @@ pub fn can_propose(level: VerificationLevel) -> Bool {
 pub fn can_operate_pool(level: VerificationLevel) -> Bool {
   when level is {
     Basic -> False
-    Ward -> False  // Guardian-linked, same as Basic
+    Ward -> False
+    // Guardian-linked, same as Basic
     Standard -> False
     Verified -> True
     Steward -> True
@@ -1261,10 +1203,14 @@ pub fn impact_category_code(category: ImpactCategory) -> ByteArray {
 /// Calculate net impact from list of impacts
 /// Weighted by confidence
 pub fn calculate_net_impact(impacts: List<Impact>) -> Int {
-  list.foldl(impacts, 0, fn(impact, acc) {
-    let weighted = impact.magnitude * impact.confidence / 100
-    acc + weighted
-  })
+  list.foldl(
+    impacts,
+    0,
+    fn(impact, acc) {
+      let weighted = impact.magnitude * impact.confidence / 100
+      acc + weighted
+    },
+  )
 }
 
 /// Check if impacts require remediation (net negative)
@@ -1275,7 +1221,11 @@ pub fn requires_remediation(impacts: List<Impact>) -> Bool {
 /// Calculate required remediation amount
 pub fn remediation_required(impacts: List<Impact>) -> Int {
   let net = calculate_net_impact(impacts)
-  if net < 0 { -net } else { 0 }
+  if net < 0 {
+    -net
+  } else {
+    0
+  }
 }
 
 /// Check if impacts list is valid (non-empty, all valid)
@@ -1284,10 +1234,11 @@ pub fn valid_impacts(impacts: List<Impact>) -> Bool {
   let non_empty = list.length(impacts) > 0
 
   // All impacts must have valid confidence
-  let all_valid = list.all(impacts, fn(impact) {
-    impact.confidence >= 0 &&
-    impact.confidence <= 100
-  })
+  let all_valid =
+    list.all(
+      impacts,
+      fn(impact) { impact.confidence >= 0 && impact.confidence <= 100 },
+    )
 
   non_empty && all_valid
 }
