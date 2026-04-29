@@ -9,23 +9,29 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install Aiken
         run: |
           curl -sSfL https://install.aiken-lang.org | bash
           echo "$HOME/.aiken/bin" >> $GITHUB_PATH
-      
+
       - name: Check contracts
-        run: aiken check
+        run: |
+          export PATH="$HOME/.aiken/bin:$PATH"
+          aiken check
 
       - name: Build contracts
-        run: aiken build
+        run: |
+          export PATH="$HOME/.aiken/bin:$PATH"
+          aiken build
 
       - name: Test contracts
-        run: aiken check
+        run: |
+          export PATH="$HOME/.aiken/bin:$PATH"
+          aiken check
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
