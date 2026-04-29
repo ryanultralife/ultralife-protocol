@@ -16,9 +16,11 @@ jobs:
       - name: Install Aiken
         run: |
           AIKEN_VERSION="v1.1.9"
+          mkdir -p aiken-extract
           curl -sSL "https://github.com/aiken-lang/aiken/releases/download/${AIKEN_VERSION}/aiken-x86_64-unknown-linux-gnu.tar.gz" -o aiken.tar.gz
-          tar -xzf aiken.tar.gz
-          sudo mv aiken /usr/local/bin/
+          tar -xzf aiken.tar.gz -C aiken-extract
+          find aiken-extract -name "aiken" -type f -exec sudo mv {} /usr/local/bin/aiken \;
+          sudo chmod +x /usr/local/bin/aiken
           aiken --version
 
       - name: Check contracts
