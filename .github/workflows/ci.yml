@@ -20,9 +20,7 @@ jobs:
         run: cargo install aiken --version 1.1.21
 
       - name: Check contracts
-        run: |
-          aiken check --trace-level verbose 2>&1 | tee /tmp/aiken-output.txt
-          exit ${PIPESTATUS[0]}
+        run: aiken check
 
       - name: Build contracts
         run: aiken build
