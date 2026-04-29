@@ -1,0 +1,499 @@
+{
+  "testUsers": [
+    {
+      "name": "Alice",
+      "address": "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp",
+      "pnftId": "pnft_ml47yps2_7e54410f8ccc126d",
+      "bioregion": "sierra_nevada",
+      "createdAt": "2026-01-15T10:30:00.000Z"
+    },
+    {
+      "name": "Bob",
+      "address": "addr_test1qpu5vlrf4xkxv2qpwngf6cjhtw542ayty80v8dyr49rf5ewvxwdrt70qlcpeeagscasafhffqsxy36t90ldv06wqrk2qum8x5w",
+      "pnftId": "pnft_k8r3npw1_3a21bc9d4ef7890a",
+      "bioregion": "cascadia",
+      "createdAt": "2026-01-20T14:45:00.000Z"
+    },
+    {
+      "name": "Carlos",
+      "address": "addr_test1qr0c3frkem9cqn5f73dnvqpena27k2fgqew6wct9eaka03agfwkvzr0zyq7nqvcj24zehrshx63zzdxv24x3a4tcnfeq9zwmn7",
+      "pnftId": "pnft_surveyor_carlos_001",
+      "bioregion": "sierra_nevada",
+      "createdAt": "2026-01-10T08:00:00.000Z"
+    }
+  ],
+  "pnfts": [
+    {
+      "id": "pnft_ml47yps2_7e54410f8ccc126d",
+      "owner": "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp",
+      "name": "Alice",
+      "level": "Verified",
+      "bioregion": "sierra_nevada",
+      "createdAt": "2026-01-15T10:30:00.000Z",
+      "createdSlot": 45000000,
+      "status": "minted",
+      "testnetSimulated": true,
+      "lands_stewarded": ["land_sierra_forest_001", "land_sierra_meadow_002"]
+    },
+    {
+      "id": "pnft_k8r3npw1_3a21bc9d4ef7890a",
+      "owner": "addr_test1qpu5vlrf4xkxv2qpwngf6cjhtw542ayty80v8dyr49rf5ewvxwdrt70qlcpeeagscasafhffqsxy36t90ldv06wqrk2qum8x5w",
+      "name": "Bob",
+      "level": "Standard",
+      "bioregion": "cascadia",
+      "createdAt": "2026-01-20T14:45:00.000Z",
+      "createdSlot": 45100000,
+      "status": "minted",
+      "testnetSimulated": true,
+      "lands_stewarded": []
+    },
+    {
+      "id": "pnft_surveyor_carlos_001",
+      "owner": "addr_test1qr0c3frkem9cqn5f73dnvqpena27k2fgqew6wct9eaka03agfwkvzr0zyq7nqvcj24zehrshx63zzdxv24x3a4tcnfeq9zwmn7",
+      "name": "Carlos",
+      "level": "Steward",
+      "bioregion": "sierra_nevada",
+      "createdAt": "2026-01-10T08:00:00.000Z",
+      "createdSlot": 44900000,
+      "status": "minted",
+      "testnetSimulated": true,
+      "lands_stewarded": ["land_sierra_ranch_003"],
+      "surveyor_certifications": ["Ecological", "Soil", "Biodiversity"]
+    }
+  ],
+  "ultraBalances": {
+    "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp": 1250.75,
+    "addr_test1qpu5vlrf4xkxv2qpwngf6cjhtw542ayty80v8dyr49rf5ewvxwdrt70qlcpeeagscasafhffqsxy36t90ldv06wqrk2qum8x5w": 325.50,
+    "addr_test1qr0c3frkem9cqn5f73dnvqpena27k2fgqew6wct9eaka03agfwkvzr0zyq7nqvcj24zehrshx63zzdxv24x3a4tcnfeq9zwmn7": 2100.00
+  },
+  "signupGrants": [
+    {
+      "pnftId": "pnft_ml47yps2_7e54410f8ccc126d",
+      "pnftOwner": "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp",
+      "amount": 50,
+      "claimedAt": "2026-01-15T10:31:00.000Z",
+      "testnetSimulated": true
+    },
+    {
+      "pnftId": "pnft_k8r3npw1_3a21bc9d4ef7890a",
+      "pnftOwner": "addr_test1qpu5vlrf4xkxv2qpwngf6cjhtw542ayty80v8dyr49rf5ewvxwdrt70qlcpeeagscasafhffqsxy36t90ldv06wqrk2qum8x5w",
+      "amount": 50,
+      "claimedAt": "2026-01-20T14:46:00.000Z",
+      "testnetSimulated": true
+    }
+  ],
+  "lands": [
+    {
+      "landId": "land_sierra_forest_001",
+      "name": "Sierra Pine Forest",
+      "boundsHash": "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG",
+      "area_m2": 405000,
+      "bioregion": "sierra_nevada",
+      "classification": {
+        "name": "Mixed Conifer Forest",
+        "terrain": "Mountainous",
+        "ecosystem": "Forest",
+        "sequestrationRate": 8.5
+      },
+      "health": {
+        "overall_index": 78,
+        "soil_health": 75,
+        "water_health": 82,
+        "biodiversity_index": 71,
+        "carbon_stock": 45000,
+        "last_survey": "2026-03-15T00:00:00.000Z"
+      },
+      "primarySteward": "pnft_ml47yps2_7e54410f8ccc126d",
+      "stewardAddress": "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp",
+      "rights": {
+        "carbon": "pnft_ml47yps2_7e54410f8ccc126d",
+        "water": "pnft_ml47yps2_7e54410f8ccc126d",
+        "timber": "pnft_ml47yps2_7e54410f8ccc126d"
+      },
+      "registered_at": 45000500,
+      "registeredAt": "2026-01-15T12:00:00.000Z",
+      "testnetSimulated": true
+    },
+    {
+      "landId": "land_sierra_meadow_002",
+      "name": "High Sierra Meadow",
+      "boundsHash": "QmT5NvUtoM5nWFfrQdVrFtvGfKFmG7AHE8P34isapyhCxX",
+      "area_m2": 120000,
+      "bioregion": "sierra_nevada",
+      "classification": {
+        "name": "Alpine Meadow",
+        "terrain": "High Altitude",
+        "ecosystem": "Grassland",
+        "sequestrationRate": 3.2
+      },
+      "health": {
+        "overall_index": 85,
+        "soil_health": 88,
+        "water_health": 90,
+        "biodiversity_index": 82,
+        "carbon_stock": 8500,
+        "last_survey": "2026-03-20T00:00:00.000Z"
+      },
+      "primarySteward": "pnft_ml47yps2_7e54410f8ccc126d",
+      "stewardAddress": "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp",
+      "rights": {},
+      "registered_at": 45050000,
+      "registeredAt": "2026-01-18T09:00:00.000Z",
+      "testnetSimulated": true
+    },
+    {
+      "landId": "land_sierra_ranch_003",
+      "name": "Foothill Ranch",
+      "boundsHash": "QmUNLLsPACCz1vLxQVkXqqLX5R1X345qqfHbsf67hvA3Nn",
+      "area_m2": 800000,
+      "bioregion": "sierra_nevada",
+      "classification": {
+        "name": "Regenerative Ranch",
+        "terrain": "Rolling Hills",
+        "ecosystem": "Grassland",
+        "sequestrationRate": 4.8
+      },
+      "health": {
+        "overall_index": 72,
+        "soil_health": 70,
+        "water_health": 75,
+        "biodiversity_index": 68,
+        "carbon_stock": 35000,
+        "last_survey": "2026-02-28T00:00:00.000Z"
+      },
+      "primarySteward": "pnft_surveyor_carlos_001",
+      "stewardAddress": "addr_test1qr0c3frkem9cqn5f73dnvqpena27k2fgqew6wct9eaka03agfwkvzr0zyq7nqvcj24zehrshx63zzdxv24x3a4tcnfeq9zwmn7",
+      "rights": {
+        "grazing": "pnft_surveyor_carlos_001",
+        "carbon": "pnft_surveyor_carlos_001"
+      },
+      "registered_at": 44920000,
+      "registeredAt": "2026-01-12T14:00:00.000Z",
+      "testnetSimulated": true
+    }
+  ],
+  "bioregionStats": {
+    "sierra_nevada": {
+      "name": "Sierra Nevada",
+      "totalLandArea": 1325000,
+      "landsRegistered": 3,
+      "totalSequestrationCapacity": 88500,
+      "residentCount": 2,
+      "healthIndex": 7800,
+      "ubiPool": 15000,
+      "lastHealthUpdate": "2026-03-20T00:00:00.000Z"
+    },
+    "cascadia": {
+      "name": "Cascadia Bioregion",
+      "totalLandArea": 0,
+      "landsRegistered": 0,
+      "totalSequestrationCapacity": 0,
+      "residentCount": 1,
+      "healthIndex": 8200,
+      "ubiPool": 12000,
+      "lastHealthUpdate": "2026-03-18T00:00:00.000Z"
+    }
+  },
+  "transactions": [
+    {
+      "txHash": "tx_transfer_001_abc123def456",
+      "sender": "pnft_ml47yps2_7e54410f8ccc126d",
+      "senderAddress": "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp",
+      "senderBioregion": "sierra_nevada",
+      "recipient": "pnft_k8r3npw1_3a21bc9d4ef7890a",
+      "recipientAddress": "addr_test1qpu5vlrf4xkxv2qpwngf6cjhtw542ayty80v8dyr49rf5ewvxwdrt70qlcpeeagscasafhffqsxy36t90ldv06wqrk2qum8x5w",
+      "recipientBioregion": "cascadia",
+      "amount": 25,
+      "txType": {
+        "code": 1,
+        "name": "Transfer",
+        "description": "Token transfer between pNFTs"
+      },
+      "impact": {
+        "description": "Cross-bioregion transfer",
+        "compounds": [
+          {
+            "compound": "CO2",
+            "quantity": 0.1,
+            "unit": "kg",
+            "confidence": 95
+          }
+        ],
+        "netImpact": 0.1,
+        "evidenceHash": "QmEvidence001"
+      },
+      "note": "Payment for consulting services",
+      "slot": 46000000,
+      "timestamp": "2026-02-10T16:30:00.000Z",
+      "testnetSimulated": true
+    },
+    {
+      "txHash": "tx_purchase_002_789ghi012jkl",
+      "sender": "pnft_k8r3npw1_3a21bc9d4ef7890a",
+      "senderAddress": "addr_test1qpu5vlrf4xkxv2qpwngf6cjhtw542ayty80v8dyr49rf5ewvxwdrt70qlcpeeagscasafhffqsxy36t90ldv06wqrk2qum8x5w",
+      "senderBioregion": "cascadia",
+      "recipient": "pnft_ml47yps2_7e54410f8ccc126d",
+      "recipientAddress": "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp",
+      "recipientBioregion": "sierra_nevada",
+      "amount": 150,
+      "txType": {
+        "code": 2,
+        "name": "Purchase",
+        "description": "Marketplace purchase"
+      },
+      "impact": {
+        "description": "Purchase of organic produce",
+        "compounds": [
+          {
+            "compound": "CO2",
+            "quantity": -2.5,
+            "unit": "kg",
+            "confidence": 80
+          },
+          {
+            "compound": "H2O",
+            "quantity": 50,
+            "unit": "L",
+            "confidence": 75
+          }
+        ],
+        "netImpact": -2.5,
+        "evidenceHash": "QmEvidence002"
+      },
+      "note": "Bulk organic apple purchase - local delivery",
+      "slot": 46500000,
+      "timestamp": "2026-03-01T10:00:00.000Z",
+      "testnetSimulated": true
+    }
+  ],
+  "bioregionImpact": {
+    "sierra_nevada": {
+      "totalTransactions": 15,
+      "totalVolume": 2500,
+      "netImpact": -45000,
+      "byType": {
+        "Transfer": 8,
+        "Purchase": 5,
+        "CreditSale": 2
+      },
+      "byCompound": {
+        "CO2": -45000,
+        "H2O": 1200,
+        "CH4": -50
+      }
+    },
+    "cascadia": {
+      "totalTransactions": 5,
+      "totalVolume": 800,
+      "netImpact": 150,
+      "byType": {
+        "Transfer": 3,
+        "Purchase": 2
+      },
+      "byCompound": {
+        "CO2": 150
+      }
+    }
+  },
+  "impactTokens": [
+    {
+      "tokenId": "impact_sierra_forest_2026Q1",
+      "amount": 3442,
+      "category": "Carbon",
+      "compounds": [
+        {
+          "compound": "CO2",
+          "quantity": -3442,
+          "unit": "kg",
+          "confidence": 85
+        }
+      ],
+      "mintedAt": "2026-03-31T00:00:00.000Z",
+      "mintedBy": "pnft_ml47yps2_7e54410f8ccc126d",
+      "bioregion": "sierra_nevada",
+      "txHash": "tx_impact_mint_001",
+      "landId": "land_sierra_forest_001",
+      "surveyedBy": "pnft_surveyor_carlos_001"
+    }
+  ],
+  "impactTokenBalances": {
+    "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp": [
+      {
+        "tokenId": "impact_sierra_forest_2026Q1",
+        "amount": 3442,
+        "category": "Carbon"
+      }
+    ]
+  },
+  "impactDebt": {
+    "addr_test1qpu5vlrf4xkxv2qpwngf6cjhtw542ayty80v8dyr49rf5ewvxwdrt70qlcpeeagscasafhffqsxy36t90ldv06wqrk2qum8x5w": 150.5
+  },
+  "sequestrationCredits": [
+    {
+      "creditId": "credit_sierra_forest_001_2026Q1",
+      "landId": "land_sierra_forest_001",
+      "landName": "Sierra Pine Forest",
+      "steward": "pnft_ml47yps2_7e54410f8ccc126d",
+      "stewardAddress": "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp",
+      "bioregion": "sierra_nevada",
+      "amount": 34.42,
+      "unit": "tCO2",
+      "cyclesGenerated": 3,
+      "generatedAt": "2026-03-31T00:00:00.000Z",
+      "landType": "Mixed Conifer Forest",
+      "sequestrationRate": 8.5,
+      "confidence": 85,
+      "status": "Available",
+      "testnetSimulated": true
+    },
+    {
+      "creditId": "credit_sierra_ranch_003_2026Q1",
+      "landId": "land_sierra_ranch_003",
+      "landName": "Foothill Ranch",
+      "steward": "pnft_surveyor_carlos_001",
+      "stewardAddress": "addr_test1qr0c3frkem9cqn5f73dnvqpena27k2fgqew6wct9eaka03agfwkvzr0zyq7nqvcj24zehrshx63zzdxv24x3a4tcnfeq9zwmn7",
+      "bioregion": "sierra_nevada",
+      "amount": 38.4,
+      "unit": "tCO2",
+      "cyclesGenerated": 3,
+      "generatedAt": "2026-03-31T00:00:00.000Z",
+      "landType": "Regenerative Ranch",
+      "sequestrationRate": 4.8,
+      "confidence": 78,
+      "status": "Available",
+      "testnetSimulated": true
+    }
+  ],
+  "creditBalances": {
+    "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp": {
+      "total": 34.42,
+      "available": 30.42,
+      "sold": 4,
+      "byLand": {
+        "land_sierra_forest_001": 34.42
+      }
+    },
+    "addr_test1qr0c3frkem9cqn5f73dnvqpena27k2fgqew6wct9eaka03agfwkvzr0zyq7nqvcj24zehrshx63zzdxv24x3a4tcnfeq9zwmn7": {
+      "total": 38.4,
+      "available": 38.4,
+      "sold": 0,
+      "byLand": {
+        "land_sierra_ranch_003": 38.4
+      }
+    }
+  },
+  "lastCreditGeneration": {
+    "land_sierra_forest_001": "2026-03-31T00:00:00.000Z",
+    "land_sierra_meadow_002": "2026-03-31T00:00:00.000Z",
+    "land_sierra_ranch_003": "2026-03-31T00:00:00.000Z"
+  },
+  "creditPurchases": [
+    {
+      "purchaseId": "purchase_carbon_001",
+      "buyer": "pnft_k8r3npw1_3a21bc9d4ef7890a",
+      "seller": "pnft_ml47yps2_7e54410f8ccc126d",
+      "amount": 4,
+      "unit": "tCO2",
+      "price": 20,
+      "priceUnit": "ULTRA",
+      "debtBefore": 170.5,
+      "debtAfter": 150.5,
+      "purchasedAt": "2026-03-15T14:00:00.000Z",
+      "testnetSimulated": true
+    }
+  ],
+  "marketplace": [
+    {
+      "id": "offering_apples_001",
+      "offerer": "pnft_ml47yps2_7e54410f8ccc126d",
+      "offererName": "Alice",
+      "what": "Organic Apples",
+      "whatType": "Thing",
+      "description": "Fresh organic Fuji apples from Sierra Nevada orchard. No pesticides, hand-picked.",
+      "price": 8,
+      "unit": "per kg",
+      "status": "Active",
+      "bioregion": "sierra_nevada",
+      "impactDisclosure": {
+        "CO2": -0.5,
+        "H2O": 25
+      },
+      "createdAt": "2026-02-01T00:00:00.000Z"
+    },
+    {
+      "id": "offering_carpentry_002",
+      "offerer": "pnft_surveyor_carlos_001",
+      "offererName": "Carlos",
+      "what": "Carpentry Services",
+      "whatType": "Work",
+      "description": "Skilled carpentry and woodworking. Furniture, repairs, custom builds. 25 years experience.",
+      "price": 45,
+      "unit": "per hour",
+      "status": "Active",
+      "bioregion": "sierra_nevada",
+      "impactDisclosure": {
+        "CO2": 2.5
+      },
+      "createdAt": "2026-01-20T00:00:00.000Z"
+    },
+    {
+      "id": "offering_survey_003",
+      "offerer": "pnft_surveyor_carlos_001",
+      "offererName": "Carlos",
+      "what": "Ecological Survey",
+      "whatType": "Knowledge",
+      "description": "Certified ecological surveyor. Biodiversity assessment, soil health, carbon stock estimation.",
+      "price": 200,
+      "unit": "per survey",
+      "status": "Active",
+      "bioregion": "sierra_nevada",
+      "impactDisclosure": {
+        "CO2": 5
+      },
+      "createdAt": "2026-01-15T00:00:00.000Z"
+    }
+  ],
+  "care": [
+    {
+      "id": "need_harvest_001",
+      "needer": "pnft_ml47yps2_7e54410f8ccc126d",
+      "neederName": "Alice",
+      "description": "Need help with apple harvest - September 2026. 3-4 days of work.",
+      "category": "Agricultural Work",
+      "budget": 400,
+      "status": "Open",
+      "bioregion": "sierra_nevada",
+      "createdAt": "2026-03-01T00:00:00.000Z"
+    },
+    {
+      "id": "need_transport_002",
+      "needer": "pnft_k8r3npw1_3a21bc9d4ef7890a",
+      "neederName": "Bob",
+      "description": "Looking for ride share from Cascadia to Sierra Nevada for bioregion meeting.",
+      "category": "Transport",
+      "budget": 50,
+      "status": "Open",
+      "bioregion": "cascadia",
+      "createdAt": "2026-03-25T00:00:00.000Z"
+    }
+  ],
+  "collectives": [
+    {
+      "id": "collective_sierra_growers",
+      "name": "Sierra Growers Cooperative",
+      "description": "Cooperative of organic farmers in the Sierra Nevada bioregion",
+      "members": ["pnft_ml47yps2_7e54410f8ccc126d", "pnft_surveyor_carlos_001"],
+      "treasury": 500,
+      "bioregion": "sierra_nevada",
+      "createdAt": "2026-02-01T00:00:00.000Z",
+      "status": "Active"
+    }
+  ],
+  "metadata": {
+    "generated": "2026-04-29T00:00:00.000Z",
+    "version": "1.0.0",
+    "network": "preprod",
+    "mode": "simulation",
+    "note": "Sample deployment data for local development and demonstration"
+  }
+}
