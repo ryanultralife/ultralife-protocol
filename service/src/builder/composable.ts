@@ -253,6 +253,19 @@ export class ComposableTxBuilder {
     );
   }
 
+  /**
+   * Select the payer as a READ-ONLY wallet (address + its on-chain UTxOs) so
+   * build()'s `complete()` can run coin selection and set change WITHOUT a
+   * signing key. The result is an UNSIGNED tx the payer later signs (wallet or
+   * biometric pNFT). This keeps key custody with the human — the builder never
+   * holds a private key.
+   */
+  async selectPayer(address: string): Promise<void> {
+    if (!this.lucid) throw new Error('Builder not initialized');
+    const utxos = await this.lucid.utxosAt(address);
+    this.lucid.selectWalletFrom({ address, utxos });
+  }
+
   // ===========================================================================
   // CHAINABLE ACTION METHODS
   // ===========================================================================

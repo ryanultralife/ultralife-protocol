@@ -13,6 +13,7 @@ import {
   getDeploymentState,
   getHealthCheck,
 } from './routes.js';
+import { registerBuildRoute } from './build.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -27,7 +28,7 @@ const app: Express = express();
 // Middleware
 app.use(cors({
   origin: process.env.CORS_ORIGIN || '*',
-  methods: ['GET', 'HEAD', 'OPTIONS'],
+  methods: ['GET', 'HEAD', 'OPTIONS', 'POST'],
   credentials: true,
 }));
 
@@ -120,6 +121,12 @@ app.get('/', (req: Request, res: Response) => {
         path: '/health',
         description: 'Health check endpoint',
       },
+      build: {
+        path: '/build',
+        method: 'POST',
+        description: 'Build an unsigned preprod tx from a CompositionBundle proposal',
+        body: { bundle: 'leaseRentSettlement | workSettlement | workerOnboarding', params: '{ ... }' },
+      },
     },
     docs: 'https://github.com/ultralife-protocol/spec',
     source: 'https://github.com/ultralife-protocol',
@@ -142,6 +149,9 @@ app.get('/deployment', getDeploymentState);
 
 // Health check
 app.get('/health', getHealthCheck);
+
+// Transaction builder — orchestrator proposal → unsigned preprod tx
+registerBuildRoute(app);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
