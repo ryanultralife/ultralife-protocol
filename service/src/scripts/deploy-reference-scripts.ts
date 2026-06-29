@@ -20,6 +20,11 @@ import { Lucid, Blockfrost, fromHex, toHex, getAddressDetails } from 'lucid-card
 import { execSync, spawnSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+// ESM (this package is "type": "module") — __dirname isn't defined; derive it.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // =============================================================================
 // CONFIGURATION
@@ -93,17 +98,21 @@ const DEPLOYMENT_ORDER = [
 function checkPrerequisites(): boolean {
   console.log('Checking prerequisites...\n');
 
-  // Check Aiken
-  const aikenResult = spawnSync('aiken', ['--version'], { encoding: 'utf-8' });
+  // Check Aiken. shell:true so Windows resolves the npm `aiken.cmd`/`.ps1`
+  // shim (bare spawnSync can't, returning ENOENT even when Aiken is installed).
+  const aikenResult = spawnSync('aiken', ['--version'], { encoding: 'utf-8', shell: true });
   if (aikenResult.error || aikenResult.status !== 0) {
     console.error('ERROR: Aiken CLI not found');
-    console.error('Install: curl -sSfL https://install.aiken-lang.org | bash');
+    console.error('Install (mac/Linux): curl -sSfL https://install.aiken-lang.org | bash');
+    console.error('Install (any OS): npm install -g @aiken-lang/aiken');
     return false;
   }
   console.log(`  Aiken: ${aikenResult.stdout.trim()}`);
 
   // Check contracts directory
-  const contractsDir = path.join(__dirname, '..', '..', '..', 'contracts');
+  // The Aiken project (aiken.toml, validators/, plutus.json) lives at the repo
+  // root — service/src/scripts -> up 3 == repo root. (No contracts/ subdir.)
+  const contractsDir = path.join(__dirname, '..', '..', '..');
   if (!fs.existsSync(contractsDir)) {
     console.error(`ERROR: Contracts directory not found: ${contractsDir}`);
     return false;
@@ -130,7 +139,9 @@ function checkPrerequisites(): boolean {
 async function compileAiken(): Promise<Map<string, string>> {
   console.log('Compiling Aiken contracts...\n');
 
-  const contractsDir = path.join(__dirname, '..', '..', '..', 'contracts');
+  // The Aiken project (aiken.toml, validators/, plutus.json) lives at the repo
+  // root — service/src/scripts -> up 3 == repo root. (No contracts/ subdir.)
+  const contractsDir = path.join(__dirname, '..', '..', '..');
 
   // Run aiken check first
   console.log('  Running: aiken check');
