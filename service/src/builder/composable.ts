@@ -1109,6 +1109,49 @@ export const CompositionBundles = {
   impactRecord: (impacts: RecordImpactParams[]) => {
     return impacts.map(params => ({ type: 'record_impact', params }));
   },
+
+  /**
+   * Property OS — Lease rent settlement.
+   * Atomic tx: rent (net) to the lessor + operator commission to the operator pNFT.
+   * Realizes the operator's commission split (e.g. 600 bps = 6%) trustlessly in one tx.
+   */
+  leaseRentSettlement: (params: {
+    payerPnft: string; payerAddress: string;
+    lessorPnft: string; lessorAddress: string;
+    operatorPnft: string; operatorAddress: string;
+    rent: bigint; commissionBps: number;
+  }) => {
+    const commission = (params.rent * BigInt(params.commissionBps)) / 10000n;
+    const net = params.rent - commission;
+    return [
+      { type: 'transfer', params: { senderPnft: params.payerPnft, senderAddress: params.payerAddress, recipientPnft: params.lessorPnft, recipientAddress: params.lessorAddress, amount: net, purpose: 'lease_rent' } },
+      { type: 'transfer', params: { senderPnft: params.payerPnft, senderAddress: params.payerAddress, recipientPnft: params.operatorPnft, recipientAddress: params.operatorAddress, amount: commission, purpose: 'operator_commission' } },
+    ];
+  },
+
+  /**
+   * Property OS — Work settlement.
+   * Atomic tx: pay the worker pNFT + (optionally) record the maintenance/build impact.
+   */
+  workSettlement: (params: {
+    payerPnft: string; payerAddress: string;
+    workerPnft: string; workerAddress: string;
+    amount: bigint; impact?: RecordImpactParams;
+  }) => {
+    const actions: Array<{ type: string; params: unknown }> = [
+      { type: 'transfer', params: { senderPnft: params.payerPnft, senderAddress: params.payerAddress, recipientPnft: params.workerPnft, recipientAddress: params.workerAddress, amount: params.amount, purpose: 'work_payment' } },
+    ];
+    if (params.impact) actions.push({ type: 'record_impact', params: params.impact });
+    return actions;
+  },
+
+  /**
+   * Property OS — Worker onboarding. Mints the worker's pNFT identity so they can
+   * receive work-auction assignments and trustless pay.
+   */
+  workerOnboarding: (params: MintPnftParams) => {
+    return [{ type: 'mint_pnft', params }];
+  },
 };
 
 export default ComposableTxBuilder;
