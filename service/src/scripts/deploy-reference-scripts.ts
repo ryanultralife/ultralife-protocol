@@ -47,6 +47,24 @@ if (!DEPLOYER_SEED) {
   process.exit(1);
 }
 
+// Guard against pasting the runbook placeholders (e.g. "<your real key>").
+// Without this, a bogus key just makes Blockfrost return an HTML error page and
+// the failure surfaces as a cryptic "Unexpected token '<' ... is not valid JSON".
+if (/[<>]/.test(BLOCKFROST_KEY)) {
+  console.error('ERROR: BLOCKFROST_API_KEY still contains placeholder characters (< or >).');
+  console.error(`  Got: ${BLOCKFROST_KEY}`);
+  console.error('  Paste your REAL preprod project key from https://blockfrost.io (e.g. preprodXXXXXXXX...).');
+  process.exit(1);
+}
+if (/[<>]/.test(DEPLOYER_SEED)) {
+  console.error('ERROR: DEPLOYER_SEED still contains placeholder characters (< or >).');
+  console.error('  Paste your REAL 24-word mnemonic (a funded preprod wallet, ~500 tADA).');
+  process.exit(1);
+}
+if (!BLOCKFROST_KEY.toLowerCase().startsWith(NETWORK.toLowerCase())) {
+  console.warn(`WARNING: BLOCKFROST_API_KEY does not start with "${NETWORK}" — make sure it's a ${NETWORK} project key, not mainnet/preview.`);
+}
+
 // Reference script holder address - will be generated from deployer wallet
 let REF_SCRIPT_ADDRESS: string;
 
