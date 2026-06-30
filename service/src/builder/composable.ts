@@ -16,13 +16,16 @@ import {
   fromText,
   toHex,
   fromHex,
-  UTxO,
-  TxComplete,
-  Tx,
   Constr,
+} from '@lucid-evolution/lucid';
+import type {
+  LucidEvolution,
+  UTxO,
+  TxSignBuilder,
+  TxBuilder,
   Address,
   Assets,
-} from 'lucid-cardano';
+} from '@lucid-evolution/lucid';
 import type {
   UltraLifeConfig,
   CategoryRef,
@@ -173,7 +176,7 @@ export interface TxAction {
 // =============================================================================
 
 export interface ComposedTx {
-  tx: TxComplete;
+  tx: TxSignBuilder;
   txHash: string;
   actions: TxAction[];
   summary: ComposedTxSummary;
@@ -233,7 +236,7 @@ interface PlannedMint {
 
 export class ComposableTxBuilder {
   private actions: TxAction[] = [];
-  private lucid: Lucid | null = null;
+  private lucid: LucidEvolution | null = null;
   private config: UltraLifeConfig;
   private indexer: UltraLifeIndexer;
   private actionCounter = 0;
@@ -244,12 +247,14 @@ export class ComposableTxBuilder {
   }
 
   async initialize(): Promise<void> {
-    this.lucid = await Lucid.new(
+    this.lucid = await Lucid(
       new Blockfrost(
         `https://cardano-${this.config.network}.blockfrost.io/api`,
         this.config.blockfrostApiKey
       ),
-      this.config.network === 'mainnet' ? 'Mainnet' : 'Preprod'
+      this.config.network === 'mainnet' ? 'Mainnet'
+        : this.config.network === 'preview' ? 'Preview'
+        : 'Preprod'
     );
   }
 
@@ -263,7 +268,7 @@ export class ComposableTxBuilder {
   async selectPayer(address: string): Promise<void> {
     if (!this.lucid) throw new Error('Builder not initialized');
     const utxos = await this.lucid.utxosAt(address);
-    this.lucid.selectWalletFrom({ address, utxos });
+    this.lucid.selectWallet.fromAddress(address, utxos);
   }
 
   // ===========================================================================
@@ -469,7 +474,7 @@ export class ComposableTxBuilder {
     }
 
     // Build the transaction
-    let txBuilder: Tx = this.lucid.newTx();
+    let txBuilder: TxBuilder = this.lucid.newTx();
 
     // Add reference scripts
     if (refScriptUtxos.length > 0) {
@@ -492,13 +497,13 @@ export class ComposableTxBuilder {
     // Add outputs
     for (const output of mergedOutputs) {
       if (output.datum) {
-        txBuilder = txBuilder.payToContract(
+        txBuilder = txBuilder.pay.ToContract(
           output.address,
-          { inline: output.datum },
+          { kind: 'inline', value: output.datum },
           output.assets
         );
       } else {
-        txBuilder = txBuilder.payToAddress(output.address, output.assets);
+        txBuilder = txBuilder.pay.ToAddress(output.address, output.assets);
       }
     }
 

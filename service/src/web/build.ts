@@ -103,8 +103,8 @@ export function registerBuildRoute(app: Express): void {
       }
 
       const composed = await builder.build();
-      // Lucid's TxComplete.toString() returns the unsigned tx as CBOR hex.
-      const unsignedTx = composed.tx.toString();
+      // lucid-evolution's TxSignBuilder.toCBOR() returns the unsigned tx as CBOR hex.
+      const unsignedTx = composed.tx.toCBOR();
 
       return res.json({
         unsignedTx,
