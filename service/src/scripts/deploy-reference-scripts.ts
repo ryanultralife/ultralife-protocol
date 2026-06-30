@@ -16,7 +16,14 @@
  *   npm run deploy-scripts
  */
 
-import { Lucid, Blockfrost, fromHex, toHex, getAddressDetails } from 'lucid-cardano';
+import {
+  Lucid,
+  Blockfrost,
+  validatorToAddress,
+  mintingPolicyToId,
+  applyDoubleCborEncoding,
+} from '@lucid-evolution/lucid';
+import type { Script, Network, LucidEvolution } from '@lucid-evolution/lucid';
 import { execSync, spawnSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -63,6 +70,18 @@ if (/[<>]/.test(DEPLOYER_SEED)) {
 }
 if (!BLOCKFROST_KEY.toLowerCase().startsWith(NETWORK.toLowerCase())) {
   console.warn(`WARNING: BLOCKFROST_API_KEY does not start with "${NETWORK}" — make sure it's a ${NETWORK} project key, not mainnet/preview.`);
+}
+
+// Lucid Network enum from our lowercase NETWORK env.
+const LUCID_NETWORK: Network =
+  NETWORK === 'mainnet' ? 'Mainnet' : NETWORK === 'preview' ? 'Preview' : 'Preprod';
+
+// Wrap an Aiken blueprint compiledCode as a Plutus V3 Script. applyDoubleCborEncoding
+// gives the canonical form lucid hashes/deploys — using the SAME Script object for
+// policy-id derivation, address derivation, and the deployed reference script keeps
+// all three mutually consistent.
+function toScript(compiledCode: string): Script {
+  return { type: 'PlutusV3', script: applyDoubleCborEncoding(compiledCode) };
 }
 
 // Reference script holder address - will be generated from deployer wallet
@@ -154,7 +173,7 @@ function checkPrerequisites(): boolean {
 // COMPILE AIKEN
 // =============================================================================
 
-async function compileAiken(): Promise<Map<string, string>> {
+async function compileAiken(): Promise<{ scripts: Map<string, string>; hashes: Map<string, string> }> {
   console.log('Compiling Aiken contracts...\n');
 
   // The Aiken project (aiken.toml, validators/, plutus.json) lives at the repo
@@ -189,6 +208,7 @@ async function compileAiken(): Promise<Map<string, string>> {
   const plutus = JSON.parse(fs.readFileSync(plutusPath, 'utf-8'));
 
   const scripts = new Map<string, string>();
+  const hashes = new Map<string, string>();
 
   console.log('\nCompiled validators:');
   for (const validator of plutus.validators) {
@@ -199,11 +219,12 @@ async function compileAiken(): Promise<Map<string, string>> {
     const hash = validator.hash;
 
     scripts.set(name, script);
+    if (hash) hashes.set(name, hash);
     console.log(`  ${name.padEnd(20)} ${hash.slice(0, 16)}... (${script.length} chars)`);
   }
 
   console.log(`\nTotal: ${scripts.size} validators compiled\n`);
-  return scripts;
+  return { scripts, hashes };
 }
 
 // =============================================================================
@@ -211,7 +232,7 @@ async function compileAiken(): Promise<Map<string, string>> {
 // =============================================================================
 
 async function deployReferenceScripts(
-  lucid: Lucid,
+  lucid: LucidEvolution,
   scripts: Map<string, string>
 ): Promise<Map<string, { txHash: string; outputIndex: number }>> {
   
@@ -232,21 +253,17 @@ async function deployReferenceScripts(
     for (const [name, script] of batch) {
       console.log(`  Adding: ${name}`);
       
-      // Create output with script reference
-      tx = tx.payToAddressWithData(
+      // Create output carrying the validator as a Plutus V3 reference script.
+      tx = tx.pay.ToAddressWithData(
         REF_SCRIPT_ADDRESS,
-        {
-          scriptRef: {
-            type: 'PlutusV2',
-            script: script,
-          },
-        },
-        { lovelace: 20_000_000n } // 20 ADA for storage
+        undefined,                  // no datum
+        { lovelace: 20_000_000n },  // 20 ADA for storage
+        toScript(script)            // scriptRef (V3)
       );
     }
     
     const completed = await tx.complete();
-    const signed = await completed.sign().complete();
+    const signed = await completed.sign.withWallet().complete();
     const txHash = await signed.submit();
     
     console.log(`  TX: ${txHash}`);
@@ -275,35 +292,45 @@ async function deployReferenceScripts(
 
 function generateConfig(
   deployed: Map<string, { txHash: string; outputIndex: number }>,
-  policyIds: Map<string, string>
+  policyIds: Map<string, string>,
+  addresses: Map<string, string>
 ): void {
-  
+
   console.log('\n=== DEPLOYMENT CONFIG ===\n');
-  
+
   // Generate .env format
   let envContent = `# UltraLife Protocol Deployment - ${NETWORK}\n`;
   envContent += `# Generated: ${new Date().toISOString()}\n\n`;
-  
+
   envContent += `NETWORK=${NETWORK}\n`;
   envContent += `BLOCKFROST_API_KEY=${BLOCKFROST_KEY}\n\n`;
-  
+
   // Policy IDs
   for (const [name, policyId] of policyIds) {
     envContent += `${name.toUpperCase()}_POLICY=${policyId}\n`;
   }
   envContent += '\n';
-  
+
+  // Validator addresses
+  envContent += '# Validator Addresses\n';
+  for (const [name, address] of addresses) {
+    envContent += `ADDR_${name.toUpperCase()}=${address}\n`;
+  }
+  envContent += '\n';
+
   // Reference scripts
   envContent += '# Reference Scripts\n';
   for (const [name, { txHash, outputIndex }] of deployed) {
     envContent += `REF_${name.toUpperCase()}=${txHash}#${outputIndex}\n`;
   }
-  
-  // Write to file
-  fs.writeFileSync(path.join(__dirname, '..', '..', '.env.deployed'), envContent);
+
+  // Repo root — next to plutus.json / aiken.toml (service/src/scripts -> up 3).
+  const repoRoot = path.join(__dirname, '..', '..', '..');
+
+  fs.writeFileSync(path.join(repoRoot, '.env.deployed'), envContent);
   console.log('Written to: .env.deployed');
-  
-  // Also output JSON format
+
+  // Also output JSON format — consumed by service/src/config.ts.
   const jsonConfig = {
     network: NETWORK,
     referenceScripts: Object.fromEntries(
@@ -313,11 +340,12 @@ function generateConfig(
       ])
     ),
     policyIds: Object.fromEntries(policyIds),
+    addresses: Object.fromEntries(addresses),
     deployedAt: new Date().toISOString(),
   };
-  
+
   fs.writeFileSync(
-    path.join(__dirname, '..', '..', 'deployment.json'),
+    path.join(repoRoot, 'deployment.json'),
     JSON.stringify(jsonConfig, null, 2)
   );
   console.log('Written to: deployment.json');
@@ -329,7 +357,7 @@ function generateConfig(
 
 function calculatePolicyIds(
   scripts: Map<string, string>,
-  lucid: Lucid
+  hashes: Map<string, string>
 ): Map<string, string> {
   console.log('\nCalculating policy IDs...');
 
@@ -340,16 +368,44 @@ function calculatePolicyIds(
 
   for (const name of mintingScripts) {
     const script = scripts.get(name);
-    if (script) {
-      // In production, calculate actual policy ID from script
-      // For now, use a placeholder that will be replaced with actual deployment
-      const placeholder = `${name}_policy_${Date.now().toString(16)}`;
-      policyIds.set(name, placeholder);
-      console.log(`  ${name}: ${placeholder.slice(0, 32)}...`);
+    if (!script) continue;
+    // Real policy id = the minting script's hash, derived from the compiled code.
+    const policyId = mintingPolicyToId(toScript(script));
+    policyIds.set(name, policyId);
+    const blueprintHash = hashes.get(name);
+    if (blueprintHash && blueprintHash !== policyId) {
+      console.warn(`  WARNING ${name}: derived policy id ${policyId} != blueprint hash ${blueprintHash}`);
+      console.warn('    (CBOR-encoding assumption mismatch — verify before mainnet.)');
     }
+    console.log(`  ${name}: ${policyId}`);
   }
 
   return policyIds;
+}
+
+// =============================================================================
+// CALCULATE VALIDATOR ADDRESSES
+// =============================================================================
+
+// Spend-validator addresses (e.g. `records`, where the transfer record datum is
+// paid). These are NOT policy ids — they're derived from each validator's script
+// hash — and the builder/config needs them. deployment.json carries them so
+// config.ts can populate contracts.records / contracts.*_spend.
+function calculateAddresses(
+  scripts: Map<string, string>,
+  hashes: Map<string, string>
+): Map<string, string> {
+  console.log('\nCalculating validator addresses...');
+
+  const addresses = new Map<string, string>();
+
+  for (const [name, script] of scripts) {
+    const address = validatorToAddress(LUCID_NETWORK, toScript(script));
+    addresses.set(name, address);
+  }
+
+  console.log(`  ${addresses.size} addresses derived (network: ${LUCID_NETWORK})`);
+  return addresses;
 }
 
 // =============================================================================
@@ -371,23 +427,23 @@ async function main(): Promise<void> {
 
   // Initialize Lucid
   console.log('Initializing Lucid...');
-  const lucid = await Lucid.new(
+  const lucid = await Lucid(
     new Blockfrost(
       `https://cardano-${NETWORK}.blockfrost.io/api`,
       BLOCKFROST_KEY!
     ),
-    NETWORK === 'mainnet' ? 'Mainnet' : 'Preprod'
+    LUCID_NETWORK
   );
 
   // Load deployer wallet
-  lucid.selectWalletFromSeed(DEPLOYER_SEED!);
-  const deployerAddress = await lucid.wallet.address();
+  lucid.selectWallet.fromSeed(DEPLOYER_SEED!);
+  const deployerAddress = await lucid.wallet().address();
   REF_SCRIPT_ADDRESS = deployerAddress; // Use deployer address for reference scripts
 
   console.log(`\nDeployer: ${deployerAddress}`);
 
   // Check balance
-  const utxos = await lucid.wallet.getUtxos();
+  const utxos = await lucid.wallet().getUtxos();
   const totalAda = utxos.reduce((sum, u) => sum + (u.assets.lovelace || 0n), 0n);
   const adaBalance = Number(totalAda) / 1_000_000;
   console.log(`Balance: ${adaBalance.toFixed(2)} ADA`);
@@ -408,10 +464,11 @@ async function main(): Promise<void> {
   console.log('='.repeat(60) + '\n');
 
   // Compile contracts
-  const scripts = await compileAiken();
+  const { scripts, hashes } = await compileAiken();
 
-  // Calculate policy IDs
-  const policyIds = calculatePolicyIds(scripts, lucid);
+  // Calculate policy IDs + validator addresses (real, from the compiled scripts)
+  const policyIds = calculatePolicyIds(scripts, hashes);
+  const addresses = calculateAddresses(scripts, hashes);
 
   // Check if all expected scripts are present
   const missingScripts = DEPLOYMENT_ORDER.filter((name) => !scripts.has(name));
@@ -444,7 +501,7 @@ async function main(): Promise<void> {
   console.log('='.repeat(60) + '\n');
 
   // Generate config
-  generateConfig(deployed, policyIds);
+  generateConfig(deployed, policyIds, addresses);
 
   // Print summary
   console.log('\n' + '='.repeat(60));
@@ -456,7 +513,7 @@ async function main(): Promise<void> {
   console.log(`Policy IDs generated: ${policyIds.size}`);
 
   if (!DRY_RUN) {
-    const finalUtxos = await lucid.wallet.getUtxos();
+    const finalUtxos = await lucid.wallet().getUtxos();
     const finalAda = finalUtxos.reduce((sum, u) => sum + (u.assets.lovelace || 0n), 0n);
     const spent = (totalAda - finalAda) / 1_000_000n;
     console.log(`ADA spent: ${spent} ADA`);
