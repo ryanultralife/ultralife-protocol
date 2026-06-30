@@ -12,6 +12,9 @@
  * `findPlaceholders()`.
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 import type { UltraLifeConfig } from './types/index.js';
 
 export const TESTNET_CONFIG: UltraLifeConfig = {
@@ -154,4 +157,85 @@ export function findPlaceholders(cfg: UltraLifeConfig, bundle: string): string[]
     if (!v || !v.txHash || v.txHash === 'TODO') missing.push(`referenceScripts.${r}`);
   }
   return missing;
+}
+
+// =============================================================================
+// DEPLOYMENT OVERLAY
+// =============================================================================
+//
+// `npm run deploy-scripts` (deploy-reference-scripts.ts) writes deployment.json:
+//   { network, policyIds: {name->id}, addresses: {name->addr},
+//     referenceScripts: {name->{txHash,outputIndex}} }
+// where `name` is the validator short name (pnft, token, records, ...).
+//
+// Overlay those onto TESTNET_CONFIG so /build uses real on-chain locations.
+// Precedence: explicit env var > deployment.json > placeholder. We only
+// overwrite values that are still placeholders, so an env override always wins.
+
+interface DeploymentJson {
+  network?: string;
+  policyIds?: Record<string, string>;
+  addresses?: Record<string, string>;
+  referenceScripts?: Record<string, { txHash: string; outputIndex: number }>;
+}
+
+// Validator short name -> config.contracts policy-id field.
+const POLICY_KEY: Record<string, string> = { token: 'token_policy', pnft: 'pnft_policy' };
+// Validator short name -> config.contracts spend-address field (default: same name).
+const ADDRESS_KEY: Record<string, string> = { token: 'token_spend', pnft: 'pnft_spend' };
+// Validator short name -> config.referenceScripts field (default: same name).
+const REFSCRIPT_KEY: Record<string, string> = { pnft: 'pnft_mint' };
+
+function isPlaceholder(v: string | undefined): boolean {
+  return !v || v.startsWith('TODO') || v.endsWith('TODO');
+}
+
+function loadDeployment(): DeploymentJson | null {
+  const candidates: string[] = [];
+  if (process.env.DEPLOYMENT_PATH) candidates.push(process.env.DEPLOYMENT_PATH);
+  candidates.push(path.resolve(process.cwd(), 'deployment.json'));
+  candidates.push(path.resolve(process.cwd(), '..', 'deployment.json'));
+  try {
+    const here = path.dirname(fileURLToPath(import.meta.url)); // dist/ or src/
+    candidates.push(path.resolve(here, '..', '..', 'deployment.json')); // repo root
+    candidates.push(path.resolve(here, '..', '..', '..', 'deployment.json'));
+  } catch {
+    /* import.meta unavailable — ignore */
+  }
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf-8')) as DeploymentJson;
+    } catch {
+      /* unreadable/invalid — try next */
+    }
+  }
+  return null;
+}
+
+function overlayDeployment(cfg: UltraLifeConfig, dep: DeploymentJson): void {
+  const contracts = cfg.contracts as unknown as Record<string, string>;
+  const refs = cfg.referenceScripts as unknown as Record<string, { txHash: string; outputIndex: number }>;
+
+  for (const [name, pid] of Object.entries(dep.policyIds || {})) {
+    const key = POLICY_KEY[name] ?? `${name}_policy`;
+    if (key in contracts && isPlaceholder(contracts[key])) contracts[key] = pid;
+  }
+  for (const [name, addr] of Object.entries(dep.addresses || {})) {
+    const key = ADDRESS_KEY[name] ?? name;
+    if (key in contracts && isPlaceholder(contracts[key])) contracts[key] = addr;
+  }
+  for (const [name, ref] of Object.entries(dep.referenceScripts || {})) {
+    const key = REFSCRIPT_KEY[name] ?? name;
+    const cur = refs[key];
+    if (key in refs && (!cur || !cur.txHash || cur.txHash === 'TODO')) {
+      refs[key] = { txHash: ref.txHash, outputIndex: ref.outputIndex };
+    }
+  }
+}
+
+// Apply at module load so every importer of TESTNET_CONFIG sees deployed values.
+const _deployment = loadDeployment();
+if (_deployment) {
+  overlayDeployment(TESTNET_CONFIG, _deployment);
+  console.log(`[config] deployment.json loaded (network=${_deployment.network ?? '?'}); on-chain locations active.`);
 }
