@@ -154,4 +154,27 @@ export function registerBuildRoute(app: Express): void {
       return res.status(500).json({ error: message });
     }
   });
+
+  // POST /assemble — combine an unsigned tx with CIP-30 witness set(s) into a
+  // submittable signed tx. The WALLET signs and the WALLET submits; this just
+  // does the CBOR assembly a no-build static page can't. Never holds a key.
+  app.post('/assemble', async (req: Request, res: Response) => {
+    try {
+      const { unsignedTx, witnesses } = (req.body || {}) as { unsignedTx?: string; witnesses?: string[] };
+      if (!unsignedTx) return res.status(400).json({ error: 'Missing "unsignedTx" (CBOR hex)' });
+      if (!Array.isArray(witnesses) || witnesses.length === 0) {
+        return res.status(400).json({ error: 'Missing "witnesses" (array of CIP-30 witness-set CBOR hex)' });
+      }
+
+      const builder = new ComposableTxBuilder(TESTNET_CONFIG, getIndexer());
+      await builder.initialize(await getProtocolParameters());
+      const lucid = builder.getLucid();
+      const signed = await lucid.fromTx(unsignedTx).assemble(witnesses).complete();
+
+      return res.json({ signedTx: signed.toCBOR(), txHash: signed.toHash() });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      return res.status(500).json({ error: message });
+    }
+  });
 }

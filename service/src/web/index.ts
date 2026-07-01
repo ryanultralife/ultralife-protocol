@@ -127,6 +127,12 @@ app.get('/', (req: Request, res: Response) => {
         description: 'Build an unsigned preprod tx from a CompositionBundle proposal',
         body: { bundle: 'leaseRentSettlement | workSettlement | workerOnboarding', params: '{ ... }' },
       },
+      assemble: {
+        path: '/assemble',
+        method: 'POST',
+        description: 'Combine an unsigned tx with CIP-30 witness set(s) into a submittable signed tx',
+        body: { unsignedTx: '<cbor hex>', witnesses: ['<cbor hex>'] },
+      },
     },
     docs: 'https://github.com/ultralife-protocol/spec',
     source: 'https://github.com/ultralife-protocol',
@@ -168,6 +174,7 @@ app.use((req: Request, res: Response) => {
       '/deployment',
       '/health',
       'POST /build',
+      'POST /assemble',
     ],
   });
 });

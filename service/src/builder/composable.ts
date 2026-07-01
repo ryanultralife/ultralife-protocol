@@ -263,6 +263,12 @@ export class ComposableTxBuilder {
     );
   }
 
+  /** The initialized Lucid instance (e.g. for fromTx/assemble). */
+  getLucid(): LucidEvolution {
+    if (!this.lucid) throw new Error('Builder not initialized');
+    return this.lucid;
+  }
+
   /**
    * Select the payer as a READ-ONLY wallet (address + its on-chain UTxOs) so
    * build()'s `complete()` can run coin selection and set change WITHOUT a
