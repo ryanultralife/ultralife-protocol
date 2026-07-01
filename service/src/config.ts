@@ -21,6 +21,12 @@ export const TESTNET_CONFIG: UltraLifeConfig = {
   network: 'preprod',
   blockfrostApiKey: process.env.BLOCKFROST_API_KEY || 'your_api_key_here',
 
+  // Pilot default: settle in plain tADA (receipt datum inline on the payment
+  // output — no protocol contracts required). Set SETTLEMENT_UNIT to the ULTRA
+  // token's full asset unit (policyIdHex+assetNameHex) after the token policy
+  // is deployed via the parameterization ceremony.
+  settlementUnit: process.env.SETTLEMENT_UNIT || 'lovelace',
+
   contracts: {
     // Identity
     pnft_policy: process.env.PNFT_POLICY || 'TODO_DEPLOY',
@@ -153,7 +159,11 @@ export function findPlaceholdersForActions(cfg: UltraLifeConfig, actionTypes: st
   const missing = new Set<string>();
   const contracts = cfg.contracts as unknown as Record<string, string>;
   const refScripts = cfg.referenceScripts as unknown as Record<string, { txHash: string }>;
+  const lovelaceMode = (cfg.settlementUnit ?? 'lovelace') === 'lovelace';
   for (const type of actionTypes) {
+    // In lovelace (pilot) mode a transfer is a plain payment with an inline
+    // receipt datum — no token policy, no records contract, no scripts.
+    if (type === 'transfer' && lovelaceMode) continue;
     const req = ACTION_REQUIREMENTS[type];
     if (!req) continue; // unknown action — let the builder surface its own error
     for (const c of req.contracts) {

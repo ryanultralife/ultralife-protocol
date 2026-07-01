@@ -1171,6 +1171,13 @@ export interface UltraLifeConfig {
   blockfrostApiKey: string;
   contracts: ContractAddresses;
   referenceScripts: ReferenceScripts;
+  /**
+   * What settlements move. 'lovelace' (pilot default — plain tADA with the
+   * receipt datum inline on the payment output, no protocol contracts needed)
+   * or a full asset unit (policyIdHex + assetNameHex) once the ULTRA token
+   * policy is deployed via the parameterization ceremony.
+   */
+  settlementUnit?: string;
 }
 
 // =============================================================================

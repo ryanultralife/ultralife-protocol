@@ -688,30 +688,44 @@ export class ComposableTxBuilder {
         const params = action.action.params;
         const recordId = this.generateId('record');
 
+        // Ids are UTF-8 strings ("record_...", "pnft_..."), not hex — encode
+        // with fromText. (fromHex threw on every transfer.) pNFT ids may be
+        // empty in the lovelace pilot, before identity enrollment exists.
         const recordDatum = Data.to(new Constr(0, [
-          fromHex(recordId),
-          fromHex(params.senderPnft),
-          fromHex(params.recipientPnft),
+          fromText(recordId),
+          fromText(params.senderPnft || ''),
+          fromText(params.recipientPnft || ''),
           params.amount,
           fromText(params.purpose),
           [],
           BigInt(Math.floor(Date.now() / 1000)),
         ]) as unknown as Data);
 
-        // Token transfer
-        outputs.push({
-          address: params.recipientAddress,
-          assets: { [this.config.contracts.token_policy]: params.amount },
-        });
-
-        // Record
-        outputs.push({
-          address: this.config.contracts.records,
-          assets: { lovelace: 2_000_000n },
-          datum: recordDatum,
-        });
-
-        refScripts.push('token', 'records');
+        const unit = this.config.settlementUnit ?? 'lovelace';
+        if (unit === 'lovelace') {
+          // Pilot mode: plain tADA payment with the receipt datum INLINE on the
+          // payment output itself — one output, no token policy, no records
+          // contract, no scripts. `amount` is lovelace.
+          outputs.push({
+            address: params.recipientAddress,
+            assets: { lovelace: params.amount },
+            datum: recordDatum,
+          });
+        } else {
+          // Token mode: move the ULTRA asset (full unit = policyId+assetName —
+          // NOT the bare policy id) + pay the receipt datum to the records
+          // contract. Requires the parameterization-ceremony deployment.
+          outputs.push({
+            address: params.recipientAddress,
+            assets: { [unit]: params.amount },
+          });
+          outputs.push({
+            address: this.config.contracts.records,
+            assets: { lovelace: 2_000_000n },
+            datum: recordDatum,
+          });
+          refScripts.push('token', 'records');
+        }
         break;
       }
 
