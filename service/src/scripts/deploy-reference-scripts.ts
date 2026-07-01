@@ -87,16 +87,27 @@ function toScript(compiledCode: string): Script {
 // Reference script holder address - will be generated from deployer wallet
 let REF_SCRIPT_ADDRESS: string;
 
-// Deployment order (respects contract dependencies)
+// Deployment order (respects contract dependencies). Names are VALIDATOR BLOCK
+// names from the blueprint (title = "file.block.purpose") — NOT file stems.
+// Files hold multiple blocks (token.ak -> `token` spend + `token_policy` mint),
+// and the old file-stem keying collapsed them last-wins: the derived
+// "token policy id" could silently be the spend validator's hash.
 const DEPLOYMENT_ORDER = [
+  // Phase 0: Unparameterized — deployable as-is today
+  'lease',      // Property OS lease validator (activate_lease / asset twins)
+  'identity',   // biometric.ak identity validator (pNFT signing flow)
   // Phase 1: Foundation
   'genesis',
-  'pnft',
+  'pnft_policy',
+  'pnft_spend',
+  'token_policy',
   'token',
   // Phase 2: Infrastructure
   'treasury',
   'bioregion',
+  'bioregion_beacon',
   'registry',
+  'thing',
   // Phase 3: Economics
   'stake_pool',
   'ubi',
@@ -108,6 +119,7 @@ const DEPLOYMENT_ORDER = [
   'memory',
   // Phase 5: Impact
   'impact',
+  'impact_policy',
   'impact_market',
   'asset_impact',
   'remediation',
@@ -127,6 +139,15 @@ const DEPLOYMENT_ORDER = [
   'ultralife_validator',
   'fee_pool',
 ];
+
+// A compiled validator block from the blueprint.
+interface CompiledBlock {
+  script: string;            // compiledCode (CBOR hex, unapplied if parameterized)
+  hash: string;              // blueprint hash
+  purposes: Set<string>;     // mint | spend | else | ...
+  parameterized: boolean;    // takes params -> MUST be applied before deploy
+  paramTitles: string[];
+}
 
 // =============================================================================
 // PREREQUISITE CHECKS
@@ -173,7 +194,7 @@ function checkPrerequisites(): boolean {
 // COMPILE AIKEN
 // =============================================================================
 
-async function compileAiken(): Promise<{ scripts: Map<string, string>; hashes: Map<string, string> }> {
+async function compileAiken(): Promise<Map<string, CompiledBlock>> {
   console.log('Compiling Aiken contracts...\n');
 
   // The Aiken project (aiken.toml, validators/, plutus.json) lives at the repo
@@ -207,24 +228,37 @@ async function compileAiken(): Promise<{ scripts: Map<string, string>; hashes: M
 
   const plutus = JSON.parse(fs.readFileSync(plutusPath, 'utf-8'));
 
-  const scripts = new Map<string, string>();
-  const hashes = new Map<string, string>();
+  // Key by validator BLOCK name (title = "file.block.purpose"). One block can
+  // appear under several purposes (spend/mint/else) with the same compiled
+  // code — record every purpose, keep one script.
+  const blocks = new Map<string, CompiledBlock>();
 
-  console.log('\nCompiled validators:');
+  console.log('\nCompiled validator blocks:');
   for (const validator of plutus.validators) {
-    // Extract name from title like "validators/pnft.pnft"
-    const fullName = validator.title;
-    const name = fullName.split('/').pop()?.split('.')[0] || fullName;
-    const script = validator.compiledCode;
-    const hash = validator.hash;
+    const parts = (validator.title as string).split('.');
+    const block = parts.length >= 2 ? parts[1] : parts[0];
+    const purpose = parts.length >= 3 ? parts[2] : 'unknown';
 
-    scripts.set(name, script);
-    if (hash) hashes.set(name, hash);
-    console.log(`  ${name.padEnd(20)} ${hash.slice(0, 16)}... (${script.length} chars)`);
+    const existing = blocks.get(block);
+    if (existing) {
+      existing.purposes.add(purpose);
+      continue;
+    }
+    blocks.set(block, {
+      script: validator.compiledCode,
+      hash: validator.hash,
+      purposes: new Set([purpose]),
+      parameterized: Array.isArray(validator.parameters) && validator.parameters.length > 0,
+      paramTitles: (validator.parameters || []).map((p: { title?: string }) => p.title || '?'),
+    });
   }
 
-  console.log(`\nTotal: ${scripts.size} validators compiled\n`);
-  return { scripts, hashes };
+  for (const [name, b] of blocks) {
+    const tag = b.parameterized ? `PARAMETERIZED(${b.paramTitles.join(',')})` : 'ready';
+    console.log(`  ${name.padEnd(22)} ${b.hash.slice(0, 12)}... [${[...b.purposes].join('/')}] ${tag}`);
+  }
+  console.log(`\nTotal: ${blocks.size} validator blocks\n`);
+  return blocks;
 }
 
 // =============================================================================
@@ -355,31 +389,23 @@ function generateConfig(
 // CALCULATE POLICY IDS
 // =============================================================================
 
-function calculatePolicyIds(
-  scripts: Map<string, string>,
-  hashes: Map<string, string>
-): Map<string, string> {
-  console.log('\nCalculating policy IDs...');
+// Policy ids come ONLY from blocks that (a) have a mint purpose and (b) are NOT
+// parameterized. A parameterized policy's real id only exists after
+// applyParamsToScript — deriving from the unapplied template is silently wrong.
+function calculatePolicyIds(blocks: Map<string, CompiledBlock>): Map<string, string> {
+  console.log('\nCalculating policy IDs (unparameterized mint blocks only)...');
 
   const policyIds = new Map<string, string>();
-
-  // Minting policies (scripts that mint NFTs/tokens)
-  const mintingScripts = ['pnft', 'token', 'genesis'];
-
-  for (const name of mintingScripts) {
-    const script = scripts.get(name);
-    if (!script) continue;
-    // Real policy id = the minting script's hash, derived from the compiled code.
-    const policyId = mintingPolicyToId(toScript(script));
+  for (const [name, b] of blocks) {
+    if (b.parameterized || !b.purposes.has('mint')) continue;
+    const policyId = mintingPolicyToId(toScript(b.script));
     policyIds.set(name, policyId);
-    const blueprintHash = hashes.get(name);
-    if (blueprintHash && blueprintHash !== policyId) {
-      console.warn(`  WARNING ${name}: derived policy id ${policyId} != blueprint hash ${blueprintHash}`);
+    if (b.hash && b.hash !== policyId) {
+      console.warn(`  WARNING ${name}: derived policy id ${policyId} != blueprint hash ${b.hash}`);
       console.warn('    (CBOR-encoding assumption mismatch — verify before mainnet.)');
     }
     console.log(`  ${name}: ${policyId}`);
   }
-
   return policyIds;
 }
 
@@ -388,22 +414,16 @@ function calculatePolicyIds(
 // =============================================================================
 
 // Spend-validator addresses (e.g. `records`, where the transfer record datum is
-// paid). These are NOT policy ids — they're derived from each validator's script
-// hash — and the builder/config needs them. deployment.json carries them so
-// config.ts can populate contracts.records / contracts.*_spend.
-function calculateAddresses(
-  scripts: Map<string, string>,
-  hashes: Map<string, string>
-): Map<string, string> {
-  console.log('\nCalculating validator addresses...');
+// paid). Only meaningful for unparameterized spend blocks — an unapplied
+// parameterized validator's address is not where anything will ever validate.
+function calculateAddresses(blocks: Map<string, CompiledBlock>): Map<string, string> {
+  console.log('\nCalculating validator addresses (unparameterized spend blocks only)...');
 
   const addresses = new Map<string, string>();
-
-  for (const [name, script] of scripts) {
-    const address = validatorToAddress(LUCID_NETWORK, toScript(script));
-    addresses.set(name, address);
+  for (const [name, b] of blocks) {
+    if (b.parameterized || !b.purposes.has('spend')) continue;
+    addresses.set(name, validatorToAddress(LUCID_NETWORK, toScript(b.script)));
   }
-
   console.log(`  ${addresses.size} addresses derived (network: ${LUCID_NETWORK})`);
   return addresses;
 }
@@ -448,33 +468,44 @@ async function main(): Promise<void> {
   const adaBalance = Number(totalAda) / 1_000_000;
   console.log(`Balance: ${adaBalance.toFixed(2)} ADA`);
 
-  // Estimate cost: ~20 ADA per script + fees
-  const estimatedCost = DEPLOYMENT_ORDER.length * 25;
-  console.log(`Estimated cost: ~${estimatedCost} ADA`);
-
-  if (totalAda < BigInt(estimatedCost) * 1_000_000n) {
-    console.error(`\nERROR: Insufficient balance`);
-    console.error(`Need at least ${estimatedCost} ADA for deployment`);
-    console.error(`Current balance: ${adaBalance.toFixed(2)} ADA`);
-    process.exit(1);
-  }
-
   console.log('\n' + '='.repeat(60));
   console.log('PHASE 1: COMPILE CONTRACTS');
   console.log('='.repeat(60) + '\n');
 
   // Compile contracts
-  const { scripts, hashes } = await compileAiken();
+  const blocks = await compileAiken();
 
-  // Calculate policy IDs + validator addresses (real, from the compiled scripts)
-  const policyIds = calculatePolicyIds(scripts, hashes);
-  const addresses = calculateAddresses(scripts, hashes);
+  // Split deployable vs blocked. An unapplied parameterized validator is a
+  // dead script on-chain (its runtime hash can never match) — refuse to deploy
+  // those until an applyParamsToScript ceremony provides real config values.
+  const deployable = new Map<string, string>();
+  const blocked: string[] = [];
+  for (const name of DEPLOYMENT_ORDER) {
+    const b = blocks.get(name);
+    if (!b) { console.warn(`  WARNING: block "${name}" not found in plutus.json — skipped`); continue; }
+    if (b.parameterized) { blocked.push(`${name}(${b.paramTitles.join(',')})`); continue; }
+    deployable.set(name, b.script);
+  }
 
-  // Check if all expected scripts are present
-  const missingScripts = DEPLOYMENT_ORDER.filter((name) => !scripts.has(name));
-  if (missingScripts.length > 0) {
-    console.warn(`\nWARNING: Missing scripts: ${missingScripts.join(', ')}`);
-    console.warn('Deployment will skip missing scripts\n');
+  if (blocked.length) {
+    console.log('\nPARAMETERIZED — NOT deployable until params are applied (applyParamsToScript ceremony):');
+    for (const n of blocked) console.log(`  ${n}`);
+    console.log('  These need real config values (genesis UTxO, oracle keys, policy ids, ...).');
+  }
+  console.log(`\nDeployable now (unparameterized): ${[...deployable.keys()].join(', ') || 'none'}`);
+
+  // Calculate policy IDs + validator addresses (real, from unparameterized blocks)
+  const policyIds = calculatePolicyIds(blocks);
+  const addresses = calculateAddresses(blocks);
+
+  // Cost estimate: ~20 ADA per deployable script + fees
+  const estimatedCost = Math.max(deployable.size, 1) * 25;
+  console.log(`\nEstimated cost: ~${estimatedCost} ADA for ${deployable.size} script(s)`);
+  if (!DRY_RUN && totalAda < BigInt(estimatedCost) * 1_000_000n) {
+    console.error(`\nERROR: Insufficient balance`);
+    console.error(`Need at least ${estimatedCost} ADA for deployment`);
+    console.error(`Current balance: ${adaBalance.toFixed(2)} ADA`);
+    process.exit(1);
   }
 
   console.log('\n' + '='.repeat(60));
@@ -483,18 +514,14 @@ async function main(): Promise<void> {
 
   if (DRY_RUN) {
     console.log('[DRY RUN] Would deploy the following scripts:\n');
-    for (const name of DEPLOYMENT_ORDER) {
-      if (scripts.has(name)) {
-        console.log(`  ${name}`);
-      }
-    }
+    for (const name of deployable.keys()) console.log(`  ${name}`);
     console.log('\nSkipping actual deployment (DRY_RUN=true)\n');
   }
 
   // Deploy as reference scripts
   const deployed = DRY_RUN
-    ? new Map(DEPLOYMENT_ORDER.filter((n) => scripts.has(n)).map((n) => [n, { txHash: 'DRY_RUN', outputIndex: 0 }]))
-    : await deployReferenceScripts(lucid, scripts);
+    ? new Map([...deployable.keys()].map((n) => [n, { txHash: 'DRY_RUN', outputIndex: 0 }]))
+    : await deployReferenceScripts(lucid, deployable);
 
   console.log('\n' + '='.repeat(60));
   console.log('PHASE 3: GENERATE CONFIGURATION');
