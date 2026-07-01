@@ -10,9 +10,36 @@
  */
 
 import type { Express, Request, Response } from 'express';
+import { Blockfrost } from '@lucid-evolution/lucid';
+import type { ProtocolParameters } from '@lucid-evolution/lucid';
 import { ComposableTxBuilder, CompositionBundles } from '../builder/composable.js';
 import { UltraLifeIndexer } from '../indexer/index.js';
-import { TESTNET_CONFIG, findPlaceholders } from '../config.js';
+import { TESTNET_CONFIG, findPlaceholdersForActions } from '../config.js';
+
+// Shared across requests: the indexer is a stateless reader, and protocol
+// parameters change once per epoch at most — fetch them once instead of on
+// every /build call. Each request still gets its OWN Lucid instance (via
+// builder.initialize) so concurrent requests can't race on wallet selection.
+let indexerSingleton: UltraLifeIndexer | null = null;
+let paramsCache: Promise<ProtocolParameters> | null = null;
+
+function getIndexer(): UltraLifeIndexer {
+  return (indexerSingleton ??= new UltraLifeIndexer(TESTNET_CONFIG));
+}
+
+function getProtocolParameters(): Promise<ProtocolParameters> {
+  if (!paramsCache) {
+    const provider = new Blockfrost(
+      `https://cardano-${TESTNET_CONFIG.network}.blockfrost.io/api`,
+      TESTNET_CONFIG.blockfrostApiKey
+    );
+    paramsCache = provider.getProtocolParameters().catch((e) => {
+      paramsCache = null; // don't cache failures
+      throw e;
+    });
+  }
+  return paramsCache;
+}
 
 // Amount fields that arrive over HTTP as JSON numbers/strings but the builder
 // needs as bigint (lovelace / token quantities). Coerced before the bundle runs
@@ -65,27 +92,38 @@ export function registerBuildRoute(app: Express): void {
         });
       }
 
-      // Fail early and clearly if the chain isn't deployed for this bundle yet,
-      // rather than letting Lucid build against placeholder (TODO) addresses.
-      const missing = findPlaceholders(TESTNET_CONFIG, bundle);
+      const coerced = coerceBigints(params || {}) as Record<string, unknown>;
+
+      // Bundles do bigint math on their params — malformed input is a caller
+      // error (400), not a server fault.
+      let actions: ReturnType<BundleFn>;
+      try {
+        actions = make(coerced);
+      } catch (e: unknown) {
+        const detail = e instanceof Error ? e.message : String(e);
+        return res.status(400).json({ error: `Invalid params for bundle "${bundle}": ${detail}` });
+      }
+
+      // Fail early and clearly if the chain isn't deployed for what this bundle
+      // actually composes, rather than letting Lucid build against placeholder
+      // (TODO) addresses. Derived from the action list, so it covers every
+      // bundle — including ones added later.
+      const missing = findPlaceholdersForActions(TESTNET_CONFIG, actions.map((a) => a.type));
       if (missing.length) {
         return res.status(503).json({
-          error: `Protocol contracts not deployed for "${bundle}". Compile + deploy reference scripts and set the matching env vars first.`,
+          error: `Protocol contracts not deployed for "${bundle}". Run deploy-scripts (writes deployment.json) or set the matching env vars first.`,
           missing,
         });
       }
 
-      const coerced = coerceBigints(params || {}) as Record<string, unknown>;
-      const actions = make(coerced);
-
-      const indexer = new UltraLifeIndexer(TESTNET_CONFIG);
-      const builder = new ComposableTxBuilder(TESTNET_CONFIG, indexer);
-      await builder.initialize();
-
+      // Cheap validation before any network work.
       const payerAddress = (coerced.payerAddress || coerced.userAddress) as string | undefined;
       if (!payerAddress) {
         return res.status(400).json({ error: 'params.payerAddress (or userAddress) is required for coin selection' });
       }
+
+      const builder = new ComposableTxBuilder(TESTNET_CONFIG, getIndexer());
+      await builder.initialize(await getProtocolParameters());
       await builder.selectPayer(payerAddress);
 
       for (const a of actions) {

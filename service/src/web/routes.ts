@@ -1,11 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import { readFile } from 'fs/promises';
-import { join } from 'path';
+import { join, dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
 import { z } from 'zod';
 
-// Paths to data files
-const PROTOCOL_SPEC_PATH = '/home/user/ultralife-protocol/protocol-spec.json';
-const DEPLOYMENT_PATH = '/home/user/ultralife-protocol/scripts/deployment.json';
+// Paths to data files — resolved relative to the repo root (this module lives at
+// <root>/service/{src|dist}/web/), env-overridable. The previous hardcoded
+// /home/user/ultralife-protocol paths broke /spec and /health everywhere else
+// (Railway, Windows, CI).
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const PROTOCOL_SPEC_PATH = process.env.PROTOCOL_SPEC_PATH || join(REPO_ROOT, 'protocol-spec.json');
+const DEPLOYMENT_PATH = process.env.DEPLOYMENT_PATH || join(REPO_ROOT, 'scripts', 'deployment.json');
 
 // Cache for protocol spec (loaded once at startup)
 let protocolSpecCache: any = null;

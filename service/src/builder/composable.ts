@@ -14,7 +14,6 @@ import {
   Blockfrost,
   Data,
   fromText,
-  toHex,
   fromHex,
   Constr,
 } from '@lucid-evolution/lucid';
@@ -23,8 +22,8 @@ import type {
   UTxO,
   TxSignBuilder,
   TxBuilder,
-  Address,
   Assets,
+  ProtocolParameters,
 } from '@lucid-evolution/lucid';
 import type {
   UltraLifeConfig,
@@ -246,7 +245,12 @@ export class ComposableTxBuilder {
     this.indexer = indexer;
   }
 
-  async initialize(): Promise<void> {
+  /**
+   * @param presetProtocolParameters Optional cached protocol parameters. When
+   * provided, Lucid skips its per-instance Blockfrost params fetch — callers
+   * that create a builder per request (web/build.ts) fetch them once and reuse.
+   */
+  async initialize(presetProtocolParameters?: ProtocolParameters): Promise<void> {
     this.lucid = await Lucid(
       new Blockfrost(
         `https://cardano-${this.config.network}.blockfrost.io/api`,
@@ -254,7 +258,8 @@ export class ComposableTxBuilder {
       ),
       this.config.network === 'mainnet' ? 'Mainnet'
         : this.config.network === 'preview' ? 'Preview'
-        : 'Preprod'
+        : 'Preprod',
+      presetProtocolParameters ? { presetProtocolParameters } : undefined
     );
   }
 

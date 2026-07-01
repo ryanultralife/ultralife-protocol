@@ -126,37 +126,46 @@ export const TESTNET_CONFIG: UltraLifeConfig = {
 };
 
 /**
- * The contracts/reference scripts a given CompositionBundle actually touches.
- * Used to give a precise "deploy these first" error instead of a cryptic
- * Lucid failure when building against placeholder addresses.
+ * The contracts/reference scripts each ACTION TYPE actually touches, mirrored
+ * from ComposableTxBuilder.processAction (composable.ts). Keyed by action type
+ * rather than bundle name so the guard covers every bundle automatically —
+ * a static per-bundle map proved incomplete (e.g. mint_pnft also pays welcome
+ * tokens from token_policy and outputs to pnft_spend).
  */
-export const BUNDLE_REQUIREMENTS: Record<string, { contracts: string[]; refScripts: string[] }> = {
-  // transfer action -> pays token_policy to recipient + writes a record datum
-  leaseRentSettlement: { contracts: ['token_policy', 'records'], refScripts: ['token', 'records'] },
-  workSettlement: { contracts: ['token_policy', 'records'], refScripts: ['token', 'records'] },
-  workerOnboarding: { contracts: ['pnft_policy'], refScripts: ['pnft_mint'] },
+export const ACTION_REQUIREMENTS: Record<string, { contracts: string[]; refScripts: string[] }> = {
+  transfer: { contracts: ['token_policy', 'records'], refScripts: ['token', 'records'] },
+  mint_pnft: { contracts: ['pnft_policy', 'pnft_spend', 'token_policy'], refScripts: ['pnft_mint'] },
+  record_impact: { contracts: ['impact'], refScripts: ['impact'] },
+  claim_grant: { contracts: ['token_policy'], refScripts: ['grants'] },
+  create_bucket: { contracts: ['spending_bucket', 'token_policy'], refScripts: ['spending_bucket'] },
+  fund_bucket: { contracts: ['spending_bucket'], refScripts: ['spending_bucket'] },
+  create_offering: { contracts: ['marketplace'], refScripts: ['marketplace'] },
+  claim_ubi: { contracts: ['token_policy', 'ubi'], refScripts: ['ubi'] },
+  create_collective: { contracts: ['collective'], refScripts: ['collective'] },
 };
 
 /**
- * Returns the list of still-placeholder dependencies for a bundle, or [] if all
- * required addresses/scripts are populated. A non-empty result means the chain
- * isn't ready to build this bundle yet.
+ * Returns the list of still-placeholder dependencies for a set of action types,
+ * or [] if everything required is populated. A non-empty result means the chain
+ * isn't deployed/configured for these actions yet.
  */
-export function findPlaceholders(cfg: UltraLifeConfig, bundle: string): string[] {
-  const req = BUNDLE_REQUIREMENTS[bundle];
-  if (!req) return [];
-  const missing: string[] = [];
+export function findPlaceholdersForActions(cfg: UltraLifeConfig, actionTypes: string[]): string[] {
+  const missing = new Set<string>();
   const contracts = cfg.contracts as unknown as Record<string, string>;
-  for (const c of req.contracts) {
-    const v = contracts[c];
-    if (!v || v.startsWith('TODO') || v.endsWith('TODO')) missing.push(`contracts.${c}`);
-  }
   const refScripts = cfg.referenceScripts as unknown as Record<string, { txHash: string }>;
-  for (const r of req.refScripts) {
-    const v = refScripts[r];
-    if (!v || !v.txHash || v.txHash === 'TODO') missing.push(`referenceScripts.${r}`);
+  for (const type of actionTypes) {
+    const req = ACTION_REQUIREMENTS[type];
+    if (!req) continue; // unknown action — let the builder surface its own error
+    for (const c of req.contracts) {
+      const v = contracts[c];
+      if (!v || v.startsWith('TODO') || v.endsWith('TODO')) missing.add(`contracts.${c}`);
+    }
+    for (const r of req.refScripts) {
+      const v = refScripts[r];
+      if (!v || !v.txHash || v.txHash === 'TODO') missing.add(`referenceScripts.${r}`);
+    }
   }
-  return missing;
+  return [...missing];
 }
 
 // =============================================================================
@@ -192,7 +201,10 @@ function isPlaceholder(v: string | undefined): boolean {
 
 function loadDeployment(): DeploymentJson | null {
   const candidates: string[] = [];
-  if (process.env.DEPLOYMENT_PATH) candidates.push(process.env.DEPLOYMENT_PATH);
+  // NOTE: CONTRACTS_DEPLOYMENT_PATH, not DEPLOYMENT_PATH — the latter already
+  // means the SEED-DATA deployment.json (scripts/deployment.json) in index.ts
+  // and web/routes.ts. Two different files that share a name.
+  if (process.env.CONTRACTS_DEPLOYMENT_PATH) candidates.push(process.env.CONTRACTS_DEPLOYMENT_PATH);
   candidates.push(path.resolve(process.cwd(), 'deployment.json'));
   candidates.push(path.resolve(process.cwd(), '..', 'deployment.json'));
   try {

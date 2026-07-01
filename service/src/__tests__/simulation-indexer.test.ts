@@ -5,13 +5,19 @@
  */
 
 import { describe, it, expect, beforeAll } from '@jest/globals';
+import { resolve } from 'path';
 import { createLocalIndexer, SimulationIndexer } from '../indexer/index-local.js';
 
 describe('SimulationIndexer', () => {
   let indexer: SimulationIndexer;
 
   beforeAll(async () => {
-    indexer = createLocalIndexer({ projectRoot: '/home/user/ultralife-protocol' });
+    // Committed fixture — the suite previously read the gitignored
+    // scripts/deployment.json seeded on one specific Linux box (via a
+    // hardcoded /home/user path), so it could never pass anywhere else.
+    indexer = createLocalIndexer({
+      deploymentPath: resolve(process.cwd(), 'src', '__tests__', 'fixtures', 'deployment.json'),
+    });
     await indexer.initialize();
   });
 

@@ -1,0 +1,138 @@
+{
+  "_comment": "Committed test fixture for simulation-indexer.test.ts. The suite previously read the gitignored scripts/deployment.json seeded on one specific machine, so it could never pass anywhere else (CI, Windows, fresh clones). Field values here intentionally match the test file's assertions.",
+  "testUsers": [
+    {
+      "name": "Test User One",
+      "address": "addr_test1qzx344f5mszedz3uem7jg4784v96dxf5c4a9lcrc9tepnpq75dudj575njxxly3mnqw2m78p5vyseucqww60y50hpxyqkzug5a",
+      "mnemonic": "test only fixture mnemonic never funded",
+      "pnftId": "pnft_ml47yps2_7e54410f8ccc126d",
+      "bioregion": "sierra_nevada",
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    }
+  ],
+  "pnfts": [
+    {
+      "id": "pnft_ml47yps2_7e54410f8ccc126d",
+      "owner": "addr_test1qzx344f5mszedz3uem7jg4784v96dxf5c4a9lcrc9tepnpq75dudj575njxxly3mnqw2m78p5vyseucqww60y50hpxyqkzug5a",
+      "level": "Basic",
+      "bioregion": "sierra_nevada",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "createdSlot": 1000000,
+      "status": "active",
+      "testnetSimulated": true,
+      "lands_stewarded": ["land_ml4819qs_c516cb80ec5980de"]
+    },
+    {
+      "id": "pnft_ml47zzz9_1b2c3d4e5f607182",
+      "owner": "addr_test1qq7h5wjmrzndkgh72yccequa8hmmyl4zvun69s9f0tkkjj5e26dxj5xkkwfd3we2lak2wnn7f7rskcz97phn7wt3ly0qtvtzzc",
+      "level": "Verified",
+      "bioregion": "sierra_nevada",
+      "createdAt": "2026-01-02T00:00:00.000Z",
+      "createdSlot": 1000500,
+      "status": "active",
+      "testnetSimulated": true
+    }
+  ],
+  "ultraBalances": {
+    "addr_test1qzx344f5mszedz3uem7jg4784v96dxf5c4a9lcrc9tepnpq75dudj575njxxly3mnqw2m78p5vyseucqww60y50hpxyqkzug5a": 79.400875,
+    "addr_test1qq7h5wjmrzndkgh72yccequa8hmmyl4zvun69s9f0tkkjj5e26dxj5xkkwfd3we2lak2wnn7f7rskcz97phn7wt3ly0qtvtzzc": 25
+  },
+  "signupGrants": [
+    {
+      "pnftId": "pnft_ml47yps2_7e54410f8ccc126d",
+      "pnftOwner": "addr_test1qzx344f5mszedz3uem7jg4784v96dxf5c4a9lcrc9tepnpq75dudj575njxxly3mnqw2m78p5vyseucqww60y50hpxyqkzug5a",
+      "amount": 50000000,
+      "claimedAt": "2026-01-01T00:05:00.000Z",
+      "testnetSimulated": true
+    }
+  ],
+  "lands": [
+    {
+      "landId": "land_ml4819qs_c516cb80ec5980de",
+      "name": "Quincy Forest Parcel",
+      "boundsHash": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+      "area_m2": 202343,
+      "bioregion": "sierra_nevada",
+      "classification": {
+        "name": "Forest",
+        "terrain": "Mountain",
+        "ecosystem": "Temperate Conifer",
+        "sequestrationRate": 250
+      },
+      "health": {
+        "overall_index": 75,
+        "soil_health": 70,
+        "water_health": 80,
+        "biodiversity_index": 72,
+        "carbon_stock": 65,
+        "last_survey": "2026-01-01"
+      },
+      "primarySteward": "pnft_ml47yps2_7e54410f8ccc126d",
+      "stewardAddress": "addr_test1qzx344f5mszedz3uem7jg4784v96dxf5c4a9lcrc9tepnpq75dudj575njxxly3mnqw2m78p5vyseucqww60y50hpxyqkzug5a",
+      "rights": {},
+      "traditional_territory": null,
+      "cultural_protocols": null,
+      "registered_at": 1767225600,
+      "registeredAt": "2026-01-01T00:00:00.000Z",
+      "testnetSimulated": true
+    }
+  ],
+  "bioregionStats": {
+    "sierra_nevada": {
+      "totalLandArea": 202343,
+      "landsRegistered": 1,
+      "totalSequestrationCapacity": 50585
+    }
+  },
+  "transactions": [
+    {
+      "txHash": "fixture_tx_0000000000000000000000000000000000000000000000000000000001",
+      "sender": "pnft_ml47yps2_7e54410f8ccc126d",
+      "senderAddress": "addr_test1qzx344f5mszedz3uem7jg4784v96dxf5c4a9lcrc9tepnpq75dudj575njxxly3mnqw2m78p5vyseucqww60y50hpxyqkzug5a",
+      "recipient": "pnft_ml47zzz9_1b2c3d4e5f607182",
+      "recipientAddress": "addr_test1qq7h5wjmrzndkgh72yccequa8hmmyl4zvun69s9f0tkkjj5e26dxj5xkkwfd3we2lak2wnn7f7rskcz97phn7wt3ly0qtvtzzc",
+      "amount": 5000000,
+      "txType": { "code": 1, "name": "transfer", "description": "Peer transfer" },
+      "impact": {
+        "description": "none recorded",
+        "compounds": []
+      },
+      "timestamp": "2026-01-03T00:00:00.000Z"
+    }
+  ],
+  "bioregionImpact": {},
+  "impactTokens": [],
+  "impactTokenBalances": {},
+  "impactDebt": {},
+  "sequestrationCredits": [
+    {
+      "creditId": "credit_fixture_0001",
+      "landId": "land_ml4819qs_c516cb80ec5980de",
+      "landName": "Quincy Forest Parcel",
+      "steward": "pnft_ml47yps2_7e54410f8ccc126d",
+      "stewardAddress": "addr_test1qzx344f5mszedz3uem7jg4784v96dxf5c4a9lcrc9tepnpq75dudj575njxxly3mnqw2m78p5vyseucqww60y50hpxyqkzug5a",
+      "bioregion": "sierra_nevada",
+      "amount": 8,
+      "unit": "tCO2e",
+      "cyclesGenerated": 1,
+      "generatedAt": "2026-01-04T00:00:00.000Z",
+      "landType": "Forest",
+      "sequestrationRate": 250,
+      "confidence": 80,
+      "status": "available",
+      "testnetSimulated": true
+    }
+  ],
+  "creditBalances": {
+    "addr_test1qq7h5wjmrzndkgh72yccequa8hmmyl4zvun69s9f0tkkjj5e26dxj5xkkwfd3we2lak2wnn7f7rskcz97phn7wt3ly0qtvtzzc": {
+      "total": 8,
+      "available": 8,
+      "sold": 0,
+      "byLand": { "land_ml4819qs_c516cb80ec5980de": 8 }
+    }
+  },
+  "lastCreditGeneration": {
+    "land_ml4819qs_c516cb80ec5980de": "2026-01-04T00:00:00.000Z"
+  },
+  "creditPurchases": []
+}

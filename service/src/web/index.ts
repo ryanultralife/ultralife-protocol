@@ -167,6 +167,7 @@ app.use((req: Request, res: Response) => {
       '/spec/validators/:id',
       '/deployment',
       '/health',
+      'POST /build',
     ],
   });
 });

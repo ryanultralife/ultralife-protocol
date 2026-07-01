@@ -248,7 +248,10 @@ export class SimulationIndexer {
   private loadDeploymentData(): DeploymentData {
     try {
       const data = readFileSync(this.deploymentPath, 'utf-8');
-      return JSON.parse(data) as DeploymentData;
+      // Overlay onto the empty defaults: older/partial seed files omit whole
+      // sections (bioregionStats, lands, creditBalances, ...) and every query
+      // should degrade to "no data" instead of throwing on undefined.
+      return { ...this.getDefaultData(), ...(JSON.parse(data) as Partial<DeploymentData>) };
     } catch (error) {
       console.warn(`Could not load deployment.json from ${this.deploymentPath}, using defaults`);
       return this.getDefaultData();

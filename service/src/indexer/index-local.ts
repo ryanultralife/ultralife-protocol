@@ -5,7 +5,8 @@
  * Uses deployment.json as the data source instead of querying blockchain.
  */
 
-import { join } from 'path';
+import { join, dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
 import { SimulationIndexer } from './simulation.js';
 import type {
   DeploymentData,
@@ -76,12 +77,13 @@ export function createLocalIndexer(options?: LocalIndexerOptions): SimulationInd
 
 /**
  * Creates a simulation indexer with the standard UltraLife project layout.
- * Assumes the project root is /home/user/ultralife-protocol
+ * The project root is derived from this module's location
+ * (<root>/service/{src|dist}/indexer/) — portable across machines/deploys.
  *
  * @returns SimulationIndexer instance
  */
 export function createUltraLifeLocalIndexer(): SimulationIndexer {
-  const projectRoot = '/home/user/ultralife-protocol';
+  const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
   return createLocalIndexer({ projectRoot });
 }
 
