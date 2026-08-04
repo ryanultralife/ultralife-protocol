@@ -116,10 +116,13 @@ export function registerBuildRoute(app: Express): void {
         });
       }
 
-      // Cheap validation before any network work.
-      const payerAddress = (coerced.payerAddress || coerced.userAddress) as string | undefined;
+      // Cheap validation before any network work. Array-shaped params (the
+      // `settlement` bundle takes a transfers array) pay from the first sender.
+      const payerAddress = (Array.isArray(coerced)
+        ? (coerced[0] as Record<string, unknown> | undefined)?.senderAddress
+        : coerced.payerAddress || coerced.userAddress) as string | undefined;
       if (!payerAddress) {
-        return res.status(400).json({ error: 'params.payerAddress (or userAddress) is required for coin selection' });
+        return res.status(400).json({ error: 'params.payerAddress (or userAddress, or transfers[0].senderAddress) is required for coin selection' });
       }
 
       const builder = new ComposableTxBuilder(TESTNET_CONFIG, getIndexer());
