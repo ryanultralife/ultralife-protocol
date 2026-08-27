@@ -21,14 +21,16 @@
 
 use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
-use cardano/assets.{AssetName, PolicyId, Value, quantity_of}
+use aiken/interval
+use cardano/address.{Script, VerificationKey}
+use cardano/assets.{AssetName, PolicyId, Value, flatten, quantity_of}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
 }
 use ultralife/types.{
   ActivityImpact, AssetActivityRecord, CompoundCode, CompoundFlow, MassUnit,
   MeasurementMethod, PnftDatum, Standard, Steward, VerificationLevel, Verified,
-  can_transact,
+  can_transact, voting_weight,
 }
 
 // =============================================================================
@@ -568,8 +570,19 @@ fn validate_update_request(
       Some(new_max) -> new_max >= request.budget_max
       None -> True
     }
-
-  budget_valid
+  let deadline_valid =
+    when new_deadline is {
+      Some(new_dl) -> new_dl >= request.bid_deadline
+      None -> True
+    }
+  expect budget_valid
+  expect deadline_valid
+  // 4. Updated request must remain Open at the script address
+  let updated_output = find_request_output(tx.outputs, config)
+  expect Some(output) = updated_output
+  expect InlineDatum(data) = output.datum
+  expect RequestDatum(updated): WorkAuctionDatum = data
+  updated.request_id == request.request_id && updated.status == Open && updated.requester == request.requester
 }
 
 // =============================================================================
@@ -663,7 +676,15 @@ fn validate_withdraw_bid(
       tx.extra_signatories,
       get_pnft_owner(tx, bid.bidder, config.pnft_policy),
     )
-  True
+  // 3. Bid UTXO is consumed or rewritten as Withdrawn
+  when find_bid_output(tx.outputs, config) is {
+    None -> True
+    Some(output) -> {
+      expect InlineDatum(data) = output.datum
+      expect BidDatum(updated): WorkAuctionDatum = data
+      updated.bid_id == bid_id && updated.status == Withdrawn
+    }
+  }
 }
 
 fn validate_reject_bid(
@@ -673,8 +694,29 @@ fn validate_reject_bid(
   reason: Option<ByteArray>,
   config: WorkAuctionConfig,
 ) -> Bool {
-  // Similar to accept but updates bid status to Rejected
-  True
+  // 1. Must have request datum still Open
+  expect Some(RequestDatum(request)) = datum
+  expect request.status == Open
+  // 2. Requester must sign
+  expect
+    list.has(
+      tx.extra_signatories,
+      get_pnft_owner(tx, request.requester, config.pnft_policy),
+    )
+  // 3. Bid must exist, be Pending, and belong to this request
+  let bid = find_bid_by_id(tx.reference_inputs, bid_id, config)
+  expect Some(b) = bid
+  expect b.status == Pending
+  expect b.request_id == request.request_id
+  // 4. Bid output (if continued) must be BidRejected
+  when find_bid_output(tx.outputs, config) is {
+    None -> True
+    Some(output) -> {
+      expect InlineDatum(data) = output.datum
+      expect BidDatum(updated): WorkAuctionDatum = data
+      updated.bid_id == bid_id && updated.status == BidRejected { reason }
+    }
+  }
 }
 
 // =============================================================================
@@ -838,8 +880,10 @@ fn verify_asset_impact_called(
 }
 
 fn get_script_hash_from_input(input: Input) -> Option<ByteArray> {
-  None
-  // Simplified - would extract script hash from input
+  when input.output.address.payment_credential is {
+    Script(hash) -> Some(hash)
+    _ -> None
+  }
 }
 
 fn work_type_to_bytes(work_type: WorkType) -> ByteArray {
@@ -879,7 +923,7 @@ fn validate_release_payment(
   let auto_release = is_auto_release_time(tx, escrow)
   expect requester_signed || auto_release
   // 3. Payment goes to worker
-  let worker_output = find_output_to_pnft(tx.outputs, escrow.worker, config)
+  let worker_output = find_output_to_pnft(tx, escrow.worker, config)
   expect Some(w_out) = worker_output
   let payment_to_worker =
     quantity_of(w_out.value, config.token_policy, config.token_name)
@@ -925,7 +969,7 @@ fn validate_request_refund(
     )
   // 4. Funds return to requester
   let requester_output =
-    find_output_to_pnft(tx.outputs, escrow.requester, config)
+    find_output_to_pnft(tx, escrow.requester, config)
   expect Some(r_out) = requester_output
   let refund = quantity_of(r_out.value, config.token_policy, config.token_name)
   refund >= escrow.amount
@@ -956,7 +1000,14 @@ fn validate_initiate_dispute(
     )
   expect requester_signed || worker_signed
   // Update status to InDispute
-  True
+  let updated_output = find_escrow_output(tx.outputs, config)
+  expect Some(output) = updated_output
+  expect InlineDatum(data) = output.datum
+  expect EscrowDatum(updated): WorkAuctionDatum = data
+  updated.escrow_id == escrow.escrow_id && when updated.status is {
+    InDispute { .. } -> True
+    _ -> False
+  }
 }
 
 fn validate_resolve_dispute(
@@ -991,17 +1042,33 @@ fn validate_resolve_dispute(
 // =============================================================================
 
 fn find_signer_pnft(tx: Transaction, pnft_policy: PolicyId) -> Option<PnftData> {
-  // Find pNFT owned by a signer
-  list.find_map(
-    tx.reference_inputs,
-    fn(input) {
-      extract_pnft_if_owned_by_signer(
-        input.output,
-        pnft_policy,
-        tx.extra_signatories,
+  // pNFT is a CIP-not-68 custom token: inline PnftDatum on the UTXO that holds
+  // quantity 1 under pnft_policy. Prefer spent inputs, then reference inputs.
+  let from_inputs =
+    list.find_map(
+      tx.inputs,
+      fn(input) {
+        extract_pnft_if_owned_by_signer(
+          input.output,
+          pnft_policy,
+          tx.extra_signatories,
+        )
+      },
+    )
+  when from_inputs is {
+    Some(d) -> Some(d)
+    None ->
+      list.find_map(
+        tx.reference_inputs,
+        fn(input) {
+          extract_pnft_if_owned_by_signer(
+            input.output,
+            pnft_policy,
+            tx.extra_signatories,
+          )
+        },
       )
-    },
-  )
+  }
 }
 
 type PnftData {
@@ -1010,13 +1077,101 @@ type PnftData {
   level: VerificationLevel,
 }
 
+/// True if this output sits at a script address (work_auction UTXOs live here).
+fn is_script_output(output: Output) -> Bool {
+  when output.address.payment_credential is {
+    Script(_) -> True
+    _ -> False
+  }
+}
+
+/// Decode inline WorkAuctionDatum only on script outputs so pNFT UTXOs (key
+/// addresses with PnftDatum) cannot trip `expect`.
+fn decode_work_auction_datum(output: Output) -> Option<WorkAuctionDatum> {
+  if is_script_output(output) {
+    when output.datum is {
+      InlineDatum(data) -> {
+        expect datum: WorkAuctionDatum = data
+        Some(datum)
+      }
+      _ -> None
+    }
+  } else {
+    None
+  }
+}
+
 fn extract_pnft_if_owned_by_signer(
   output: Output,
   pnft_policy: PolicyId,
   signers: List<VerificationKeyHash>,
 ) -> Option<PnftData> {
-  // Implementation
-  None
+  // Scan value for a quantity-1 asset under pnft_policy, then require the
+  // inline datum to be PnftDatum whose owner signed and whose pnft_id matches.
+  let policy_tokens =
+    list.filter_map(
+      flatten(output.value),
+      fn(asset) {
+        let (policy, name, qty) = asset
+        if policy == pnft_policy && qty == 1 {
+          Some(name)
+        } else {
+          None
+        }
+      },
+    )
+  if list.length(policy_tokens) != 1 {
+    None
+  } else {
+    when output.datum is {
+      InlineDatum(data) -> {
+        expect datum: PnftDatum = data
+        if list.has(signers, datum.owner) && quantity_of(
+          output.value,
+          pnft_policy,
+          datum.pnft_id,
+        ) == 1 {
+          Some(
+            PnftData {
+              pnft_id: datum.pnft_id,
+              owner: datum.owner,
+              level: datum.level,
+            },
+          )
+        } else {
+          None
+        }
+      }
+      _ -> None
+    }
+  }
+}
+
+fn lookup_pnft_owner_from_inputs(
+  inputs: List<Input>,
+  pnft_id: AssetName,
+  pnft_policy: PolicyId,
+) -> Option<VerificationKeyHash> {
+  list.find_map(
+    inputs,
+    fn(input) {
+      if quantity_of(input.output.value, pnft_policy, pnft_id) == 1 {
+        when input.output.datum is {
+          InlineDatum(data) -> {
+            expect datum: PnftDatum = data
+            if datum.pnft_id == pnft_id {
+              Some(datum.owner)
+            } else {
+              None
+            }
+          }
+          _ -> None
+        }
+      } else {
+        None
+      }
+    },
+  )
 }
 
 fn get_pnft_owner(
@@ -1024,8 +1179,18 @@ fn get_pnft_owner(
   pnft_id: AssetName,
   pnft_policy: PolicyId,
 ) -> VerificationKeyHash {
-  // Look up owner from pNFT datum
-  #""
+  when lookup_pnft_owner_from_inputs(tx.inputs, pnft_id, pnft_policy) is {
+    Some(owner) -> owner
+    None ->
+      when lookup_pnft_owner_from_inputs(
+        tx.reference_inputs,
+        pnft_id,
+        pnft_policy,
+      ) is {
+        Some(owner) -> owner
+        None -> #""
+      }
+  }
 }
 
 fn find_request_by_id(
@@ -1033,7 +1198,20 @@ fn find_request_by_id(
   request_id: ByteArray,
   config: WorkAuctionConfig,
 ) -> Option<WorkRequest> {
-  None
+  list.find_map(
+    inputs,
+    fn(input) {
+      when decode_work_auction_datum(input.output) is {
+        Some(RequestDatum(request)) ->
+          if request.request_id == request_id {
+            Some(request)
+          } else {
+            None
+          }
+        _ -> None
+      }
+    },
+  )
 }
 
 fn find_bid_by_id(
@@ -1041,52 +1219,111 @@ fn find_bid_by_id(
   bid_id: ByteArray,
   config: WorkAuctionConfig,
 ) -> Option<WorkBid> {
-  None
+  list.find_map(
+    inputs,
+    fn(input) {
+      when decode_work_auction_datum(input.output) is {
+        Some(BidDatum(bid)) ->
+          if bid.bid_id == bid_id {
+            Some(bid)
+          } else {
+            None
+          }
+        _ -> None
+      }
+    },
+  )
 }
 
 fn find_request_output(
   outputs: List<Output>,
   config: WorkAuctionConfig,
 ) -> Option<Output> {
-  None
+  list.find(
+    outputs,
+    fn(output) {
+      when decode_work_auction_datum(output) is {
+        Some(RequestDatum(_)) -> True
+        _ -> False
+      }
+    },
+  )
 }
 
 fn find_bid_output(
   outputs: List<Output>,
   config: WorkAuctionConfig,
 ) -> Option<Output> {
-  None
+  list.find(
+    outputs,
+    fn(output) {
+      when decode_work_auction_datum(output) is {
+        Some(BidDatum(_)) -> True
+        _ -> False
+      }
+    },
+  )
 }
 
 fn find_escrow_output(
   outputs: List<Output>,
   config: WorkAuctionConfig,
 ) -> Option<Output> {
-  None
+  list.find(
+    outputs,
+    fn(output) {
+      when decode_work_auction_datum(output) is {
+        Some(EscrowDatum(_)) -> True
+        _ -> False
+      }
+    },
+  )
 }
 
 fn find_output_to_pnft(
-  outputs: List<Output>,
+  tx: Transaction,
   pnft: AssetName,
   config: WorkAuctionConfig,
 ) -> Option<Output> {
-  None
+  let owner = get_pnft_owner(tx, pnft, config.pnft_policy)
+  list.find(
+    tx.outputs,
+    fn(output) {
+      when output.address.payment_credential is {
+        VerificationKey(pkh) -> pkh == owner
+        _ -> False
+      }
+    },
+  )
 }
 
 fn get_current_slot(tx: Transaction) -> Int {
-  0
+  // Match marketplace.ak: validity range lower bound, else upper bound.
+  when tx.validity_range.lower_bound.bound_type is {
+    interval.Finite(slot) -> slot
+    _ ->
+      when tx.validity_range.upper_bound.bound_type is {
+        interval.Finite(slot) -> slot
+        _ -> 0
+      }
+  }
 }
 
 fn meets_level_requirement(
   actual: VerificationLevel,
   required: VerificationLevel,
 ) -> Bool {
-  // Check if actual level meets or exceeds required
-  True
+  // Basic=0, Ward=0, Standard=1, Verified=2, Steward=3 (types.ak voting_weight).
+  // can_transact is separately required for requester and bidder (not Basic).
+  voting_weight(actual) >= voting_weight(required)
 }
 
 fn is_designated_surveyor(pnft: PnftData, tx: Transaction) -> Bool {
-  False
+  // No dedicated surveyor-registry datum exists yet. Verified+ (residency)
+  // is the on-chain proxy: Standard can transact but cannot verify work.
+  // `tx` is reserved for a future surveyor UTXO in reference_inputs.
+  let _refs = list.length(tx.reference_inputs)
+  pnft.level == Verified || pnft.level == Steward
 }
 
 fn verify_escrow_updated_to_verified(
@@ -1095,20 +1332,46 @@ fn verify_escrow_updated_to_verified(
   verifier: AssetName,
   config: WorkAuctionConfig,
 ) -> Bool {
-  True
+  when find_escrow_output(tx.outputs, config) is {
+    Some(output) ->
+      when decode_work_auction_datum(output) is {
+        Some(EscrowDatum(escrow)) ->
+          escrow.escrow_id == escrow_id && when escrow.status is {
+            Verified { verifier: v, .. } -> v == verifier
+            _ -> False
+          }
+        _ -> False
+      }
+    None -> False
+  }
 }
 
 fn is_auto_release_time(tx: Transaction, escrow: WorkEscrow) -> Bool {
-  False
+  // After the work deadline, verified escrow may auto-release without the
+  // requester's signature (worker still needs the verified status check).
+  get_current_slot(tx) > escrow.deadline
 }
 
 fn is_dispute_resolved_for_requester(escrow: WorkEscrow) -> Bool {
-  False
+  // Escrow datum has no resolution outcome field. A requester refund via
+  // dispute requires ResolveDispute from governance, not this helper.
+  when escrow.status is {
+    Refunded { .. } -> True
+    _ -> False
+  }
 }
 
 fn verify_from_governance(
   tx: Transaction,
   governance_contract: ByteArray,
 ) -> Bool {
-  False
+  list.any(
+    tx.inputs,
+    fn(input) {
+      when get_script_hash_from_input(input) is {
+        Some(hash) -> hash == governance_contract
+        None -> False
+      }
+    },
+  )
 }
