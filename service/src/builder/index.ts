@@ -157,6 +157,7 @@ const CollectiveDatumSchema = Data.Object({
   collective_id: Data.Bytes(),
   name_hash: Data.Bytes(),
   members: Data.Array(Data.Bytes()),
+  resources: Data.Array(Data.Bytes()),
   governance_hash: Data.Bytes(),
   treasury: Data.Bytes(),
   bioregion: Data.Bytes(),
