@@ -35,6 +35,7 @@ import type {
   VerificationMethod,
 } from '../types/index.js';
 import { UltraLifeIndexer } from '../indexer/index.js';
+import { buildWorkAuctionUnsigned, laborGate } from './work-auction.js';
 
 // =============================================================================
 // DATUM/REDEEMER SCHEMAS (for Lucid's Data.to/from)
@@ -192,40 +193,49 @@ export class UltraLifeTxBuilder {
   // ===========================================================================
 
   /**
-   * Build transaction to mint a new pNFT
+   * Build UNSIGNED tx to mint a Basic pNFT (MintBasic).
+   * Not DNA-verified. Standard upgrade is a separate Ryan-signed path.
+   * Refuses dnaHash / verificationProof / non-Basic level. No fake DNA.
    */
   async buildMintPnft(params: {
     userAddress: string;
-    dnaHash: string;
-    verificationProof: string;
+    dnaHash?: string;
+    verificationProof?: string;
+    level?: string;
   }): Promise<{ tx: TxComplete; summary: TxSummary }> {
     if (!this.lucid) throw new Error('Builder not initialized');
+
+    if (params.dnaHash || params.verificationProof || (params.level && params.level !== 'Basic')) {
+      throw new Error(
+        'buildMintPnft mints Basic only (MintBasic, dna_hash None). Do not pass DNA or a higher level. Standard is Ryan-signed UpgradeStandard, not this builder.'
+      );
+    }
 
     const pnftId = this.generateId('pnft');
     const assetName = fromText(pnftId);
     const policyId = this.config.contracts.pnft_policy;
+    const owner = this.addressToKeyHash(params.userAddress);
 
-    // Build datum using Constr encoding
-    // PnftDatum: pnft_id, owner, level, bioregion, dna_hash, guardian, ward_since, created_at, upgraded_at, consumer_impacts, care_credits
+    // PnftDatum: pnft_id, owner, level, bioregion, dna_hash, guardian, ward_since, created_at, upgraded_at, consumer_impact, nutrition_profile
     const currentSlot = BigInt(Math.floor(Date.now() / 1000));
+    const none = new Constr(1, []);
     const datum = Data.to(new Constr(0, [
-      fromHex(pnftId),                               // pnft_id
-      fromHex(this.addressToKeyHash(params.userAddress)), // owner
-      new Constr(2, []),                             // level = Standard (index 2)
-      new Constr(1, []),                             // bioregion = None
-      new Constr(0, [fromHex(params.dnaHash)]),     // dna_hash = Some(hash)
-      new Constr(1, []),                             // guardian = None
-      new Constr(1, []),                             // ward_since = None
-      currentSlot,                                   // created_at
-      new Constr(1, []),                             // upgraded_at = None
-      new Constr(1, []),                             // consumer_impacts = None
-      0n,                                            // care_credits
+      fromHex(pnftId),
+      fromHex(owner),
+      new Constr(0, []),                             // level = Basic
+      none,                                          // bioregion = None
+      none,                                          // dna_hash = None (Basic)
+      none,                                          // guardian = None
+      none,                                          // ward_since = None
+      currentSlot,
+      none,                                          // upgraded_at = None
+      none,                                          // consumer_impact = None
+      none,                                          // nutrition_profile = None
     ]) as unknown as Data);
 
-    // Build redeemer using Constr
+    // MintBasic { owner }
     const redeemer = Data.to(new Constr(0, [
-      fromHex(params.dnaHash),
-      fromHex(params.verificationProof),
+      fromHex(owner),
     ]) as unknown as Data);
 
     // Get reference script UTxO
@@ -255,7 +265,7 @@ export class UltraLifeTxBuilder {
       tx,
       summary: {
         action: 'Mint pNFT',
-        description: `Create DNA-verified identity with 50 token bootstrap grant`,
+        description: `Mint Basic pNFT (wallet signature only, not DNA-verified). Unsigned. Ryan signs.`,
         pnftId,
         costs: {
           ada: '~2 ADA (min UTxO + fees)',
@@ -1002,6 +1012,84 @@ export class UltraLifeTxBuilder {
     return utxos.length > 0 ? utxos[0] : null;
   }
 
+
+  // ===========================================================================
+  // WORK AUCTION (unsigned Mesh txs; no local JSON live path)
+  // ===========================================================================
+
+  async buildPostJob(params: Record<string, unknown>): Promise<{ tx?: unknown; summary: TxSummary; unsigned?: object }> {
+    const level = String(params.pnftLevel || params.level || '');
+    const gate = laborGate(level);
+    if (gate) throw new Error(gate);
+    const result = await buildWorkAuctionUnsigned('post_job', params, {
+      network: this.config.network,
+      blockfrostApiKey: this.config.blockfrostApiKey,
+      walletAddress: String(params.user_address || params.userAddress || ''),
+      contracts: this.config.contracts as any,
+      referenceScripts: { work_auction: (this.config.referenceScripts as any)?.work_auction },
+    });
+    if (result.blocker) throw new Error(result.blocker);
+    return {
+      unsigned: result,
+      summary: {
+        action: 'Post Job',
+        description: 'UNSIGNED CreateRequest — Ryan must sign on preprod',
+        costs: { ada: '~2.5 ADA' },
+      },
+    };
+  }
+
+  async buildBid(params: Record<string, unknown>): Promise<{ tx?: unknown; summary: TxSummary; unsigned?: object }> {
+    const level = String(params.pnftLevel || params.level || '');
+    const gate = laborGate(level);
+    if (gate) throw new Error(gate);
+    const result = await buildWorkAuctionUnsigned('bid', params, {
+      network: this.config.network,
+      blockfrostApiKey: this.config.blockfrostApiKey,
+      walletAddress: String(params.user_address || params.userAddress || ''),
+      contracts: this.config.contracts as any,
+      referenceScripts: { work_auction: (this.config.referenceScripts as any)?.work_auction },
+    });
+    if (result.blocker) throw new Error(result.blocker);
+    return { unsigned: result, summary: { action: 'Bid', description: 'UNSIGNED SubmitBid — Ryan must sign', costs: { ada: '~2 ADA' } } };
+  }
+
+  async buildAcceptBid(params: Record<string, unknown>) {
+    const result = await buildWorkAuctionUnsigned('accept_bid', params, {
+      network: this.config.network,
+      blockfrostApiKey: this.config.blockfrostApiKey,
+      walletAddress: String(params.user_address || ''),
+      contracts: this.config.contracts as any,
+      referenceScripts: { work_auction: (this.config.referenceScripts as any)?.work_auction },
+    });
+    if (result.blocker) throw new Error(result.blocker);
+    return { unsigned: result, summary: { action: 'Accept Bid', description: 'UNSIGNED AcceptBid escrow lock', costs: { ada: '~2 ADA' } } };
+  }
+
+  async buildSubmitWork(params: Record<string, unknown>) {
+    const result = await buildWorkAuctionUnsigned('submit_work', params, {
+      network: this.config.network,
+      blockfrostApiKey: this.config.blockfrostApiKey,
+      walletAddress: String(params.user_address || ''),
+      contracts: this.config.contracts as any,
+      referenceScripts: { work_auction: (this.config.referenceScripts as any)?.work_auction },
+    });
+    if (result.blocker) throw new Error(result.blocker);
+    return { unsigned: result, summary: { action: 'Submit Work', description: 'UNSIGNED SubmitWork — evidence required, no demo hash', costs: { ada: '~2 ADA' } } };
+  }
+
+  async buildReleasePayment(params: Record<string, unknown>) {
+    const result = await buildWorkAuctionUnsigned('release_payment', params, {
+      network: this.config.network,
+      blockfrostApiKey: this.config.blockfrostApiKey,
+      walletAddress: String(params.user_address || ''),
+      contracts: this.config.contracts as any,
+      referenceScripts: { work_auction: (this.config.referenceScripts as any)?.work_auction },
+    });
+    if (result.blocker) throw new Error(result.blocker);
+    return { unsigned: result, summary: { action: 'Release Payment', description: 'UNSIGNED ReleasePayment (escrow must be Verified)', costs: { ada: '~2 ADA' } } };
+  }
+
   // ===========================================================================
   // HELPER METHODS
   // ===========================================================================
@@ -1154,5 +1242,8 @@ export interface TxSummary {
     tokens?: bigint;
   };
 }
+
+export type { WorkAuctionBuildResult, WorkAuctionAction } from './work-auction.js';
+export { buildWorkAuction, loadWorkAuctionDatums } from './work-auction.js';
 
 export default UltraLifeTxBuilder;

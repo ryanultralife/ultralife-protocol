@@ -80,7 +80,19 @@ const WORK_TYPES = {
 };
 
 // Verification levels
-const VERIFICATION_LEVELS = ['Basic', 'Standard', 'Verified', 'Steward'];
+const VERIFICATION_LEVELS = ['Basic', 'Ward', 'Standard', 'Verified', 'Steward'];
+const VOTING_WEIGHT = { Basic: 0, Ward: 0, Standard: 1, Verified: 2, Steward: 3 };
+function canTransact(level) { return level && level !== 'Basic'; }
+function meetsLevelRequirement(actual, required) {
+  return (VOTING_WEIGHT[actual] ?? -1) >= (VOTING_WEIGHT[required] ?? 99);
+}
+function refuseMainnet() {
+  if ((process.env.NETWORK || 'preprod') === 'mainnet') {
+    console.error('[ERROR] Refusing mainnet. Work auction is PREPROD only.');
+    process.exit(1);
+  }
+}
+
 
 // Request statuses
 const REQUEST_STATUS = {
@@ -114,7 +126,7 @@ const ESCROW_STATUS = {
 async function main() {
   console.log(`
 +---------------------------------------------------------------+
-|         UltraLife Protocol - Work Auction Marketplace         |
+|   UltraLife Work Auction — PREPROD Mesh default (--simulate)  |
 +---------------------------------------------------------------+
 `);
 
@@ -132,6 +144,17 @@ async function main() {
     showHelp();
     return;
   }
+
+  refuseMainnet();
+
+  // Default is PREPROD Mesh. --simulate is the only JSON path.
+  if (!hasFlag('--simulate')) {
+    const { runChain } = await import('./work-auction-chain.mjs');
+    await runChain({ args, getArg, hasFlag, CONFIG, log, WORK_TYPES, REQUEST_STATUS, BID_STATUS, ESCROW_STATUS, canTransact, meetsLevelRequirement, refuseMainnet });
+    return;
+  }
+
+  log.warn('SIMULATE mode: local JSON only. This is NOT an on-chain preprod job.');
 
   const { atomicWriteSync, safeReadJson, estimateCurrentSlot } = await import('./utils.mjs');
 
@@ -218,6 +241,11 @@ async function main() {
 
   log.info(`Acting as: ${currentUser.name} (${currentPnft.id})`);
   log.info(`Verification level: ${currentPnft.level}`);
+  if (!canTransact(currentPnft.level)) {
+    log.error(`pNFT ${currentPnft.id} is ${currentPnft.level}. can_transact requires level != Basic.`);
+    log.error('Do not fake Standard/DNA. Upgrade via genesis FounderSelfVerify with a real DNA hash (Ryan-signed).');
+    process.exit(1);
+  }
 
   const currentSlot = estimateCurrentSlot(CONFIG.network);
 
@@ -229,7 +257,7 @@ async function main() {
     const budgetMax = parseInt(getArg('--budget-max') || getArg('--max') || '100');
     const bidDeadlineDays = parseInt(getArg('--bid-deadline') || '7');
     const workDeadlineDays = parseInt(getArg('--work-deadline') || '30');
-    const minLevel = getArg('--min-level') || 'Basic';
+    const minLevel = getArg('--min-level') || 'Standard';
     const asset = getArg('--asset') || null;
     const specsHash = getArg('--specs') || null;
     const skillsArg = getArg('--skills');
@@ -279,7 +307,8 @@ async function main() {
 
     console.log(`
 +---------------------------------------------------------------+
-|                     JOB POSTED SUCCESSFULLY                   |
+|  SIMULATE (local JSON only — NOT on-chain)                    |
+|  JOB RECORDED IN LOCAL JSON                                   |
 +---------------------------------------------------------------+
   Job ID:        ${request.requestId}
   Type:          ${WORK_TYPES[workType.toLowerCase()].name}
@@ -336,10 +365,7 @@ async function main() {
       process.exit(1);
     }
 
-    // Check verification level
-    const requiredLevelIdx = VERIFICATION_LEVELS.indexOf(request.minWorkerLevel);
-    const actualLevelIdx = VERIFICATION_LEVELS.indexOf(currentPnft.level);
-    if (actualLevelIdx < requiredLevelIdx) {
+    if (!meetsLevelRequirement(currentPnft.level, request.minWorkerLevel || 'Standard')) {
       log.error(`Your verification level (${currentPnft.level}) does not meet the minimum requirement (${request.minWorkerLevel})`);
       process.exit(1);
     }
@@ -360,7 +386,8 @@ async function main() {
 
     console.log(`
 +---------------------------------------------------------------+
-|                     BID PLACED SUCCESSFULLY                   |
+|  SIMULATE (local JSON only — NOT on-chain)                    |
+|  BID RECORDED IN LOCAL JSON                                   |
 +---------------------------------------------------------------+
   Bid ID:      ${bid.bidId}
   Job:         ${request.description.slice(0, 40)}...
@@ -447,7 +474,8 @@ async function main() {
 
     console.log(`
 +---------------------------------------------------------------+
-|                     BID ACCEPTED - ESCROW CREATED             |
+|  SIMULATE (local JSON only — NOT on-chain)                    |
+|  ESCROW RECORDED IN LOCAL JSON (not a chain lock)             |
 +---------------------------------------------------------------+
   Escrow ID:   ${escrow.escrowId}
   Job:         ${request.description.slice(0, 40)}...
@@ -494,7 +522,8 @@ async function main() {
 
     console.log(`
 +---------------------------------------------------------------+
-|                       WORK STARTED                            |
+|  SIMULATE (local JSON only — NOT on-chain)                    |
+|  WORK STARTED IN LOCAL JSON                                   |
 +---------------------------------------------------------------+
   Job:         ${request.description.slice(0, 40)}...
   Escrow:      ${escrow.escrowId}
@@ -511,7 +540,11 @@ async function main() {
   // Command: Complete work (submit evidence)
   if (hasFlag('--complete')) {
     const jobId = getArg('--job');
-    const evidenceHash = getArg('--evidence') || crypto.randomBytes(32).toString('hex');
+    const evidenceHash = getArg('--evidence');
+    if (!evidenceHash) {
+      log.error('SIMULATE: provide --evidence <hash>. Will not invent a demo hash.');
+      process.exit(1);
+    }
     const impactNote = getArg('--impact') || '';
 
     if (!jobId) {
@@ -553,7 +586,8 @@ async function main() {
 
     console.log(`
 +---------------------------------------------------------------+
-|                    WORK SUBMITTED FOR REVIEW                  |
+|  SIMULATE (local JSON only — NOT on-chain)                    |
+|  WORK SUBMITTED IN LOCAL JSON                                 |
 +---------------------------------------------------------------+
   Job:         ${request.description.slice(0, 40)}...
   Evidence:    ${evidenceHash.slice(0, 20)}...
@@ -620,7 +654,8 @@ async function main() {
 
     console.log(`
 +---------------------------------------------------------------+
-|                  WORK CONFIRMED - PAYMENT RELEASED            |
+|  SIMULATE (local JSON only — NOT on-chain)                    |
+|  PAYMENT RELEASED IN LOCAL JSON (not a chain payout)          |
 +---------------------------------------------------------------+
   Job:           ${request.description.slice(0, 40)}...
   Worker:        ${request.worker}
@@ -630,7 +665,7 @@ async function main() {
 
   Worker's new balance: ${deployment.ultraBalances[workerAddress]} ULTRA
 
-  Job completed successfully!
+  Simulated JSON complete only. No on-chain payout.
 +---------------------------------------------------------------+
 `);
     return;
@@ -856,8 +891,9 @@ Commands:
     --budget-max <n>      Maximum budget in ULTRA (default: 100)
     --bid-deadline <n>    Days until bid deadline (default: 7)
     --work-deadline <n>   Days until work deadline (default: 30)
-    --min-level <level>   Minimum worker level (default: Basic)
+    --min-level <level>   Minimum worker level (default: Standard; Basic cannot bid)
     --skills <list>       Comma-separated required skills
+    --impact C:qty[:unit] REQUIRED compound flow (validator: >=1). No invented CO2.
 
   --list-jobs             List all open jobs
   --list-types            List available work types
@@ -872,7 +908,7 @@ Commands:
   --accept-bid --bid <id> Accept a bid (job poster only)
   --start --job <id>      Start working on a job (worker only)
   --complete --job <id>   Submit completed work (worker only)
-    --evidence <hash>     Evidence hash (IPFS)
+    --evidence <hash>     REQUIRED. Will not invent a hash (simulate or chain).
   --confirm --job <id>    Confirm completion, release payment (poster only)
   --dispute --job <id>    Initiate a dispute
     --reason <text>       Dispute reason
@@ -882,8 +918,15 @@ Commands:
   --my-jobs               Show my posted and assigned jobs
 
 Options:
-  --user <name>           Act as a test user (e.g., Alice)
+  --user <name>           Act as a test user (e.g., Alice) [simulate]
+  --simulate              Local JSON only (NOT on-chain). Default is preprod Mesh.
+  --unsigned              Default on chain path. Print CBOR; Ryan signs. LLM cannot sign.
+  --submit                Opt-in sign+submit if WALLET_SEED_PHRASE is set. Keep seed off agent boxes.
+  --phase <phase>         Construction phase (default on chain: roofing)
   --help                  Show this help
+
+can_transact: level != Basic. Documented work_auction bar: Standard+.
+No fake DNA. No mainnet. Live demo needs Standard pNFTs + Ryan-signed preprod wallet + Blockfrost.
 
 Examples:
   # Post a job for fence repair
@@ -1093,7 +1136,7 @@ function createWorkRequest(params) {
     status: REQUEST_STATUS.OPEN,
     acceptedBid: null,
     worker: null,
-    testnetSimulated: true,
+    mode: 'simulate',
   };
 }
 
@@ -1115,7 +1158,7 @@ function createBid(params) {
     submittedAt: new Date().toISOString(),
     submittedSlot: params.currentSlot,
     status: BID_STATUS.PENDING,
-    testnetSimulated: true,
+    mode: 'simulate',
   };
 }
 
@@ -1136,7 +1179,7 @@ function createEscrow(params) {
     status: ESCROW_STATUS.FUNDED,
     createdAt: new Date().toISOString(),
     createdSlot: params.currentSlot,
-    testnetSimulated: true,
+    mode: 'simulate',
   };
 }
 
