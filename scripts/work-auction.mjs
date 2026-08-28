@@ -31,6 +31,7 @@ import dotenv from 'dotenv';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '.env') });
 
+// Fix libsodium ESM
 function fixLibsodiumESM() {
   const nodeModules = path.join(__dirname, 'node_modules');
   const targetDir = path.join(nodeModules, 'libsodium-wrappers-sumo', 'dist', 'modules-sumo-esm');
@@ -56,10 +57,20 @@ const CONFIG = {
   deploymentPath: path.join(__dirname, 'deployment.json'),
 };
 
+// Work types from the Aiken validator
 const WORK_TYPES = {
-  construction: { name: 'Construction', phases: ['site_prep', 'foundation', 'framing', 'roofing', 'electrical', 'plumbing', 'finishing', 'landscaping'] },
-  agriculture: { name: 'Agriculture', activities: ['planting', 'cultivation', 'harvesting', 'irrigation', 'soil_management'] },
-  forestry: { name: 'Forestry', activities: ['tree_planting', 'selective_harvest', 'forest_management', 'fire_prevention', 'restoration'] },
+  construction: {
+    name: 'Construction',
+    phases: ['site_prep', 'foundation', 'framing', 'roofing', 'electrical', 'plumbing', 'finishing', 'landscaping'],
+  },
+  agriculture: {
+    name: 'Agriculture',
+    activities: ['planting', 'cultivation', 'harvesting', 'irrigation', 'soil_management'],
+  },
+  forestry: {
+    name: 'Forestry',
+    activities: ['tree_planting', 'selective_harvest', 'forest_management', 'fire_prevention', 'restoration'],
+  },
   manufacturing: { name: 'Manufacturing' },
   transport: { name: 'Transport' },
   services: { name: 'Services' },
@@ -68,6 +79,8 @@ const WORK_TYPES = {
   custom: { name: 'Custom' },
 };
 
+// Verification levels
+const VERIFICATION_LEVELS = ['Basic', 'Ward', 'Standard', 'Verified', 'Steward'];
 const VOTING_WEIGHT = { Basic: 0, Ward: 0, Standard: 1, Verified: 2, Steward: 3 };
 function canTransact(level) { return level && level !== 'Basic'; }
 function meetsLevelRequirement(actual, required) {
@@ -80,57 +93,152 @@ function refuseMainnet() {
   }
 }
 
-const REQUEST_STATUS = { OPEN: 'Open', IN_PROGRESS: 'InProgress', PENDING_VERIFICATION: 'PendingVerification', COMPLETED: 'Completed', CANCELLED: 'Cancelled', DISPUTED: 'Disputed' };
-const BID_STATUS = { PENDING: 'Pending', ACCEPTED: 'Accepted', REJECTED: 'Rejected', WITHDRAWN: 'Withdrawn' };
-const ESCROW_STATUS = { FUNDED: 'Funded', WORK_STARTED: 'WorkStarted', WORK_SUBMITTED: 'WorkSubmitted', VERIFIED: 'Verified', RELEASED: 'Released', REFUNDED: 'Refunded', IN_DISPUTE: 'InDispute' };
+
+// Request statuses
+const REQUEST_STATUS = {
+  OPEN: 'Open',
+  IN_PROGRESS: 'InProgress',
+  PENDING_VERIFICATION: 'PendingVerification',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
+  DISPUTED: 'Disputed',
+};
+
+// Bid statuses
+const BID_STATUS = {
+  PENDING: 'Pending',
+  ACCEPTED: 'Accepted',
+  REJECTED: 'Rejected',
+  WITHDRAWN: 'Withdrawn',
+};
+
+// Escrow statuses
+const ESCROW_STATUS = {
+  FUNDED: 'Funded',
+  WORK_STARTED: 'WorkStarted',
+  WORK_SUBMITTED: 'WorkSubmitted',
+  VERIFIED: 'Verified',
+  RELEASED: 'Released',
+  REFUNDED: 'Refunded',
+  IN_DISPUTE: 'InDispute',
+};
 
 async function main() {
-  console.log(`\n+---------------------------------------------------------------+\n|   UltraLife Work Auction — PREPROD Mesh default (--simulate)  |\n+---------------------------------------------------------------+\n`);
+  console.log(`
++---------------------------------------------------------------+
+|   UltraLife Work Auction — PREPROD Mesh default (--simulate)  |
++---------------------------------------------------------------+
+`);
+
   const args = process.argv.slice(2);
-  const getArg = (name) => { const idx = args.indexOf(name); return idx >= 0 ? args[idx + 1] : null; };
+
+  // Parse arguments
+  const getArg = (name) => {
+    const idx = args.indexOf(name);
+    return idx >= 0 ? args[idx + 1] : null;
+  };
   const hasFlag = (name) => args.includes(name);
-  if (hasFlag('--help') || args.length === 0) { showHelp(); return; }
+
+  // Show help
+  if (hasFlag('--help') || args.length === 0) {
+    showHelp();
+    return;
+  }
+
   refuseMainnet();
+
+  // Default is PREPROD Mesh. --simulate is the only JSON path.
   if (!hasFlag('--simulate')) {
     const { runChain } = await import('./work-auction-chain.mjs');
     await runChain({ args, getArg, hasFlag, CONFIG, log, WORK_TYPES, REQUEST_STATUS, BID_STATUS, ESCROW_STATUS, canTransact, meetsLevelRequirement, refuseMainnet });
     return;
   }
+
   log.warn('SIMULATE mode: local JSON only. This is NOT an on-chain preprod job.');
+
   const { atomicWriteSync, safeReadJson, estimateCurrentSlot } = await import('./utils.mjs');
+
+  // Load deployment
   const deployment = safeReadJson(CONFIG.deploymentPath, {});
-  deployment.workAuction = deployment.workAuction || { requests: [], bids: [], escrows: [] };
+  deployment.workAuction = deployment.workAuction || {
+    requests: [],
+    bids: [],
+    escrows: [],
+  };
+
   const testUsers = deployment.testUsers || [];
   const pnfts = deployment.pnfts || [];
+
+  // Get current user
   const userArg = getArg('--user');
   let currentUser = null;
   let currentPnft = null;
+
   if (userArg) {
     currentUser = testUsers.find(u => u.name.toLowerCase() === userArg.toLowerCase());
-    if (currentUser) currentPnft = pnfts.find(p => p.id === currentUser.pnftId);
+    if (currentUser) {
+      currentPnft = pnfts.find(p => p.id === currentUser.pnftId);
+    }
   }
+
+  // If no user specified, use the main wallet
   if (!currentUser && CONFIG.walletMnemonic) {
     const { BlockfrostProvider, MeshWallet } = await import('@meshsdk/core');
     const provider = new BlockfrostProvider(CONFIG.blockfrostKey);
-    const wallet = new MeshWallet({ networkId: CONFIG.network === 'mainnet' ? 1 : 0, fetcher: provider, submitter: provider, key: { type: 'mnemonic', words: CONFIG.walletMnemonic.trim().split(/\s+/) } });
+    const wallet = new MeshWallet({
+      networkId: CONFIG.network === 'mainnet' ? 1 : 0,
+      fetcher: provider,
+      submitter: provider,
+      key: {
+        type: 'mnemonic',
+        words: CONFIG.walletMnemonic.trim().split(/\s+/),
+      },
+    });
     const walletAddress = wallet.getChangeAddress();
     currentPnft = pnfts.find(p => p.owner === walletAddress);
-    if (currentPnft) currentUser = { name: 'Main Wallet', address: walletAddress, pnftId: currentPnft.id };
+    if (currentPnft) {
+      currentUser = { name: 'Main Wallet', address: walletAddress, pnftId: currentPnft.id };
+    }
   }
-  if (hasFlag('--list-types')) { listWorkTypes(); return; }
-  if (hasFlag('--list-jobs') || hasFlag('--list')) { listJobs(deployment); return; }
+
+  // Command: List work types
+  if (hasFlag('--list-types')) {
+    listWorkTypes();
+    return;
+  }
+
+  // Command: List jobs
+  if (hasFlag('--list-jobs') || hasFlag('--list')) {
+    listJobs(deployment);
+    return;
+  }
+
+  // Command: Show job details
   if (hasFlag('--show')) {
     const jobId = getArg('--show') || getArg('--job');
-    if (!jobId) { log.error('Please provide a job ID with --show <jobId> or --job <jobId>'); process.exit(1); }
-    showJobDetails(deployment, jobId); return;
+    if (!jobId) {
+      log.error('Please provide a job ID with --show <jobId> or --job <jobId>');
+      process.exit(1);
+    }
+    showJobDetails(deployment, jobId);
+    return;
   }
-  if (hasFlag('--list-bids')) { listBids(deployment, getArg('--job')); return; }
+
+  // Command: List bids
+  if (hasFlag('--list-bids')) {
+    const jobId = getArg('--job');
+    listBids(deployment, jobId);
+    return;
+  }
+
+  // Commands requiring a pNFT
   if (!currentPnft) {
     log.error('No pNFT found. You need a pNFT to interact with the work auction.');
     log.info('Mint one first: npm run mint:pnft:basic');
     log.info('Or specify a test user: --user Alice');
     process.exit(1);
   }
+
   log.info(`Acting as: ${currentUser.name} (${currentPnft.id})`);
   log.info(`Verification level: ${currentPnft.level}`);
   if (!canTransact(currentPnft.level)) {
@@ -138,7 +246,10 @@ async function main() {
     log.error('Do not fake Standard/DNA. Upgrade via genesis FounderSelfVerify with a real DNA hash (Ryan-signed).');
     process.exit(1);
   }
+
   const currentSlot = estimateCurrentSlot(CONFIG.network);
+
+  // Command: Post a new job
   if (hasFlag('--post-job') || hasFlag('--post')) {
     const description = getArg('--desc') || getArg('--description');
     const workType = getArg('--type') || 'services';
@@ -151,65 +262,66 @@ async function main() {
     const specsHash = getArg('--specs') || null;
     const skillsArg = getArg('--skills');
     const skills = skillsArg ? skillsArg.split(',') : [];
-    if (!description) { log.error('Please provide a job description with --desc "description"'); process.exit(1); }
-    if (!WORK_TYPES[workType.toLowerCase()]) { log.error(`Unknown work type: ${workType}. Use --list-types to see available types.`); process.exit(1); }
-    if (budgetMin <= 0 || budgetMax < budgetMin) { log.error('Invalid budget range. --budget-min must be positive and <= --budget-max'); process.exit(1); }
+
+    if (!description) {
+      log.error('Please provide a job description with --desc "description"');
+      process.exit(1);
+    }
+
+    if (!WORK_TYPES[workType.toLowerCase()]) {
+      log.error(`Unknown work type: ${workType}. Use --list-types to see available types.`);
+      process.exit(1);
+    }
+
+    if (budgetMin <= 0 || budgetMax < budgetMin) {
+      log.error('Invalid budget range. --budget-min must be positive and <= --budget-max');
+      process.exit(1);
+    }
+
+    // Check ULTRA balance
     const balance = deployment.ultraBalances?.[currentUser.address] || 0;
-    if (balance < budgetMax) { log.error(`Insufficient ULTRA balance. Have: ${balance}, Need: ${budgetMax} (max budget)`); process.exit(1); }
-    const request = createWorkRequest({ requester: currentPnft.id, requesterAddress: currentUser.address, bioregion: currentPnft.bioregion || 'sierra_nevada', workType: workType.toLowerCase(), description, specsHash, budgetMin, budgetMax, requiredCertifications: skills, minWorkerLevel: minLevel, bidDeadline: currentSlot + (bidDeadlineDays * 24 * 60 * 60), workDeadline: currentSlot + (workDeadlineDays * 24 * 60 * 60), asset, currentSlot });
+    if (balance < budgetMax) {
+      log.error(`Insufficient ULTRA balance. Have: ${balance}, Need: ${budgetMax} (max budget)`);
+      process.exit(1);
+    }
+
+    const request = createWorkRequest({
+      requester: currentPnft.id,
+      requesterAddress: currentUser.address,
+      bioregion: currentPnft.bioregion || 'sierra_nevada',
+      workType: workType.toLowerCase(),
+      description,
+      specsHash,
+      budgetMin,
+      budgetMax,
+      requiredCertifications: skills,
+      minWorkerLevel: minLevel,
+      bidDeadline: currentSlot + (bidDeadlineDays * 24 * 60 * 60),
+      workDeadline: currentSlot + (workDeadlineDays * 24 * 60 * 60),
+      asset,
+      currentSlot,
+    });
+
     deployment.workAuction.requests.push(request);
     atomicWriteSync(CONFIG.deploymentPath, deployment);
-    console.log(`\nJOB POSTED ${request.requestId} budget ${budgetMin}-${budgetMax} ULTRA\n`);
-    return;
-  }
-  if (hasFlag('--bid')) {
-    const jobId = getArg('--job');
-    const bidAmount = parseInt(getArg('--amount') || '0');
-    const timelineDays = parseInt(getArg('--timeline') || '14');
-    if (!jobId) { log.error('Please provide a job ID with --job <jobId>'); process.exit(1); }
-    const request = deployment.workAuction.requests.find(r => r.requestId === jobId);
-    if (!request) { log.error(`Job not found: ${jobId}`); process.exit(1); }
-    if (request.status !== REQUEST_STATUS.OPEN) { log.error(`Job is not open for bidding. Status: ${request.status}`); process.exit(1); }
-    if (currentSlot > request.bidDeadline) { log.error('Bid deadline has passed for this job.'); process.exit(1); }
-    if (request.requester === currentPnft.id) { log.error('You cannot bid on your own job.'); process.exit(1); }
-    if (bidAmount < request.budgetMin || bidAmount > request.budgetMax) { log.error(`Bid amount must be between ${request.budgetMin} and ${request.budgetMax} ULTRA`); process.exit(1); }
-    if (!meetsLevelRequirement(currentPnft.level, request.minWorkerLevel || 'Standard')) { log.error(`Your verification level (${currentPnft.level}) does not meet the minimum requirement (${request.minWorkerLevel})`); process.exit(1); }
-    const bid = createBid({ requestId: jobId, bidder: currentPnft.id, bidderAddress: currentUser.address, bidAmount, proposedCompletion: currentSlot + (timelineDays * 24 * 60 * 60), methodsHash: getArg('--methods') || null, note: getArg('--note') || '', currentSlot });
-    deployment.workAuction.bids.push(bid);
-    atomicWriteSync(CONFIG.deploymentPath, deployment);
-    console.log(`BID PLACED ${bid.bidId} amount ${bidAmount}`);
-    return;
-  }
-  showHelp();
-}
 
-function showHelp() {
-  console.log(`Usage: node work-auction.mjs [command] [options]\n  --simulate local JSON only. --unsigned Mesh CBOR; Ryan signs. No fake DNA. No mainnet.`);
-}
-function listWorkTypes() { for (const [code, info] of Object.entries(WORK_TYPES)) console.log(code, info.name); }
-function listJobs(deployment) {
-  const requests = deployment.workAuction?.requests || [];
-  const openJobs = requests.filter(r => r.status === REQUEST_STATUS.OPEN);
-  console.log(`OPEN JOBS (${openJobs.length})`);
-  for (const req of openJobs) console.log(req.requestId, req.description, req.budgetMin, req.budgetMax);
-}
-function showJobDetails(deployment, jobId) {
-  const request = deployment.workAuction?.requests?.find(r => r.requestId === jobId);
-  if (!request) { log.error(`Job not found: ${jobId}`); return; }
-  console.log(JSON.stringify(request, null, 2));
-}
-function listBids(deployment, jobId) {
-  let bids = deployment.workAuction?.bids || [];
-  if (jobId) bids = bids.filter(b => b.requestId === jobId);
-  for (const bid of bids) console.log(bid.bidId, bid.bidAmount, bid.status);
-}
-function createWorkRequest(params) {
-  return { requestId: `job_${crypto.randomBytes(8).toString('hex')}`, requester: params.requester, requesterAddress: params.requesterAddress, asset: params.asset, bioregion: params.bioregion, workType: params.workType, description: params.description, specificationsHash: params.specsHash, expectedImpacts: [], budgetMin: params.budgetMin, budgetMax: params.budgetMax, requiredCertifications: params.requiredCertifications, minWorkerLevel: params.minWorkerLevel, bidDeadline: params.bidDeadline, workDeadline: params.workDeadline, createdAt: new Date().toISOString(), createdSlot: params.currentSlot, status: REQUEST_STATUS.OPEN, acceptedBid: null, worker: null, mode: 'simulate' };
-}
-function createBid(params) {
-  return { bidId: `bid_${crypto.randomBytes(8).toString('hex')}`, requestId: params.requestId, bidder: params.bidder, bidderAddress: params.bidderAddress, bidAmount: params.bidAmount, estimatedImpacts: [], certifications: [], efficiencyRatings: [], proposedCompletion: params.proposedCompletion, methodsHash: params.methodsHash, note: params.note, submittedAt: new Date().toISOString(), submittedSlot: params.currentSlot, status: BID_STATUS.PENDING, mode: 'simulate' };
-}
-function createEscrow(params) {
-  return { escrowId: `escrow_${crypto.randomBytes(8).toString('hex')}`, requestId: params.request.requestId, bidId: params.bid.bidId, requester: params.request.requester, worker: params.bid.bidder, asset: params.request.asset, workType: params.request.workType, amount: params.bid.bidAmount, expectedImpacts: params.bid.estimatedImpacts, deadline: params.request.workDeadline, status: ESCROW_STATUS.FUNDED, createdAt: new Date().toISOString(), createdSlot: params.currentSlot, mode: 'simulate' };
-}
-main().catch(error => { log.error(error.message); console.error(error); process.exit(1); });
+    console.log(`
++---------------------------------------------------------------+
+|  SIMULATE (local JSON only — NOT on-chain)                    |
+|  JOB RECORDED IN LOCAL JSON                                   |
++---------------------------------------------------------------+
+  Job ID:        ${request.requestId}
+  Type:          ${WORK_TYPES[workType.toLowerCase()].name}
+  Description:   ${description.slice(0, 50)}${description.length > 50 ? '...' : ''}
+  Budget:        ${budgetMin} - ${budgetMax} ULTRA
+  Bid Deadline:  ${bidDeadlineDays} days
+  Work Deadline: ${workDeadlineDays} days
+  Min Level:     ${minLevel}
+  Skills:        ${skills.length > 0 ? skills.join(', ') : 'None specified'}
+
+  Workers can now bid on this job!
+  View bids: node work-auction.mjs --list-bids --job ${request.requestId}
++---------------------------------------------------------------+
+`);
+    return;
+  }
