@@ -2,9 +2,59 @@
 
 **The bar for participation is: can you talk?**
 
-Use your coding agent to interact with the protocol through natural conversation. No technical expertise required.
+Works with Claude Code, Cursor, Windsurf, Copilot, Cody, Grok, or any LLM
+that can read a git repo or call HTTP.
 
-Works with: Claude Code, Cursor, Windsurf, Copilot, Cody, or any LLM with terminal access.
+Canonical: this repository.
+Live node implementation: https://github.com/ryanultralife/ultralife-node
+
+Read `AGENTS.md` and `llms.txt` in this repo before writing transactions.
+
+---
+
+## Find the protocol (no human required)
+
+On a live node:
+
+| Path | What |
+|------|------|
+| `/llms.txt` | Rules + tools |
+| `/.well-known/agent-card.json` | Agent card |
+| `/.well-known/did.json` | Protocol DID |
+| `POST /api/protocol` | `{"op":"tools/call","name":"...","arguments":{}}` |
+| `POST /api/mcp` | MCP JSON-RPC |
+
+Header `X-UltraLife-Session` isolates ledgers. CORS is open.
+
+In git: clone this repo, then talk. `service/` is the preprod MCP. `scripts/`
+is the CLI (`npm run setup`, `npm run mint:pnft:basic`).
+
+Cold sequence: boot → wallet → mint pNFT → then market / jobs / pools.
+
+## Hard rules
+
+- **ULTRA** is the unit. Do not ask humans for ADA.
+- pNFT is the DID: `did:ultralife:<id>`. One human, one identity.
+- Each listing, job, identity, and pool is its **own UTxO**. Do not batch
+  global state into one output. See `docs/LOCAL_STATE.md`.
+- Genesis is reference-only. `prove_seal` must fail a mirror mint.
+  See `docs/GENESIS_SEAL.md`.
+- Bioregion pools verify txs (WASM, Gerolamo, Hydra) and are paid in ULTRA.
+- Every L2 tx still terminates at a pNFT.
+
+## Tool map
+
+| You say | Tool / command |
+|---------|----------------|
+| Mint identity in Sierra Nevada | `mint_pnft` / `npm run mint:pnft:basic` |
+| List pasture eggs for 8 ULTRA | `list_offering` |
+| Buy that listing | `buy_offering` |
+| Post a timber job | `list_job` |
+| Bid 200 on the watershed job | `bid_job` |
+| Delegate 10 ULTRA to SNEV | `delegate_ultra` |
+| Open a Hydra head and verify | `open_hydra` then `pool_verify` |
+| Claim this epoch | `claim_ubi` |
+| Is this a mirror? | `inspect_genesis` + `prove_seal` |
 
 ---
 

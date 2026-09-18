@@ -4,7 +4,7 @@
 
 *"The bar for participation is: can you talk?"*
 
-Built on Cardano • 34 Aiken Validators • LLM Interface
+Built on Cardano eUTxO • 34 Aiken Validators • LLM Interface • Users transact in ULTRA
 
 **[Testnet Status: Live on Preprod](docs/TESTNET_STATUS.md)** | [Quick Start](docs/NASEC_TESTNET_GUIDE.md) | [LLM Agent Guide](docs/LLM_AGENT_GUIDE.md)
 
@@ -19,6 +19,13 @@ Built on Cardano • 34 Aiken Validators • LLM Interface
 | 3 | [Put Your Life Online](docs/PUT_YOUR_LIFE_ONLINE.md) | List skills, products, land rights |
 | 4 | [Shopping Experience](docs/SHOPPING_EXPERIENCE.md) | Buy local through conversation |
 | 5 | [Comparative Value](docs/COMPARATIVE_VALUE.md) | How transparent pricing works |
+| 6 | [AGENTS.md](AGENTS.md) | **Start here if you are an AI** |
+| 7 | [llms.txt](llms.txt) | Machine-readable reach + tools |
+| 8 | [Local state](docs/LOCAL_STATE.md) | eUTxO: no batchers, ULTRA not ADA |
+| 9 | [Genesis seal](docs/GENESIS_SEAL.md) | Why mirrors cannot steal policy |
+| 10 | [Agent discovery](docs/AGENT_DISCOVERY.md) | /llms.txt, MCP, DID, tool calls |
+| — | [ultralife-node](https://github.com/ryanultralife/ultralife-node) | WASM node + live agent gateway |
+
 
 ---
 
@@ -67,6 +74,10 @@ Built on Cardano • 34 Aiken Validators • LLM Interface
 | [SPO Quick Brief](docs/SPO_QUICK_BRIEF.md) | For technical testers |
 | [CIP-0113 Integration](docs/CIP0113_INTEGRATION.md) | Programmable token standard alignment |
 | [Rust Node Readiness](docs/RUST_NODE_READINESS.md) | Amaru node, Leios, Peras |
+| [Local State](docs/LOCAL_STATE.md) | Per-UTxO listings/jobs/pools; Hydra verifier paid in ULTRA |
+| [Genesis Seal](docs/GENESIS_SEAL.md) | Parameterized scripts, reference-only genesis NFT |
+| [Agent Discovery](docs/AGENT_DISCOVERY.md) | How any LLM finds and operates the protocol |
+
 
 ---
 

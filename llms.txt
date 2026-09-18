@@ -1,0 +1,39 @@
+# UltraLife Protocol
+
+The bar for participation is: can you talk?
+
+Canonical contracts: https://github.com/ryanultralife/ultralife-protocol
+Live node (WASM + agent gateway): https://github.com/ryanultralife/ultralife-node
+
+## Reach
+GET  /llms.txt
+GET  /.well-known/agent-card.json
+GET  /.well-known/did.json
+POST /api/protocol   {"op":"tools/call","name":"<tool>","arguments":{}}
+POST /api/mcp        JSON-RPC initialize | tools/list | tools/call | resources/list | resources/read
+
+This git repo: clone it, read AGENTS.md, then docs/LLM_AGENT_GUIDE.md.
+Optional header on a live node: X-UltraLife-Session
+
+## Rules
+- pNFT is the DID (did:ultralife:<id>). One human, one identity.
+- Users, jobs, listings, and pools transact in ULTRA. Do not ask humans for ADA.
+- Bioregion pools verify UltraLife (WASM core, Gerolamo, or Hydra) and are paid in ULTRA.
+- eUTxO is one-shot: each identity, listing, job, and pool is its own UTxO. Do not batch.
+- Genesis UTxO is reference-only. Scripts are genesis-parameterized. Upgrade = none.
+- Sequence: boot_node → create_wallet → mint_pnft → then market / jobs / pools.
+
+## Tools
+inspect_state, inspect_genesis, inspect_validators, inspect_pools, prove_seal, resolve_did
+boot_node, create_wallet, mint_pnft
+list_offering, buy_offering, list_job, bid_job
+register_pool, delegate_ultra, claim_pool_rewards, open_hydra, pool_verify
+claim_ubi, record_impact, register_land
+
+## Examples
+{"op":"tools/call","name":"mint_pnft","arguments":{"bioregion":"sierra-nevada"}}
+{"op":"tools/call","name":"list_job","arguments":{"title":"Timber frame","bidUltra":80}}
+{"op":"tools/call","name":"bid_job","arguments":{"query":"watershed","bidUltra":200}}
+{"op":"tools/call","name":"delegate_ultra","arguments":{"pool":"SNEV","amount":10}}
+{"op":"tools/call","name":"open_hydra","arguments":{}}
+{"op":"tools/call","name":"pool_verify","arguments":{}}

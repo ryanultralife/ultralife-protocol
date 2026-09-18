@@ -4,6 +4,11 @@
 
 *"The bar for participation is: can you talk?"*
 
+If you are an AI, also read **[AGENTS.md](AGENTS.md)** and **[llms.txt](llms.txt)** before building or submitting a transaction.
+Architecture constraints: [docs/LOCAL_STATE.md](docs/LOCAL_STATE.md), [docs/GENESIS_SEAL.md](docs/GENESIS_SEAL.md).
+Live node: https://github.com/ryanultralife/ultralife-node
+
+
 ## What This Is
 
 UltraLife is a parallel economy protocol on Cardano. 27 Aiken validators handle identity, marketplace, impact tracking, bioregion governance, sharing economy, and UBI. Users interact through conversation with any LLM via MCP — no app, no UI, just talk.
