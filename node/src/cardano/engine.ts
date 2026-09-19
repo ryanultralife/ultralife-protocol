@@ -941,17 +941,36 @@ export async function administerDose(state: EngineState, lotId: string, patient:
       expired: true,
     });
   }
-  const done: IsotopeLot = { ...lot, status: "Administered", patient, form: "dose" };
+  const nonce = `${state.slot}:${lot.id}`;
+  const patientCommit = await digest(`patient:${patient}:${nonce}`);
+  const procedureCommit = await digest(`proc:${lot.nuclide}:${left}:${nonce}`);
+  const done: IsotopeLot = {
+    ...lot,
+    status: "Administered",
+    form: "dose",
+    patientCommit,
+    procedureCommit,
+  };
   const src = state.utxos.find((u) => u.address === ISOTOPE && (u.datum as IsotopeLot | undefined)?.id === lot.id);
   if (!src) return log(state, "warn", "Lot UTxO missing.");
   return assemble(state, {
     intent: "administer-dose",
     scripts: ["isotope.isotope.spend"],
-    redeemers: [{ purpose: "spend", data: { op: "Administer", patient } }],
+    redeemers: [
+      { purpose: "spend", data: { op: "Administer", patient_commit: patientCommit, procedure_commit: procedureCommit } },
+    ],
     spent: [src],
     outputs: [{ address: ISOTOPE, value: cloneValue(src.value), datum: done }],
     mint: {},
-    metadata: { ul: { op: "isotope-administer", lot: lot.id, patient, remainingBq: left } },
+    metadata: {
+      ul: {
+        op: "isotope-administer",
+        lot: lot.id,
+        patient_commit: patientCommit,
+        procedure_commit: procedureCommit,
+        privacy: "tx-not-identity",
+      },
+    },
     extra: { lots: state.lots.map((l) => (l.id === lot.id ? done : l)) },
     lab: true,
   });

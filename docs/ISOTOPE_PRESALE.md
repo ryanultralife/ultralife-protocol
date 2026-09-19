@@ -58,7 +58,7 @@ They need it: lab `Convert`s (generator → Tc-99m → kit → dose). New lot UT
 
 They don’t: `Transfer` remaining activity to another pNFT (another hospital, another patient). Same atoms, new owner, decay continues.
 
-They treat: `Administer { patient }`. Lot is done. Not resold.
+They treat: `Administer { patient_commit, procedure_commit }`. Lot is done. Not resold. Patient and CPT stay off the public datum — see [TX_PRIVACY.md](TX_PRIVACY.md). Hospital inventory should own the lot; the patient should not.
 
 ## What is not anonymous
 

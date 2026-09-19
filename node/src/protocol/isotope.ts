@@ -21,7 +21,9 @@ export type IsotopeLot = {
   expirySlot: number;
   owner: string;
   custodian: string;
-  patient?: string;
+  /** blake2/sha256 of patient pNFT + nonce. Not the patient id. */
+  patientCommit?: string;
+  procedureCommit?: string;
   parent?: string;
   status: LotStatus;
   priceUltra: number;

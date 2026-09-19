@@ -277,7 +277,8 @@ export const AGENT_TOOLS = [
     type: "function" as const,
     function: {
       name: "administer_dose",
-      description: "Convert a lot into an administered dose for a patient pNFT. Ends transferability.",
+      description:
+        "Administer a dose. Patient id and procedure stay off the ledger as 32-byte commitments (tx privacy). Lot ends. Hospital should own the lot — do not put the patient as owner.",
       parameters: {
         type: "object",
         properties: {
@@ -669,7 +670,8 @@ export async function executeTool(
         remainingBq: remainingBq(l, state.slot),
         owner: l.owner,
         custodian: l.custodian,
-        patient: l.patient ?? null,
+        patientCommit: l.patientCommit ?? null,
+        procedureCommit: l.procedureCommit ?? null,
         expirySlot: l.expirySlot,
       }));
       return { ok: true, summary: JSON.stringify({ firstToken: "medical-isotope-lots", lots }), next: state };

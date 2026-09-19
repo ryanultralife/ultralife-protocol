@@ -17,6 +17,7 @@
 use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use aiken/interval.{Finite}
+use aiken/primitive/bytearray
 use cardano/assets.{AssetName, PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
 
@@ -79,7 +80,10 @@ pub type IsotopeRedeemer {
   Produce { coa_hash: ByteArray }
   Transfer { new_owner: AssetName }
   Convert { daughter: Nuclide, activity_out: Int, process_hash: ByteArray }
-  Administer { patient: AssetName }
+  /// patient_commit = blake2b(patient_pnft || nonce)
+  /// procedure_commit = blake2b(nuclide || bq || cpt || nonce)
+  /// Plaintext is a viewing-key record, not the ledger.
+  Administer { patient_commit: ByteArray, procedure_commit: ByteArray }
   Recall { reason_hash: ByteArray }
   Expire
 }
@@ -109,11 +113,13 @@ validator isotope(config: IsotopeConfig) {
           slot,
         ) >= config.min_useful_bq && remaining_bq(lot, slot) >= activity_out
       }
-      Administer { patient } -> {
+      Administer { patient_commit, procedure_commit } -> {
         ( lot.form == Dose || lot.form == Radiopharmaceutical ) && signer_is_lab(
           tx,
           config,
-        ) && patient != #"" && remaining_bq(lot, slot) >= config.min_useful_bq && slot < lot.expiry_slot
+        ) && bytearray.length(patient_commit) == 32 && bytearray.length(
+          procedure_commit,
+        ) == 32 && remaining_bq(lot, slot) >= config.min_useful_bq && slot < lot.expiry_slot
       }
       Recall { .. } -> signer_is_lab(tx, config) && lot.status != Administered
       Expire -> remaining_bq(lot, slot) < config.min_useful_bq || slot >= lot.expiry_slot
