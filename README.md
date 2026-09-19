@@ -80,6 +80,7 @@ Built on Cardano eUTxO • 34 Aiken Validators • LLM Interface • Users trans
 | [Dual stack](docs/DUAL_STACK.md) | One tool list: demo-wasm rehearsal + preprod unsigned CBOR |
 | [Red team](docs/RED_TEAM.md) | No operational keys to bots. Burner-only. `red_team` tool |
 | [Morning preprod](docs/MORNING_PREPROD.md) | Burner, faucet, steal-pnft. Do not load the mint wallet. |
+| [Isotope pre-sales](docs/ISOTOPE_PRESALE.md) | First token: title to decaying medical isotope lots. Not ULTRA. |
 
 
 

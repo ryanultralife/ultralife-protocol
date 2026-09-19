@@ -37,3 +37,5 @@ claim_ubi, record_impact, register_land
 {"op":"tools/call","name":"delegate_ultra","arguments":{"pool":"SNEV","amount":10}}
 {"op":"tools/call","name":"open_hydra","arguments":{}}
 {"op":"tools/call","name":"pool_verify","arguments":{}}
+
+First token: medical isotope lots. presale_isotope, convert_isotope, transfer_isotope, administer_dose, inspect_isotopes

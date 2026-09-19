@@ -185,6 +185,7 @@ export const POLICIES = {
   land: "d52b99f1c38e04a26f7d15b0e9c3a2f8d6b14e27c0f9a3b5d8e1f4c2",
   bioregion: "e63ca0d2e49f15b37a8e26c1f0d4b3a9e7c25f38d1a0b4c6e9f2a5d3",
   genesis: "0a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0fedcba9",
+  isotope: "f74db1e3f50a26c48b9f37d2e1c5a4b0f8d26e39c2b1a5d7f0e3b6c4",
 } as const;
 
 export function assetKey(policy: string, name: string) {

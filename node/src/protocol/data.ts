@@ -121,6 +121,8 @@ export const VALIDATOR_CATALOG = [
   { name: "fee_pool.fee_pool.spend", category: "Hydra", mem: 15_200, cpu: 4_170_000 },
   { name: "oracle_bioregion.oracle_bioregion.spend", category: "Oracle", mem: 17_400, cpu: 4_890_000 },
   { name: "oracle_impact.oracle_impact.spend", category: "Oracle", mem: 17_700, cpu: 4_960_000 },
+  { name: "isotope.isotope.spend", category: "Care", mem: 22_400, cpu: 6_480_000 },
+  { name: "isotope.isotope_policy.mint", category: "Care", mem: 18_200, cpu: 5_210_000 },
 ] as const;
 
 export function validatorByName(name: string) {
@@ -192,6 +194,7 @@ export const SCRIPT_ADDRESS = {
   pool: "addr_test1q_ul_stake_pool_lock",
   faucet: "addr_test1q_ul_preprod_faucet",
   auction: "addr_test1q_ul_work_auction_lock",
+  isotope: "addr_test1q_ul_isotope_lot_lock",
 };
 
 export const GENESIS_JOBS: Array<{

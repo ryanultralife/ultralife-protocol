@@ -1,4 +1,5 @@
 import { BIOREGIONS, GENESIS_JOBS, GENESIS_OFFERINGS, GENESIS_POOLS, SCRIPT_ADDRESS, validatorByName } from "../protocol/data";
+import { DAUGHTER, HALF_LIFE, parseNuclide, remainingBq, type IsotopeLot, type Nuclide } from "../protocol/isotope";
 import {
   FAKE_MIRROR_POLICY,
   GENESIS_ADDRESS,
@@ -55,6 +56,7 @@ export type EngineState = {
   logs: ProtocolLog[];
   mempool: string[];
   lastTx: BuiltTx | null;
+  lots: IsotopeLot[];
 };
 
 const TREASURY = SCRIPT_ADDRESS.treasury;
@@ -63,6 +65,7 @@ const MARKET = SCRIPT_ADDRESS.marketplace;
 const UBI = SCRIPT_ADDRESS.ubi;
 const POOL = SCRIPT_ADDRESS.pool;
 const AUCTION = SCRIPT_ADDRESS.auction;
+const ISOTOPE = SCRIPT_ADDRESS.isotope;
 
 function now() {
   return Date.now();
@@ -147,6 +150,22 @@ function runCek(script: string, redeemer: unknown, ctx: Record<string, unknown>)
   if (script.includes("impact") && !ctx.hasPnft) {
     ok = false;
     reason = "impact: pNFT required";
+  }
+  if (script.startsWith("isotope.") && !ctx.hasPnft) {
+    ok = false;
+    reason = "isotope: every lot terminates at a pNFT";
+  }
+  if (script.startsWith("isotope.") && ctx.expired) {
+    ok = false;
+    reason = "isotope: lot expired — cannot convert or administer";
+  }
+  if (script.startsWith("isotope.") && intent === "steal-isotope") {
+    ok = false;
+    reason = "isotope: owner pNFT must sign transfer";
+  }
+  if (script.startsWith("isotope.") && intent === "convert-isotope" && !ctx.lab) {
+    ok = false;
+    reason = "isotope: only a licensed lab pNFT may convert or administer";
   }
   if (ctx.spendingGenesis) {
     ok = false;
@@ -302,6 +321,7 @@ export function freshEngine(): EngineState {
     pools: GENESIS_POOLS.map((p) => ({ ...p })),
     delegations: [],
     auctions: GENESIS_JOBS.map((j) => ({ ...j })),
+    lots: [],
     hydra: { status: "closed", verified: 0, feesUltra: 0, lane: "l1-wasm" },
     logs: [
       {
@@ -452,6 +472,8 @@ type IntentCtx = {
   nested?: NestedSpec[];
   extra?: Partial<EngineState>;
   observe?: UTxO[];
+  expired?: boolean;
+  lab?: boolean;
 };
 
 export function genesisUtxo(state: EngineState) {
@@ -485,6 +507,8 @@ async function assemble(state: EngineState, ctx: IntentCtx): Promise<EngineState
     genesisSeal: seal,
     scriptsNeedSeal: needsSeal,
     mintPolicies,
+    expired: Boolean(ctx.expired),
+    lab: Boolean(ctx.lab),
   };
   const cek = ctx.scripts.map((script, i) => runCek(script, ctx.redeemers[i]?.data ?? {}, cekCtx));
   const nestedChildren = (ctx.nested ?? []).map((child) => {
@@ -773,6 +797,163 @@ export async function registerLand(state: EngineState, label: string, hectares: 
     ],
     mint,
     metadata: { ul: { op: "land", label, hectares } },
+  });
+}
+
+const LAB_PNFT = "pnft_lab_radiopharmacy_01";
+
+export async function presaleIsotope(state: EngineState, nuclideRaw: string, activityBq: number, priceUltra: number) {
+  if (!state.wallet || !state.pnft) return log(state, "warn", "pNFT required to pre-buy an isotope lot.");
+  const src = spendFromWallet(state, 3_000_000);
+  if (!src) return log(state, "warn", "Need ADA for fees.");
+  const nuclide: Nuclide = parseNuclide(nuclideRaw);
+  const half = HALF_LIFE[nuclide];
+  const id = `lot_${nuclide.replace("-", "")}_${Math.random().toString(36).slice(2, 7)}`;
+  const lot: IsotopeLot = {
+    id,
+    nuclide,
+    form: nuclide === "Mo-99" ? "generator" : "target",
+    activityBq: Math.max(1, Math.floor(activityBq)),
+    calibratedSlot: state.slot,
+    halfLifeSlots: half,
+    expirySlot: state.slot + half * 8,
+    owner: state.pnft.id,
+    custodian: LAB_PNFT,
+    status: "PreSold",
+    priceUltra: Math.max(1, Math.floor(priceUltra)),
+    specHash: `ipfs://iso/${id}`,
+  };
+  const mint: AssetMap = { [assetKey(POLICIES.isotope, lot.id)]: 1 };
+  return assemble(state, {
+    intent: "presale-isotope",
+    scripts: ["isotope.isotope.spend", "isotope.isotope_policy.mint"],
+    redeemers: [
+      { purpose: "spend", data: { op: "PreSell", buyer: state.pnft.id, activity_bq: lot.activityBq } },
+      { purpose: "mint", data: { lot: lot.id } },
+    ],
+    spent: [src],
+    outputs: [
+      {
+        address: ISOTOPE,
+        value: applyMint(emptyValue(2_000_000), mint),
+        datum: lot,
+      },
+      { address: state.wallet.address, value: { lovelace: src.value.lovelace - 2_000_000, assets: { ...src.value.assets } } },
+    ],
+    mint,
+    metadata: { ul: { op: "isotope-presale", lot: lot.id, nuclide, owner: state.pnft.id, custodian: LAB_PNFT } },
+    extra: { lots: [...state.lots, lot] },
+    lab: true,
+  });
+}
+
+export async function convertIsotope(state: EngineState, lotId: string, daughterRaw?: string) {
+  if (!state.wallet || !state.pnft) return log(state, "warn", "pNFT required.");
+  const parent = state.lots.find((l) => l.id === lotId || l.nuclide === parseNuclide(lotId));
+  if (!parent) return log(state, "warn", "No such lot. Pre-buy first.");
+  if (parent.owner !== state.pnft.id) return log(state, "warn", "You do not own this lot.");
+  const left = remainingBq(parent, state.slot);
+  if (left <= 0 || state.slot >= parent.expirySlot) {
+    return assemble(state, {
+      intent: "convert-isotope",
+      scripts: ["isotope.isotope.spend"],
+      redeemers: [{ purpose: "spend", data: { op: "Expire" } }],
+      spent: [],
+      outputs: [],
+      mint: {},
+      metadata: {},
+      expired: true,
+    });
+  }
+  const daughter: Nuclide = daughterRaw ? parseNuclide(daughterRaw) : (DAUGHTER[parent.nuclide] ?? parent.nuclide);
+  const child: IsotopeLot = {
+    ...parent,
+    id: `lot_${daughter.replace("-", "")}_${Math.random().toString(36).slice(2, 7)}`,
+    nuclide: daughter,
+    form: daughter === "Tc-99m" ? "eluate" : "radiopharmaceutical",
+    activityBq: Math.max(1, Math.floor(left / 2)),
+    calibratedSlot: state.slot,
+    halfLifeSlots: HALF_LIFE[daughter],
+    expirySlot: state.slot + HALF_LIFE[daughter] * 8,
+    parent: parent.id,
+    status: "Produced",
+    specHash: `ipfs://iso/${parent.id}/convert`,
+  };
+  const spentLot = state.utxos.find((u) => u.address === ISOTOPE && (u.datum as IsotopeLot | undefined)?.id === parent.id);
+  const src = spentLot ?? spendFromWallet(state, 2_000_000);
+  if (!src) return log(state, "warn", "Need the lot UTxO.");
+  const mint: AssetMap = { [assetKey(POLICIES.isotope, child.id)]: 1 };
+  const closed: IsotopeLot = { ...parent, status: "Converted" };
+  return assemble(state, {
+    intent: "convert-isotope",
+    scripts: ["isotope.isotope.spend", "isotope.isotope_policy.mint"],
+    redeemers: [
+      { purpose: "spend", data: { op: "Convert", daughter, activity_out: child.activityBq } },
+      { purpose: "mint", data: { lot: child.id } },
+    ],
+    spent: [src],
+    outputs: [{ address: ISOTOPE, value: applyMint(emptyValue(2_000_000), mint), datum: child }],
+    mint,
+    metadata: { ul: { op: "isotope-convert", parent: parent.id, child: child.id, lab: LAB_PNFT } },
+    extra: { lots: [...state.lots.filter((l) => l.id !== parent.id), closed, child] },
+    lab: true,
+  });
+}
+
+export async function transferIsotope(state: EngineState, lotId: string, newOwner: string) {
+  if (!state.wallet || !state.pnft) return log(state, "warn", "pNFT required.");
+  const lot = state.lots.find((l) => l.id === lotId);
+  if (!lot) return log(state, "warn", "No such lot.");
+  if (lot.owner !== state.pnft.id) return log(state, "warn", "You do not own this lot.");
+  if (lot.status === "Administered" || lot.status === "Converted") {
+    return log(state, "warn", "Administered or converted lots cannot be sold.");
+  }
+  const nextLot: IsotopeLot = { ...lot, owner: newOwner, status: "Held" };
+  const src = state.utxos.find((u) => u.address === ISOTOPE && (u.datum as IsotopeLot | undefined)?.id === lot.id);
+  if (!src) return log(state, "warn", "Lot UTxO missing.");
+  return assemble(state, {
+    intent: "transfer-isotope",
+    scripts: ["isotope.isotope.spend"],
+    redeemers: [{ purpose: "spend", data: { op: "Transfer", new_owner: newOwner } }],
+    spent: [src],
+    outputs: [{ address: ISOTOPE, value: cloneValue(src.value), datum: nextLot }],
+    mint: {},
+    metadata: { ul: { op: "isotope-transfer", lot: lot.id, from: lot.owner, to: newOwner } },
+    extra: { lots: state.lots.map((l) => (l.id === lot.id ? nextLot : l)) },
+  });
+}
+
+export async function administerDose(state: EngineState, lotId: string, patient: string) {
+  if (!state.wallet || !state.pnft) return log(state, "warn", "pNFT required.");
+  const lot = state.lots.find((l) => l.id === lotId);
+  if (!lot) return log(state, "warn", "No such lot.");
+  if (lot.owner !== state.pnft.id) return log(state, "warn", "You do not own this lot.");
+  const left = remainingBq(lot, state.slot);
+  if (left <= 0 || state.slot >= lot.expirySlot) {
+    return assemble(state, {
+      intent: "administer-dose",
+      scripts: ["isotope.isotope.spend"],
+      redeemers: [{ purpose: "spend", data: { op: "Expire" } }],
+      spent: [],
+      outputs: [],
+      mint: {},
+      metadata: {},
+      expired: true,
+    });
+  }
+  const done: IsotopeLot = { ...lot, status: "Administered", patient, form: "dose" };
+  const src = state.utxos.find((u) => u.address === ISOTOPE && (u.datum as IsotopeLot | undefined)?.id === lot.id);
+  if (!src) return log(state, "warn", "Lot UTxO missing.");
+  return assemble(state, {
+    intent: "administer-dose",
+    scripts: ["isotope.isotope.spend"],
+    redeemers: [{ purpose: "spend", data: { op: "Administer", patient } }],
+    spent: [src],
+    outputs: [{ address: ISOTOPE, value: cloneValue(src.value), datum: done }],
+    mint: {},
+    metadata: { ul: { op: "isotope-administer", lot: lot.id, patient, remainingBq: left } },
+    extra: { lots: state.lots.map((l) => (l.id === lot.id ? done : l)) },
+    lab: true,
   });
 }
 

@@ -80,3 +80,6 @@ Each tool maps to named validators in `src/lib/protocol/contracts.ts` of
 `ultralife-node` is demo-wasm. Preprod is Cardano. `inspect_preprod` reads Koios. Agents build unsigned txs. Wallets sign. See docs/DUAL_STACK.md and docs/TESTNET_STATUS.md.
 
 Never give agents founder/treasury keys. See docs/RED_TEAM.md.
+
+
+First tokenization is medical isotope lots (`presale_isotope`, `convert_isotope`, `administer_dose`). Customer pNFT owns the lot until convert, sell, or dose. See docs/ISOTOPE_PRESALE.md.

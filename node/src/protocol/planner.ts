@@ -24,8 +24,9 @@ export function planTools(text: string, snap: AgentSnapshot): ToolCall[] {
     any(t, ["impact", "co2", "carbon", "ch4"]) ||
     ((t.includes("h2o") || t.includes("water")) && !any(t, ["watershed", "job", "bid", "pool"]));
   const wantsLand = any(t, ["land", "parcel", "hectares", "hectare"]);
-  const wantsList = any(t, ["sell", "list", "offer"]) && !t.includes("buy");
-  const wantsBuy = any(t, ["buy", "eggs", "purchase", "settle"]);
+  const iso = any(t, ["isotope", "mo-99", "mo99", "tc-99", "i-131", "lu-177", "ac-225", "f-18", "radiopharma", "dose", "half-life"]);
+  const wantsList = any(t, ["sell", "list", "offer"]) && !t.includes("buy") && !iso;
+  const wantsBuy = any(t, ["buy", "eggs", "purchase", "settle"]) && !iso;
   const wantsSend = has(t, "send") || t.includes("ada to");
   const wantsInspect =
     any(t, ["status", "balance", "what can", "where am i", "inspect", "state"]) &&
@@ -41,6 +42,20 @@ export function planTools(text: string, snap: AgentSnapshot): ToolCall[] {
   if (wantsInspect) calls.push({ name: "inspect_state", args: {} });
   if (any(t, ["did", "who am i", "my identity"])) calls.push({ name: "resolve_did", args: {} });
   if (any(t, ["preprod", "on chain", "cardanoscan", "is it live"])) calls.push({ name: "inspect_preprod", args: {} });
+  if (any(t, ["isotope", "mo-99", "mo99", "tc-99", "i-131", "lu-177", "ac-225", "f-18", "radiopharma", "dose", "half-life"])) {
+    if (any(t, ["convert", "elute", "generator"])) {
+      const id = snap.lots[0]?.id ?? "lot";
+      calls.push({ name: "convert_isotope", args: { lotId: id } });
+    } else if (any(t, ["administer", "treat", "dose"])) {
+      const id = snap.lots[0]?.id ?? "lot";
+      calls.push({ name: "administer_dose", args: { lotId: id, patient: "pnft_patient" } });
+    } else if (any(t, ["inspect", "list", "show", "lots"])) {
+      calls.push({ name: "inspect_isotopes", args: {} });
+    } else {
+      const nuclide = t.includes("i-131") ? "I-131" : t.includes("lu") ? "Lu-177" : t.includes("ac-225") ? "Ac-225" : t.includes("f-18") ? "F-18" : "Mo-99";
+      calls.push({ name: "presale_isotope", args: { nuclide, activityBq: 1_000_000_000, priceUltra: 40 } });
+    }
+  }
   if (any(t, ["red team", "break it", "attack", "steal genesis", "exploit"])) calls.push({ name: "red_team", args: {} });
   if (wantsSeal) {
     calls.push({ name: "inspect_genesis", args: {} });
@@ -125,6 +140,7 @@ function withPrereqs(goal: ToolCall[], snap: AgentSnapshot): ToolCall[] {
         "resolve_did",
         "inspect_preprod",
         "red_team",
+        "inspect_isotopes",
       ].includes(c.name),
   );
   if (needLedger && snap.status !== "ready") out.push({ name: "boot_node", args: {} });
@@ -145,11 +161,15 @@ function withPrereqs(goal: ToolCall[], snap: AgentSnapshot): ToolCall[] {
       "claim_pool_rewards",
       "open_hydra",
       "pool_verify",
+      "presale_isotope",
+      "convert_isotope",
+      "transfer_isotope",
+      "administer_dose",
     ].includes(c.name),
   );
   if (needWallet && !snap.address) out.push({ name: "create_wallet", args: {} });
   const needPnft = goal.some((c) =>
-    ["claim_ubi", "record_impact", "register_land", "list_job", "bid_job", "register_pool", "delegate_ultra", "open_hydra", "pool_verify"].includes(
+    ["claim_ubi", "record_impact", "register_land", "list_job", "bid_job", "register_pool", "delegate_ultra", "open_hydra", "pool_verify", "presale_isotope", "convert_isotope", "transfer_isotope", "administer_dose"].includes(
       c.name,
     ),
   );

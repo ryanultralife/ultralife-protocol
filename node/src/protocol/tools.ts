@@ -18,6 +18,10 @@ import {
   runRedTeam,
   recordImpact,
   registerLand,
+  presaleIsotope,
+  convertIsotope,
+  transferIsotope,
+  administerDose,
   registerPool,
   sendAda,
   assetQty,
@@ -28,6 +32,7 @@ import { genesisOutRef, genesisScriptRoot } from "./genesis";
 import { POLICIES } from "../cardano/types";
 import { BIOREGIONS, VALIDATOR_CATALOG } from "./data";
 import { identityDidDocument } from "./did";
+import { remainingBq } from "./isotope";
 import { canonicalTool, rewriteArgs } from "./aliases";
 import { inspectPreprod } from "./chain";
 import { assertContract, contractFor, TOOL_CONTRACTS } from "./contracts";
@@ -67,6 +72,7 @@ export type AgentSnapshot = {
   hydra: EngineState["hydra"];
   lastIntent: string | null;
   bioregions: { id: string; name: string; health: number }[];
+  lots: { id: string; nuclide: string; status: string; remainingBq: number; owner: string }[];
 };
 
 export type ToolCall = { id?: string; name: string; args: Record<string, unknown> };
@@ -218,6 +224,76 @@ export const AGENT_TOOLS = [
         },
         required: ["label", "hectares"],
       },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "presale_isotope",
+      description:
+        "First tokenization: pre-buy a medical isotope lot (Mo-99, I-131, Lu-177, Ac-225, F-18). Your pNFT owns the atoms until you convert them at a lab, sell remaining activity, or administer a dose. Not ULTRA. Not a fraction of identity.",
+      parameters: {
+        type: "object",
+        properties: {
+          nuclide: { type: "string", description: "Mo-99, Tc-99m, I-131, Lu-177, Ac-225, F-18" },
+          activityBq: { type: "number" },
+          priceUltra: { type: "number" },
+        },
+        required: ["nuclide"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "convert_isotope",
+      description: "Licensed lab converts a lot you own (e.g. Mo-99 generator → Tc-99m eluate). Parent consumed, daughter lot minted.",
+      parameters: {
+        type: "object",
+        properties: {
+          lotId: { type: "string" },
+          daughter: { type: "string" },
+        },
+        required: ["lotId"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "transfer_isotope",
+      description: "Sell remaining activity to another pNFT. Administered/converted lots cannot move.",
+      parameters: {
+        type: "object",
+        properties: {
+          lotId: { type: "string" },
+          newOwner: { type: "string" },
+        },
+        required: ["lotId", "newOwner"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "administer_dose",
+      description: "Convert a lot into an administered dose for a patient pNFT. Ends transferability.",
+      parameters: {
+        type: "object",
+        properties: {
+          lotId: { type: "string" },
+          patient: { type: "string" },
+        },
+        required: ["lotId", "patient"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "inspect_isotopes",
+      description: "List isotope lots this node knows, with remaining Bq after decay.",
+      parameters: { type: "object", properties: {}, additionalProperties: false },
     },
   },
   {
@@ -394,6 +470,13 @@ export function snapshot(state: EngineState): AgentSnapshot {
     hydra: state.hydra,
     lastIntent: state.lastTx?.intent ?? null,
     bioregions: BIOREGIONS.map((b) => ({ id: b.id, name: b.name, health: b.health })),
+    lots: (state.lots ?? []).map((l) => ({
+      id: l.id,
+      nuclide: l.nuclide,
+      status: l.status,
+      remainingBq: remainingBq(l, state.slot),
+      owner: l.owner,
+    })),
   };
 }
 
@@ -547,6 +630,49 @@ export async function executeTool(
       const label = String(args.label ?? "Parcel").slice(0, 48);
       const ha = Number(args.hectares ?? 1);
       return fromEngine(before, await registerLand(state, label, ha), `Land rights registered: ${label}, ${ha} ha.`);
+    }
+    case "presale_isotope": {
+      const nuclide = String(args.nuclide ?? "Mo-99");
+      const bq = Number(args.activityBq ?? 1_000_000_000);
+      const price = Number(args.priceUltra ?? 40);
+      return fromEngine(
+        before,
+        await presaleIsotope(state, nuclide, bq, price),
+        `Pre-sold ${nuclide} lot. Your pNFT owns it until convert, sell, or dose.`,
+      );
+    }
+    case "convert_isotope": {
+      const lotId = String(args.lotId ?? "");
+      const daughter = args.daughter ? String(args.daughter) : undefined;
+      return fromEngine(before, await convertIsotope(state, lotId, daughter), `Lab conversion of ${lotId}.`);
+    }
+    case "transfer_isotope": {
+      return fromEngine(
+        before,
+        await transferIsotope(state, String(args.lotId ?? ""), String(args.newOwner ?? "")),
+        "Title moved. Atoms still decaying.",
+      );
+    }
+    case "administer_dose": {
+      return fromEngine(
+        before,
+        await administerDose(state, String(args.lotId ?? ""), String(args.patient ?? "")),
+        "Dose administered. Lot no longer transferable.",
+      );
+    }
+    case "inspect_isotopes": {
+      const lots = (state.lots ?? []).map((l) => ({
+        id: l.id,
+        nuclide: l.nuclide,
+        form: l.form,
+        status: l.status,
+        remainingBq: remainingBq(l, state.slot),
+        owner: l.owner,
+        custodian: l.custodian,
+        patient: l.patient ?? null,
+        expirySlot: l.expirySlot,
+      }));
+      return { ok: true, summary: JSON.stringify({ firstToken: "medical-isotope-lots", lots }), next: state };
     }
     case "list_offering": {
       const title = String(args.title ?? "Offering").slice(0, 48);
