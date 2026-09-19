@@ -53,7 +53,7 @@ market / jobs / pools.
 
 ## Tools (agent surface)
 
-`inspect_state`, `inspect_genesis`, `inspect_validators`, `inspect_pools`,
+`inspect_preprod`, `inspect_state`, `inspect_genesis`, `inspect_validators`, `inspect_pools`,
 `prove_seal`, `resolve_did`, `boot_node`, `create_wallet`, `mint_pnft`,
 `list_offering`, `buy_offering`, `list_job`, `bid_job`, `register_pool`,
 `delegate_ultra`, `claim_pool_rewards`, `open_hydra`, `pool_verify`,
@@ -74,3 +74,7 @@ Each tool maps to named validators in `src/lib/protocol/contracts.ts` of
 - Keep marketplace/work_auction as *per-output* state. A singleton market UTxO is a bug.
 - Document any new tool in `llms.txt` and `docs/LLM_AGENT_GUIDE.md`.
 - Tests: `npm test` in `service/` and `aiken check`.
+
+## Ledger honesty
+
+`ultralife-node` is demo-wasm. Preprod is Cardano. `inspect_preprod` reads Koios. Agents build unsigned txs. Wallets sign. See docs/DUAL_STACK.md and docs/TESTNET_STATUS.md.

@@ -27,6 +27,8 @@ import { genesisOutRef, genesisScriptRoot } from "./genesis";
 import { POLICIES } from "../cardano/types";
 import { BIOREGIONS, VALIDATOR_CATALOG } from "./data";
 import { identityDidDocument } from "./did";
+import { canonicalTool, rewriteArgs } from "./aliases";
+import { inspectPreprod } from "./chain";
 import { assertContract, contractFor, TOOL_CONTRACTS } from "./contracts";
 
 export type TalkRole = "you" | "agent" | "tool";
@@ -46,6 +48,8 @@ export type TalkMsg = {
 };
 
 export type AgentSnapshot = {
+  ledger: "demo-wasm";
+  signing: "in-tab-demo — production: unsigned CBOR, wallet signs, chain is law";
   status: EngineState["status"];
   wasmReady: boolean;
   slot: number;
@@ -107,6 +111,15 @@ export const AGENT_TOOLS = [
     function: {
       name: "inspect_validators",
       description: "List the sealed Aiken validators this node will execute. Genesis-parameterized; not upgradable.",
+      parameters: { type: "object", properties: {}, additionalProperties: false },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "inspect_preprod",
+      description:
+        "Read Cardano preprod (Koios). Confirms the documented pNFT mint. Does not submit. Production signing is the wallet, not this agent.",
       parameters: { type: "object", properties: {}, additionalProperties: false },
     },
   },
@@ -348,6 +361,8 @@ export function newMsg(partial: Omit<TalkMsg, "id">): TalkMsg {
 
 export function snapshot(state: EngineState): AgentSnapshot {
   return {
+    ledger: "demo-wasm",
+    signing: "in-tab-demo — production: unsigned CBOR, wallet signs, chain is law",
     status: state.status,
     wasmReady: state.wasmReady,
     slot: Math.floor(state.slot),
@@ -417,7 +432,18 @@ export async function executeTool(
   onTick: (s: EngineState) => void,
 ): Promise<ToolResult> {
   const before = state;
+  const incoming = name;
+  args = rewriteArgs(incoming, args);
+  name = canonicalTool(incoming);
   switch (name) {
+    case "inspect_preprod": {
+      const report = await inspectPreprod();
+      return {
+        ok: report.ok,
+        summary: JSON.stringify(report),
+        next: state,
+      };
+    }
     case "inspect_state": {
       const snap = snapshot(state);
       return {

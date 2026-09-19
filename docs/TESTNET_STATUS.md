@@ -1,8 +1,41 @@
 # UltraLife Protocol: Testnet Status
 
-**Network:** Cardano Preprod
-**Last Updated:** 2026-02-01
-**Status:** Live - 34 validators deployed, pNFT minting operational
+**Network:** Cardano Preprod  
+**Last verified:** 2026-09-18 (Koios tip epoch 314, Conway, block ~5,193,806)  
+**Status:** Partial — one pNFT mint is alive on preprod. This is not mainnet. Agents do not sign.
+
+---
+
+## What is actually on chain
+
+Verified 2026-09-18 against `https://preprod.koios.rest`:
+
+| Fact | Value |
+|------|--------|
+| pNFT id | `pnft_ml361rj3_dcb6eb37787234c8` |
+| Policy | `7c9f5578c7d5815c89af5d4f4635b2aa390e3ed06facdb3ecf9971fc` |
+| Fingerprint | `asset1zqpf9a550pddcwa3t0tzjwgmdjgc2jgx5ylaxm` |
+| Mint tx | `959f5ba634a5fc5f0d9072c4b26c78536f7ec130689489233a3aa9aff8bfe51d` |
+| Minted | 2026-02-01T03:14:10Z · block 4,379,169 · epoch 268 |
+| Still present | **yes** (output still carries the asset) |
+| Explorer | https://preprod.cardanoscan.io/transaction/959f5ba634a5fc5f0d9072c4b26c78536f7ec130689489233a3aa9aff8bfe51d |
+
+Do not claim “34 validators live and busy” without a fresh UTxO query per script. The February 2026 deploy table below is **historical**. Re-run `inspect_preprod` / Koios before telling a human the chain is operating.
+
+## Two ledgers (do not mix them up)
+
+| Surface | Ledger | Signs? |
+|---------|--------|--------|
+| [ultralife-node](https://github.com/ryanultralife/ultralife-node) WASM tab | `demo-wasm` | In-tab demo keys. Rehearsal. |
+| `service/` MCP + `scripts/` | Cardano preprod | **Unsigned CBOR.** Wallet signs. Chain is law. |
+
+Tool names are unified: `build_mint_pnft` → `mint_pnft`, `post_job` → `list_job`, `bid` → `bid_job`. See `docs/DUAL_STACK.md`.
+
+## Security split
+
+LLM / Grok bot: read chain, build intent, never hold production keys.  
+Wallet: signs.  
+Aiken validators: law.
 
 ---
 

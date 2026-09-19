@@ -3,6 +3,8 @@ import { TOOL_CONTRACTS } from "./contracts";
 import { VALIDATOR_CATALOG } from "./data";
 import { identityDidDocument, protocolDid, protocolDidDocument } from "./did";
 import { genesisOutRef, genesisScriptRoot } from "./genesis";
+import { TOOL_ALIASES } from "./aliases";
+import { PREPROD } from "./chain";
 import { AGENT_TOOLS, executeTool, snapshot } from "./tools";
 
 type Session = { state: EngineState; inbound: { t: number; name: string; ok: boolean; summary: string }[] };
@@ -91,6 +93,9 @@ Bioregion stake pools verify UltraLife transactions (this WASM core, Gerolamo, o
 ## State
 eUTxO is one-shot. Do not batch. Each identity, listing, job, and pool is its own UTxO. Genesis and bioregion oracles are reference inputs. Hydra is the high-frequency lane.
 
+## Ledger
+This node is demo-wasm. inspect_preprod reads Cardano preprod (Koios). Agents build; wallets sign; chain is law. MCP names from service/ (build_mint_pnft, post_job, bid) alias onto these tools.
+
 ## Tools
 Call POST ${origin}/api/protocol
 {"op":"tools/call","name":"<tool>","arguments":{}}
@@ -140,6 +145,15 @@ export async function handleProtocol(request: Request): Promise<Response> {
       tools: AGENT_TOOLS.map((t) => t.function),
       validators: VALIDATOR_CATALOG,
       genesis: { outRef: genesisOutRef(), scriptRoot: genesisScriptRoot(), upgrade: "none" },
+      ledger: "demo-wasm",
+      signing: "in-tab-demo — production: unsigned CBOR, wallet signs, chain is law",
+      preprod: {
+        network: PREPROD.network,
+        pnft: PREPROD.pnft,
+        explorer: `${PREPROD.explorer}/transaction/${PREPROD.pnft.tx}`,
+        inspect: "tools/call inspect_preprod",
+      },
+      aliases: TOOL_ALIASES,
       snapshot: snapshot(sess.state),
       inbound: sess.inbound.slice(0, 8),
     });

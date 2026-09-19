@@ -38,6 +38,13 @@ export const TOOL_CONTRACTS: Record<string, ToolContract> = {
     nested: [],
     requires: [],
   },
+  inspect_preprod: {
+    name: "inspect_preprod",
+    intent: "read",
+    scripts: [],
+    nested: [],
+    requires: [],
+  },
   prove_seal: {
     name: "prove_seal",
     intent: "read",

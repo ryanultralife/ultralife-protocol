@@ -77,6 +77,8 @@ Built on Cardano eUTxO • 34 Aiken Validators • LLM Interface • Users trans
 | [Local State](docs/LOCAL_STATE.md) | Per-UTxO listings/jobs/pools; Hydra verifier paid in ULTRA |
 | [Genesis Seal](docs/GENESIS_SEAL.md) | Parameterized scripts, reference-only genesis NFT |
 | [Agent Discovery](docs/AGENT_DISCOVERY.md) | How any LLM finds and operates the protocol |
+| [Dual stack](docs/DUAL_STACK.md) | One tool list: demo-wasm rehearsal + preprod unsigned CBOR |
+
 
 
 ---

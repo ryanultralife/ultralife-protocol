@@ -40,6 +40,7 @@ export function planTools(text: string, snap: AgentSnapshot): ToolCall[] {
 
   if (wantsInspect) calls.push({ name: "inspect_state", args: {} });
   if (any(t, ["did", "who am i", "my identity"])) calls.push({ name: "resolve_did", args: {} });
+  if (any(t, ["preprod", "on chain", "cardanoscan", "is it live"])) calls.push({ name: "inspect_preprod", args: {} });
   if (wantsSeal) {
     calls.push({ name: "inspect_genesis", args: {} });
     calls.push({ name: "prove_seal", args: {} });
@@ -114,9 +115,15 @@ function withPrereqs(goal: ToolCall[], snap: AgentSnapshot): ToolCall[] {
   const out: ToolCall[] = [];
   const needLedger = goal.some(
     (c) =>
-      !["inspect_state", "inspect_genesis", "prove_seal", "inspect_validators", "inspect_pools", "resolve_did"].includes(
-        c.name,
-      ),
+      ![
+        "inspect_state",
+        "inspect_genesis",
+        "prove_seal",
+        "inspect_validators",
+        "inspect_pools",
+        "resolve_did",
+        "inspect_preprod",
+      ].includes(c.name),
   );
   if (needLedger && snap.status !== "ready") out.push({ name: "boot_node", args: {} });
   const needWallet = goal.some((c) =>
