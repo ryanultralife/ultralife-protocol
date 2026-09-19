@@ -41,6 +41,8 @@ Cases (all must hold, ledger unchanged):
 
 This is rehearsal. Passing it does **not** mean preprod is safe.
 
+**Morning runbook:** [MORNING_PREPROD.md](MORNING_PREPROD.md). Recon (no keys): `cd scripts && npm run red-team:recon`.
+
 ## What to attack on preprod (burner only)
 
 Need: throwaway mnemonic, faucet ADA, Blockfrost preprod key. **Not** in git, **not** in chat, **not** in the protocol bot.

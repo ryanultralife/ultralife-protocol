@@ -49,6 +49,8 @@
     "show:address": "node show-wallet-address.mjs",
     "setup": "node setup-testnet.mjs",
     "setup:generate": "node setup-testnet.mjs --generate-wallet",
+    "red-team:recon": "node red-team-recon.mjs",
+    "red-team:preprod": "node red-team-preprod.mjs",
     "register:bioregion": "node register-bioregion-pool.mjs",
     "register:pool:sierra-a": "node register-bioregion-pool.mjs --bioregion sierra_nevada --ticker SNA",
     "register:pool:pacific-nw": "node register-bioregion-pool.mjs --bioregion pacific_northwest --ticker PNW",

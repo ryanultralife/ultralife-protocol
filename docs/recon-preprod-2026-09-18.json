@@ -1,0 +1,36 @@
+{
+  "when": "2026-09-19T04:28:25.016Z",
+  "network": "preprod",
+  "tip": {
+    "epoch": 314,
+    "block": 5193931,
+    "era": "Conway",
+    "absSlot": 134108857
+  },
+  "genesis": {
+    "configuredEndSlot": 131000000,
+    "endedByTime": true,
+    "note": "Aiken genesis.spend EndGenesis does not require a founder key — only slot >= genesis_end_slot (or steward/oracle/bioregion thresholds) plus an output with genesis_active=False. If a genesis UTxO is still active, a burner can try to close it. WASM node 'never spend genesis' is stricter than this validator."
+  },
+  "pnft": {
+    "id": "pnft_ml361rj3_dcb6eb37787234c8",
+    "policy": "7c9f5578c7d5815c89af5d4f4635b2aa390e3ed06facdb3ecf9971fc",
+    "fingerprint": "asset1zqpf9a550pddcwa3t0tzjwgmdjgc2jgx5ylaxm",
+    "mintTx": "959f5ba634a5fc5f0d9072c4b26c78536f7ec130689489233a3aa9aff8bfe51d",
+    "holder": "addr_test1qq7h5wjmrzndkgh72yccequa8hmmyl4zvun69s9f0tkkjj5e26dxj5xkkwfd3we2lak2wnn7f7rskcz97phn7wt3ly0qtvtzzc",
+    "utxo": {
+      "tx": "959f5ba634a5fc5f0d9072c4b26c78536f7ec130689489233a3aa9aff8bfe51d",
+      "index": 0,
+      "stillMintOutput": true,
+      "hasInlineDatum": true,
+      "scriptLocked": false
+    },
+    "warning": "This pNFT sits at a payment key, not a script address. A burner cannot spend it (missing vkey). The *holder* wallet can send it like any native asset unless the mint policy forbids transfer. Do not load that mnemonic into the red-team .env."
+  },
+  "morning": {
+    "generateBurner": "cd scripts && npm run setup:generate   # NEW mnemonic. Abort if address equals holder.",
+    "faucet": "https://docs.cardano.org/cardano-testnets/tools/faucet/",
+    "recon": "npm run red-team:recon",
+    "attack": "npm run red-team:preprod -- --attack steal-pnft"
+  }
+}
