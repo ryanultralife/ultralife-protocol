@@ -15,6 +15,7 @@ import {
   openHydraHead,
   poolVerify,
   proveGenesisSeal,
+  runRedTeam,
   recordImpact,
   registerLand,
   registerPool,
@@ -103,6 +104,15 @@ export const AGENT_TOOLS = [
     function: {
       name: "prove_seal",
       description: "Attempt a mirror mint and a genesis spend. Both must fail. Does not change the ledger.",
+      parameters: { type: "object", properties: {}, additionalProperties: false },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "red_team",
+      description:
+        "Adversary suite against this WASM ledger: steal genesis, mirror ULTRA, ghost pNFT, Hydra without identity, singleton market. Attacks must fail. Does not mutate the ledger. Does not use keys. Not preprod.",
       parameters: { type: "object", properties: {}, additionalProperties: false },
     },
   },
@@ -442,6 +452,14 @@ export async function executeTool(
         ok: report.ok,
         summary: JSON.stringify(report),
         next: state,
+      };
+    }
+    case "red_team": {
+      const { cases, held, next } = runRedTeam(state);
+      return {
+        ok: held,
+        summary: JSON.stringify({ held, ledger: "demo-wasm", signing: "no keys used", cases }),
+        next,
       };
     }
     case "inspect_state": {

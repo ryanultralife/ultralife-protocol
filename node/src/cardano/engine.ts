@@ -1158,6 +1158,73 @@ export function walletUtxos(state: EngineState) {
   return state.utxos.filter((u) => u.address === state.wallet!.address);
 }
 
+export type RedTeamCase = {
+  id: string;
+  attack: string;
+  must: "fail" | "succeed";
+  ok: boolean;
+  reason: string;
+};
+
+/** Adversary suite. Must not mutate the ledger. Local CEK only — not preprod. */
+export function runRedTeam(state: EngineState): { cases: RedTeamCase[]; held: boolean; next: EngineState } {
+  const hasPnft = Boolean(state.pnft);
+  const seal = genesisIntact(state);
+  const cases: RedTeamCase[] = [];
+
+  const shot = (
+    id: string,
+    attack: string,
+    must: "fail" | "succeed",
+    script: string,
+    redeemer: unknown,
+    ctx: Record<string, unknown>,
+  ) => {
+    const r = runCek(script, redeemer, ctx);
+    const passed = must === "fail" ? !r.ok : r.ok;
+    cases.push({ id, attack, must, ok: passed, reason: r.reason ?? (r.ok ? "cek allowed" : "cek rejected") });
+  };
+
+  shot("A1", "spend genesis UTxO", "fail", "genesis.genesis.spend", { op: "steal" }, {
+    intent: "steal-genesis", spendingGenesis: true, genesisSeal: true, scriptsNeedSeal: true, hasPnft,
+  });
+  shot("A2", "mint ULTRA under a mirror policy", "fail", "token.token_policy.mint", { ticker: "ULTRA" }, {
+    intent: "clone-ultra", genesisSeal: false, scriptsNeedSeal: true, mintPolicies: [FAKE_MIRROR_POLICY], hasPnft,
+  });
+  shot("A3", "mint pNFT with no genesis seal", "fail", "pnft.pnft_policy.mint", { level: "Basic" }, {
+    intent: "ghost-identity", genesisSeal: false, scriptsNeedSeal: true, mintPolicies: [POLICIES.pnft], hasPnft: false,
+  });
+  shot("A4", "open Hydra without pNFT termination", "fail", "ultralife_validator.ultralife_validator.spend", { op: "verify" }, {
+    intent: "l2-orphan", genesisSeal: true, scriptsNeedSeal: true, hasPnft: false,
+  });
+  shot("A5", "register pool without identity", "fail", "stake_pool.stake_pool.spend", { op: "register" }, {
+    intent: "ghost-pool", genesisSeal: true, scriptsNeedSeal: true, hasPnft: false,
+  });
+  shot("A6", "canonical ULTRA mint with seal + pNFT", "succeed", "token.token_policy.mint", { ticker: "ULTRA" }, {
+    intent: "mint-ultra", genesisSeal: seal, scriptsNeedSeal: true, mintPolicies: [POLICIES.ultra], hasPnft,
+  });
+
+  const listings = state.utxos.filter((u) => u.address === SCRIPT_ADDRESS.marketplace);
+  cases.push({
+    id: "A7",
+    attack: "marketplace is sharded (no singleton batcher UTxO)",
+    must: "succeed",
+    ok: listings.length !== 1 || (listings[0]?.datum as { listed?: string } | undefined)?.listed !== undefined,
+    reason:
+      listings.length <= 1
+        ? `${listings.length} market UTxO(s) — listing-shaped is ok; a nameless singleton is a bug`
+        : `${listings.length} listing UTxOs (local state)`,
+  });
+
+  const held = cases.every((c) => c.ok);
+  let next = state;
+  for (const c of cases) {
+    next = log(next, c.ok ? "cek" : "warn", `${c.id} ${c.must === "fail" ? "ATTACK" : "INVARIANT"} ${c.ok ? "held" : "BROKEN"} — ${c.attack}. ${c.reason}`);
+  }
+  next = log(next, held ? "info" : "warn", held ? `Red team: ${cases.length} cases held. Ledger unchanged.` : "Red team: an invariant broke. Do not ship.");
+  return { cases, held, next };
+}
+
 /** Demonstrate that a mirrored policy cannot mint or steal. Does not mutate the ledger. */
 export function proveGenesisSeal(state: EngineState): EngineState {
   const steal = runCek(

@@ -54,7 +54,7 @@ market / jobs / pools.
 ## Tools (agent surface)
 
 `inspect_preprod`, `inspect_state`, `inspect_genesis`, `inspect_validators`, `inspect_pools`,
-`prove_seal`, `resolve_did`, `boot_node`, `create_wallet`, `mint_pnft`,
+`prove_seal`, `red_team`, `resolve_did`, `boot_node`, `create_wallet`, `mint_pnft`,
 `list_offering`, `buy_offering`, `list_job`, `bid_job`, `register_pool`,
 `delegate_ultra`, `claim_pool_rewards`, `open_hydra`, `pool_verify`,
 `claim_ubi`, `record_impact`, `register_land`.
@@ -78,3 +78,5 @@ Each tool maps to named validators in `src/lib/protocol/contracts.ts` of
 ## Ledger honesty
 
 `ultralife-node` is demo-wasm. Preprod is Cardano. `inspect_preprod` reads Koios. Agents build unsigned txs. Wallets sign. See docs/DUAL_STACK.md and docs/TESTNET_STATUS.md.
+
+Never give agents founder/treasury keys. See docs/RED_TEAM.md.

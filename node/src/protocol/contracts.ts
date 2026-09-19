@@ -45,6 +45,13 @@ export const TOOL_CONTRACTS: Record<string, ToolContract> = {
     nested: [],
     requires: [],
   },
+  red_team: {
+    name: "red_team",
+    intent: "read",
+    scripts: [],
+    nested: [],
+    requires: [],
+  },
   prove_seal: {
     name: "prove_seal",
     intent: "read",
