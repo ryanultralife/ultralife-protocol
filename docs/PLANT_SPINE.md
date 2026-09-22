@@ -11,6 +11,7 @@ Module: `lib/ultralife/control.ak` (`ultralife/control`). Aiken only compiles li
 ```
 RecordSchema = Hire | Credential | Task | Run | LotLink | ClaimLink
              | Witness | Reveal | MerkleRoot | ShiftClose | InvoiceHash
+             | TagEvent
 ```
 
 `Witness` is the ControlAttest row. The live witness itself is `Attest(ControlAttest)`, which Produce and Transfer reference.
@@ -28,6 +29,8 @@ RecordDatum {
 Keys never sit in datums. `RevealRecord` writes `schema=Reveal`, `seal=None`, and has no plaintext argument. GDPR erase revokes keys. The lineage stays.
 
 `PostRecord` refuses Reveal, MerkleRoot, and Witness. Those have their own redeemers: `RevealRecord`, `PostMerkleRoot`, `AttestControl`.
+
+`TagEvent` is a crystal-compute interaction. `subject` is the operator lapel. `asset` is the tag on the separator, door, or other machine. Both are required. The lapel is the biometric KYC. See `docs/CRYSTAL_TAG.md`.
 
 ## ControlBlock
 

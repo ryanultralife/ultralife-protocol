@@ -79,7 +79,7 @@ Read `docs/PLANT_SPINE.md`, `docs/PRE_EDF_RAISE.md`, and `docs/TWO_BIOREGIONS.md
 `list_offering`, `buy_offering`, `list_job`, `bid_job`, `register_pool`,
 `delegate_ultra`, `claim_pool_rewards`, `open_hydra`, `pool_verify`,
 `claim_ubi`, `record_impact`, `register_land`,
-`post_record`, `reveal_record`, `post_merkle_root`, `attest_control`,
+`log_interaction`, `post_record`, `reveal_record`, `post_merkle_root`, `attest_control`,
 `presale_grant`, `presale_offtake`, `close_ticket`, `inspect_tickets`.
 
 Each tool maps to named validators in `src/lib/protocol/contracts.ts` of

@@ -80,6 +80,7 @@ Built on Cardano eUTxO • 34 Aiken Validators • LLM Interface • Users trans
 | [Pre-EDF raise](docs/PRE_EDF_RAISE.md) | $20M as WorkTickets: sleeves, waterfall, refund, seniority |
 | [Two bioregions](docs/TWO_BIOREGIONS.md) | Intec site and Reno-TRIC. Shared ULTRA, separate control |
 | [Washington direction](docs/WASHINGTON_DIRECTION.md) | What we are asking SEC and BIS. Drafts only. Ryan sends |
+| [Crystal tag](docs/CRYSTAL_TAG.md) | Lapel and machine tags. Every door, separator, and check logs here |
 | [Agent Discovery](docs/AGENT_DISCOVERY.md) | How any LLM finds and operates the protocol |
 | [Dual stack](docs/DUAL_STACK.md) | One tool list: demo-wasm rehearsal + preprod unsigned CBOR |
 | [Red team](docs/RED_TEAM.md) | No operational keys to bots. Burner-only. `red_team` tool |

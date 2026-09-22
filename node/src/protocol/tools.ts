@@ -40,6 +40,7 @@ import {
   closeGrant,
   issueGrant,
   issueOfftake,
+  logInteraction,
   merkleSpine,
   postSpine,
   revealSpine,
@@ -299,6 +300,26 @@ export const AGENT_TOOLS = [
           patient: { type: "string" },
         },
         required: ["lotId", "patient"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "log_interaction",
+      description:
+        "Log a man-and-machine interaction. personTag is the operator lapel (biometric KYC). machineTag is the crystal compute tag on the separator, door, or other asset. The payload is hashed. The waveform stays on the crystal.",
+      parameters: {
+        type: "object",
+        properties: {
+          personTag: { type: "string" },
+          machineTag: { type: "string" },
+          kind: { type: "string", enum: ["Enroll", "Access", "Operate", "Check"] },
+          collective: { type: "string" },
+          bioregion: { type: "string" },
+          payload: { type: "string" },
+        },
+        required: ["personTag", "machineTag", "kind"],
       },
     },
   },
@@ -810,6 +831,26 @@ export async function executeTool(
         before,
         await administerDose(state, String(args.lotId ?? ""), String(args.patient ?? "")),
         "Dose administered. Lot no longer transferable.",
+      );
+    }
+    case "log_interaction": {
+      const kind = String(args.kind ?? "Check");
+      if (kind !== "Enroll" && kind !== "Access" && kind !== "Operate" && kind !== "Check") {
+        return { ok: false, summary: "kind is Enroll, Access, Operate, or Check.", next: state };
+      }
+      const logged = logInteraction(state.plant, state.slot, {
+        personTag: String(args.personTag ?? ""),
+        machineTag: String(args.machineTag ?? ""),
+        kind,
+        collective: String(args.collective ?? "collective_intec"),
+        bioregion: String(args.bioregion ?? "intec-site"),
+        payload: String(args.payload ?? ""),
+      });
+      if (!logged.ok) return { ok: false, summary: logged.error, next: state };
+      return fromEngine(
+        before,
+        await commitPlant(state, "log-interaction", ["records.records.spend", "biometric.identity.spend"], logged.plant),
+        `${kind} ${logged.id}. Lapel and machine tag committed. Waveform stayed on the crystal.`,
       );
     }
     case "post_record": {

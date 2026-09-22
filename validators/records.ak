@@ -21,8 +21,9 @@ use cardano/transaction.{
 use ultralife/prc37.{current_cycle, cycle_end}
 use aiken/primitive/bytearray
 use ultralife/control.{
-  ControlAttest, MerkleRoot, RecordDatum, Reveal, Witness,
+  ControlAttest, MerkleRoot, RecordDatum, Reveal, TagEvent, Witness,
 }
+use ultralife/crystal_tag.{interaction_ok}
 use ultralife/types.{
   Attest, AvatarCycleStats, AvatarStats, BioregionCycleStats, BioregionStats,
   Plant, Record, RecordsDatum, TransactionRecord, impact_sign, tx_type_code,
@@ -335,7 +336,9 @@ fn validate_finalize_cycle(
 // =============================================================================
 
 fn validate_post_record(tx: Transaction, record: RecordDatum) -> Bool {
-  record.schema != Reveal && record.schema != MerkleRoot && record.schema != Witness && spine_ok(
+  record.schema != Reveal && record.schema != MerkleRoot && record.schema != Witness && tag_event_ok(
+    record,
+  ) && spine_ok(
     tx,
     record,
   ) && plant_written(tx, record)
@@ -365,6 +368,16 @@ fn validate_attest(tx: Transaction, attest: ControlAttest) -> Bool {
     tx,
     attest,
   )
+}
+
+fn tag_event_ok(record: RecordDatum) -> Bool {
+  when record.schema is {
+    TagEvent -> {
+      expect Some(machine) = record.asset
+      interaction_ok(record.subject, machine)
+    }
+    _ -> True
+  }
 }
 
 fn spine_ok(tx: Transaction, record: RecordDatum) -> Bool {

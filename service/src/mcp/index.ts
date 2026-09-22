@@ -261,6 +261,7 @@ export class UltraLifeMcpServer {
       case 'estimate_composed_fees':
         return this.estimateComposedFees(args);
 
+      case 'log_interaction':
       case 'post_record':
       case 'reveal_record':
       case 'post_merkle_root':

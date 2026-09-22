@@ -48,4 +48,5 @@ claim_ubi, record_impact, register_land
 
 First token: medical isotope lots. presale_isotope, convert_isotope, transfer_isotope, administer_dose, inspect_isotopes
 Plant spine: post_record, reveal_record, post_merkle_root, attest_control, presale_grant, presale_offtake, close_ticket, inspect_tickets
+Crystal tag (man and machine, biometric KYC on the lapel): log_interaction. See docs/CRYSTAL_TAG.md
 Washington direction (draft only, do not send): docs/WASHINGTON_DIRECTION.md

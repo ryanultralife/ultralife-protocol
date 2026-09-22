@@ -132,6 +132,13 @@ export const TOOL_CONTRACTS: Record<string, ToolContract> = {
     nested: [],
     requires: ["ready", "wallet", "pnft"],
   },
+  log_interaction: {
+    name: "log_interaction",
+    intent: "log-interaction",
+    scripts: ["records.records.spend", "biometric.identity.spend"],
+    nested: [],
+    requires: ["ready", "wallet", "pnft"],
+  },
   post_record: {
     name: "post_record",
     intent: "post-record",

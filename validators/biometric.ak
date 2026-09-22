@@ -3,6 +3,13 @@
 //
 // Manages biometric identity registration and authentication gates.
 // Raw biometric data NEVER appears on-chain. Only hashes and confidence scores.
+//
+// The device is a crystal compute tag. A person wears the 25mm lapel crystal.
+// That lapel is the biometric KYC: enrollment_hash is the waveform hash,
+// device_pubkey is the crystal's key. A machine (separator, door, access
+// point) carries the same class of tag. It has no body waveform. Its
+// enrollment_hash is the crystal's own mount fingerprint. Interactions
+// between the two are TagEvent records, not this datum.
 
 use aiken/crypto.{Blake2b_256, Hash, Signature, VerificationKey, blake2b_256, verify_ed25519_signature}
 use aiken/interval.{Finite}

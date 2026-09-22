@@ -49,7 +49,8 @@ export type SpineSchema =
   | "Reveal"
   | "MerkleRoot"
   | "ShiftClose"
-  | "InvoiceHash";
+  | "InvoiceHash"
+  | "TagEvent";
 
 export type SpineRecord = {
   id: string;
@@ -201,6 +202,9 @@ export function postSpine(
   },
 ): { ok: true; plant: PlantState; id: string } | { ok: false; error: string } {
   const allowed: SpineSchema[] = ["Hire", "Credential", "Task", "Run", "LotLink", "ClaimLink", "ShiftClose", "InvoiceHash"];
+  if (input.schema === "TagEvent") {
+    return { ok: false, error: "Tag events use log_interaction so both the lapel and the machine tag are named." };
+  }
   if (!allowed.includes(input.schema as SpineSchema)) {
     return { ok: false, error: "Use reveal_record, post_merkle_root, or attest_control for that schema." };
   }
@@ -332,6 +336,42 @@ export function closeGrant(
       feePool: { ...plant.feePool, ultra: plant.feePool.ultra + (ticket.feeSkimBps > 0 ? 1 : 0) },
     },
   };
+}
+
+export type TagKind = "Enroll" | "Access" | "Operate" | "Check";
+
+export function logInteraction(
+  plant: PlantState,
+  slot: number,
+  input: {
+    personTag: string;
+    machineTag: string;
+    kind: TagKind;
+    collective: string;
+    bioregion: string;
+    payload: string;
+  },
+): { ok: true; plant: PlantState; id: string } | { ok: false; error: string } {
+  const person = input.personTag.trim();
+  const machine = input.machineTag.trim();
+  if (!person || !machine || person === machine) {
+    return { ok: false, error: "Every interaction names a lapel tag and a different machine tag." };
+  }
+  if (!input.collective || !input.bioregion) {
+    return { ok: false, error: "collective and bioregion are required." };
+  }
+  const id = `tag_${input.kind.toLowerCase()}_${slot}`;
+  const record: SpineRecord = {
+    id,
+    schema: "TagEvent",
+    collective: input.collective,
+    bioregion: input.bioregion,
+    asset: machine,
+    subject: person,
+    commit: commitOf(`${input.kind}|${person}|${machine}|${input.payload}`),
+    slot,
+  };
+  return { ok: true, id, plant: { ...plant, records: [...plant.records, record] } };
 }
 
 export function commitOf(payload: string) {

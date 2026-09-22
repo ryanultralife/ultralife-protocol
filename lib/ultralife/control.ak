@@ -54,6 +54,8 @@ pub type RecordSchema {
   MerkleRoot
   ShiftClose
   InvoiceHash
+  /// Crystal-compute tag interaction. Subject is the lapel. Asset is the machine tag.
+  TagEvent
 }
 
 pub type RecordAuth {
