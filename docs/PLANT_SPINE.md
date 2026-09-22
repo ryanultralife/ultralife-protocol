@@ -30,7 +30,7 @@ Keys never sit in datums. `RevealRecord` writes `schema=Reveal`, `seal=None`, an
 
 `PostRecord` refuses Reveal, MerkleRoot, and Witness. Those have their own redeemers: `RevealRecord`, `PostMerkleRoot`, `AttestControl`.
 
-`TagEvent` is a crystal-compute interaction. `subject` is the operator lapel. `asset` is the tag on the separator, door, or other machine. Both are required. The lapel is the biometric KYC. See `docs/CRYSTAL_TAG.md`.
+`TagEvent` is a crystal-compute interaction. `subject` is the operator lapel. `asset` is the tag on the separator, door, or other machine. `prev` is the enrolled waveform. `seal` is the live waveform from that pass. See `docs/CRYSTAL_TAG.md`.
 
 ## ControlBlock
 

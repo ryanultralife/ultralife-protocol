@@ -308,18 +308,20 @@ export const AGENT_TOOLS = [
     function: {
       name: "log_interaction",
       description:
-        "Log a man-and-machine interaction. personTag is the operator lapel (biometric KYC). machineTag is the crystal compute tag on the separator, door, or other asset. The payload is hashed. The waveform stays on the crystal.",
+        "Log a man-and-machine interaction. personTag is the operator lapel. machineTag is the crystal on the separator, door, or other asset. waveform is the operator's live reading. enrollment is the lapel's enrolled waveform. The log stores both hashes. The samples are not a public field.",
       parameters: {
         type: "object",
         properties: {
           personTag: { type: "string" },
           machineTag: { type: "string" },
           kind: { type: "string", enum: ["Enroll", "Access", "Operate", "Check"] },
+          waveform: { type: "string", description: "Operator's live waveform from the lapel crystal." },
+          enrollment: { type: "string", description: "Lapel enrollment waveform, or its 32-byte hash." },
           collective: { type: "string" },
           bioregion: { type: "string" },
           payload: { type: "string" },
         },
-        required: ["personTag", "machineTag", "kind"],
+        required: ["personTag", "machineTag", "kind", "waveform", "enrollment"],
       },
     },
   },
@@ -845,12 +847,14 @@ export async function executeTool(
         collective: String(args.collective ?? "collective_intec"),
         bioregion: String(args.bioregion ?? "intec-site"),
         payload: String(args.payload ?? ""),
+        waveform: String(args.waveform ?? ""),
+        enrollment: String(args.enrollment ?? ""),
       });
       if (!logged.ok) return { ok: false, summary: logged.error, next: state };
       return fromEngine(
         before,
         await commitPlant(state, "log-interaction", ["records.records.spend", "biometric.identity.spend"], logged.plant),
-        `${kind} ${logged.id}. Lapel and machine tag committed. Waveform stayed on the crystal.`,
+        `${kind} ${logged.id}. Lapel, machine tag, and the operator's waveform hash are in the log.`,
       );
     }
     case "post_record": {

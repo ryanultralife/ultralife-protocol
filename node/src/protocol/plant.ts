@@ -350,15 +350,27 @@ export function logInteraction(
     collective: string;
     bioregion: string;
     payload: string;
+    waveform: string;
+    enrollment: string;
   },
 ): { ok: true; plant: PlantState; id: string } | { ok: false; error: string } {
   const person = input.personTag.trim();
   const machine = input.machineTag.trim();
+  const waveform = input.waveform.trim();
+  const enrollment = input.enrollment.trim();
   if (!person || !machine || person === machine) {
     return { ok: false, error: "Every interaction names a lapel tag and a different machine tag." };
   }
+  if (!waveform || !enrollment) {
+    return { ok: false, error: "The lapel log needs the operator's live waveform and the enrolled waveform." };
+  }
   if (!input.collective || !input.bioregion) {
     return { ok: false, error: "collective and bioregion are required." };
+  }
+  const live = commitOf(waveform);
+  const enrolled = enrollment.length === 64 ? enrollment : commitOf(enrollment);
+  if (live === enrolled) {
+    return { ok: false, error: "Live waveform matches enrollment. That is a replay, not a new reading." };
   }
   const id = `tag_${input.kind.toLowerCase()}_${slot}`;
   const record: SpineRecord = {
@@ -368,7 +380,9 @@ export function logInteraction(
     bioregion: input.bioregion,
     asset: machine,
     subject: person,
-    commit: commitOf(`${input.kind}|${person}|${machine}|${input.payload}`),
+    prev: enrolled,
+    seal: live,
+    commit: commitOf(`${input.kind}|${person}|${machine}|${live}|${input.payload}`),
     slot,
   };
   return { ok: true, id, plant: { ...plant, records: [...plant.records, record] } };

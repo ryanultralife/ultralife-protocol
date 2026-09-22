@@ -10,8 +10,10 @@
 // validators/biometric.ak. A machine has no body. Its tag is identified by
 // the crystal's own key, mounted on that asset.
 //
-// Every building interaction names both tags. UltraLife records are the
-// ingestion layer. The payload stays off the datum. The commit is the hash.
+// Every building interaction names both tags and the operator's live
+// waveform. UltraLife records are the ingestion layer. The samples stay
+// off the public datum. The log keeps the live hash and the lapel's
+// enrollment hash, and they must differ.
 
 use aiken/primitive/bytearray
 
@@ -32,9 +34,14 @@ pub fn interaction_ok(person: ByteArray, machine: ByteArray) -> Bool {
   bytearray.length(person) > 0 && bytearray.length(machine) > 0 && person != machine
 }
 
-/// KYC commit is 32 bytes. The waveform is not an argument.
+/// A waveform hash is 32 bytes.
 pub fn kyc_commit_ok(commit: ByteArray) -> Bool {
   bytearray.length(commit) == 32
+}
+
+/// Live lapel reading versus the enrolled waveform. Equal hashes are a replay.
+pub fn waveform_log_ok(live: ByteArray, enrolled: ByteArray) -> Bool {
+  kyc_commit_ok(live) && kyc_commit_ok(enrolled) && live != enrolled
 }
 
 test door_requires_lapel_and_door() {
@@ -59,4 +66,18 @@ test a_tag_cannot_witness_itself() {
 
 test kyc_commit_is_32_bytes() {
   kyc_commit_ok("0123456789abcdef0123456789abcdef") && kyc_commit_ok("short") == False
+}
+
+test live_waveform_must_differ_from_enrollment() {
+  waveform_log_ok(
+    "0123456789abcdef0123456789abcdef",
+    "fedcba9876543210fedcba9876543210",
+  )
+}
+
+test replay_of_enrolled_waveform_is_refused() {
+  waveform_log_ok(
+    "0123456789abcdef0123456789abcdef",
+    "0123456789abcdef0123456789abcdef",
+  ) == False
 }

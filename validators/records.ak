@@ -23,7 +23,7 @@ use aiken/primitive/bytearray
 use ultralife/control.{
   ControlAttest, MerkleRoot, RecordDatum, Reveal, TagEvent, Witness,
 }
-use ultralife/crystal_tag.{interaction_ok}
+use ultralife/crystal_tag.{interaction_ok, waveform_log_ok}
 use ultralife/types.{
   Attest, AvatarCycleStats, AvatarStats, BioregionCycleStats, BioregionStats,
   Plant, Record, RecordsDatum, TransactionRecord, impact_sign, tx_type_code,
@@ -374,7 +374,9 @@ fn tag_event_ok(record: RecordDatum) -> Bool {
   when record.schema is {
     TagEvent -> {
       expect Some(machine) = record.asset
-      interaction_ok(record.subject, machine)
+      expect Some(enrolled) = record.prev
+      expect Some(live) = record.seal
+      interaction_ok(record.subject, machine) && waveform_log_ok(live, enrolled)
     }
     _ -> True
   }

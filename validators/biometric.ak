@@ -8,8 +8,8 @@
 // That lapel is the biometric KYC: enrollment_hash is the waveform hash,
 // device_pubkey is the crystal's key. A machine (separator, door, access
 // point) carries the same class of tag. It has no body waveform. Its
-// enrollment_hash is the crystal's own mount fingerprint. Interactions
-// between the two are TagEvent records, not this datum.
+// enrollment_hash is the crystal's own mount fingerprint. Each TagEvent
+// also logs the operator's live waveform hash against that enrollment.
 
 use aiken/crypto.{Blake2b_256, Hash, Signature, VerificationKey, blake2b_256, verify_ed25519_signature}
 use aiken/interval.{Finite}

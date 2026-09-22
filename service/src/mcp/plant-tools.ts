@@ -14,7 +14,7 @@ export const PLANT_TOOLS: Tool[] = [
   tool(
     "log_interaction",
     "Lapel tag plus machine tag. Biometric KYC stays on the crystal. UltraLife stores the hash.",
-    ["personTag", "machineTag", "kind"],
+    ["personTag", "machineTag", "kind", "waveform", "enrollment"],
   ),
   tool("post_record", "Hash a plant record. No PII in public fields.", ["schema", "collective", "bioregion", "subject", "payload"]),
   tool("reveal_record", "schema=Reveal. No plaintext argument.", ["recordId"]),
@@ -48,15 +48,20 @@ export function plantUnsigned(name: string, args: Record<string, unknown>) {
     if (!person || !machine || person === machine) {
       throw new Error("Every interaction names a lapel tag and a different machine tag.");
     }
+    if (!String(args.waveform ?? "").trim() || !String(args.enrollment ?? "").trim()) {
+      throw new Error("The lapel log needs the operator's live waveform and the enrolled waveform.");
+    }
   }
   if (name === "attest_control" && !args.destPolicy) {
     throw new Error("dest_policy is required and is not stripped.");
   }
+  const redeemerArgs = { ...args };
+  delete redeemerArgs.waveform;
   return {
     unsigned: true,
     signing: "wallet",
     scripts: SCRIPTS[name] ?? [],
-    redeemer: { op: name, ...args },
+    redeemer: { op: name, ...redeemerArgs },
     law: "validators/records.ak, validators/grants.ak, validators/isotope.ak, lib/ultralife/control.ak",
   };
 }

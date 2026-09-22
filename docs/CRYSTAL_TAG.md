@@ -10,7 +10,7 @@ The Resonance repo defines the device: a 25mm hexagonal crystal worn on a lapel.
 
 | Bearer | Where the tag sits | What KYC is |
 |---|---|---|
-| Person | Lapel | Biometric. The waveform is enrolled on the crystal. `validators/biometric.ak` stores the enrollment hash and the crystal's key. The waveform does not leave the device. |
+| Person | Lapel | Biometric. Each pass logs the live waveform hash next to the enrolled waveform hash. `validators/biometric.ak` keeps the samples off the public datum. |
 | Machine | Bolted to the asset | The crystal's own key and mount. A separator, a door, an access point, or any other machine. No body waveform. |
 
 A separator is a machine tag. Each vessel carries its own. Doors and access points carry their own. An operator does not badge in on a shared password. Moving through the building is the lapel coupling to the door tag.
@@ -30,8 +30,11 @@ The on-chain record is `RecordSchema.TagEvent` in `validators/records.ak`.
 
 - `subject` is the lapel tag.
 - `asset` is the machine tag.
-- `commit` is 32 bytes, `blake2b` of the payload and a nonce.
-- The payload is the inspection note, the door id in words, the separator state. It is not stored in the datum.
+- `prev` is the lapel's enrolled waveform hash.
+- `seal` is the operator's live waveform hash from this interaction.
+- `commit` binds the kind, both tags, and the live waveform hash.
+- The two waveform hashes must differ. A copy of the enrollment reading is a replay, the same rule as `validators/biometric.ak`.
+- The samples are not a public field. The log an operator checks is the pair of hashes.
 
 A tag cannot witness itself. A machine-only log, and a lapel with no machine, both fail.
 
