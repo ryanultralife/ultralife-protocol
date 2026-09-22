@@ -34,6 +34,8 @@ Cold sequence: boot → wallet → mint pNFT → then market / jobs / pools.
 ## Hard rules
 
 - **ULTRA** is the unit. Do not ask humans for ADA.
+- Restricted lots need a live ControlAttest. Do not strip `dest_policy`. Do not treat a pool ticker as a bioregion.
+- The pre-EDF $20M is WorkTickets plus SPV cash. Read `docs/PLANT_SPINE.md` before posting a record or a ticket.
 - pNFT is the DID: `did:ultralife:<id>`. One human, one identity.
 - Each listing, job, identity, and pool is its **own UTxO**. Do not batch
   global state into one output. See `docs/LOCAL_STATE.md`.

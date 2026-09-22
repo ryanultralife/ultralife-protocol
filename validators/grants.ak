@@ -11,9 +11,14 @@
 use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use cardano/address.{Script}
-use cardano/assets.{AssetName, PolicyId, flatten, quantity_of}
+use cardano/assets.{AssetName, PolicyId, lovelace_of, quantity_of}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
+}
+use aiken/interval.{Finite}
+use ultralife/control.{
+  Civil, Design, GrantNote, Hours, Machine, OfftakeClaim, Remediation, Rent,
+  control_well_formed,
 }
 use ultralife/types.{
   Basic, PnftDatum, Standard, Steward, VerificationLevel, Verified, Ward,
@@ -59,9 +64,25 @@ pub type ClaimRecord {
 // REDEEMER
 // =============================================================================
 
+pub type GrantsState {
+  /// Signup pool. Not the $20M raise.
+  Pool(GrantsDatum)
+  /// WorkTicket. Face is units * price. ULTRA is settlement, not NAV.
+  Ticket(GrantNote)
+  Offtake(OfftakeClaim)
+}
+
 pub type GrantsRedeemer {
   /// Claim signup grant (upon DNA verification)
   ClaimGrant { pnft: AssetName }
+  /// Represent SPV cash as a work ticket. Does not mint the raise as ULTRA.
+  IssueGrant { note: GrantNote }
+  /// Junior offtake. EDF later uses senior=true on a new claim.
+  IssueOfftake { claim: OfftakeClaim }
+  /// Missed refund_slot. Remaining units are void. Junior PreSold lots stay.
+  RefundGrant { ticket_id: ByteArray }
+  /// Close one unit against a plant record. Design and machine pay the prime bucket in ULTRA.
+  CloseTicket { ticket_id: ByteArray, record_id: ByteArray }
 }
 
 // =============================================================================
@@ -77,6 +98,12 @@ pub type GrantsConfig {
   pnft_policy: PolicyId,
   /// Claim record contract (prevents double claims)
   claim_records: ByteArray,
+  /// fee_pool script. Skim is ULTRA.
+  fee_pool: ByteArray,
+  /// Protocol-owned seed pool for this ticket's bioregion. Not an SPO ticker.
+  seed_pool: ByteArray,
+  /// Mechanical Battery spending bucket.
+  prime_bucket: ByteArray,
 }
 
 // =============================================================================
@@ -85,19 +112,191 @@ pub type GrantsConfig {
 
 validator grants(config: GrantsConfig) {
   spend(
-    datum: Option<GrantsDatum>,
+    datum: Option<GrantsState>,
     redeemer: GrantsRedeemer,
     own_ref: OutputReference,
     tx: Transaction,
   ) {
-    expect Some(d) = datum
     when redeemer is {
-      ClaimGrant { pnft } -> validate_claim(tx, d, pnft, config)
+      ClaimGrant { pnft } -> {
+        expect Some(Pool(d)) = datum
+        validate_claim(tx, d, pnft, config)
+      }
+      IssueGrant { note } -> validate_issue(tx, note, config)
+      IssueOfftake { claim } -> validate_offtake(tx, claim)
+      RefundGrant { ticket_id } -> validate_refund(tx, datum, ticket_id)
+      CloseTicket { ticket_id, record_id } ->
+        validate_close(tx, datum, ticket_id, record_id, config)
     }
   }
 
   else(_) {
     fail
+  }
+}
+
+fn validate_issue(tx: Transaction, note: GrantNote, config: GrantsConfig) -> Bool {
+  note.units > 0 && note.units_remaining == note.units && note.price > 0 && note.fee_skim_bps >= 0 && note.fee_skim_bps <= 10000 && note.cap_ada_exit_bps >= 0 && note.cap_ada_exit_bps <= 10000 && note.ticket_id != #"" && note.milestone_commit != #"" && ticket_written(
+    tx,
+    note,
+  ) && skim_and_seed(tx, note, config)
+}
+
+fn validate_offtake(tx: Transaction, claim: OfftakeClaim) -> Bool {
+  claim.qty > 0 && claim.qty_remaining == claim.qty && claim.claim_id != #"" && claim.window_end > claim.window_start && control_well_formed_claim(
+    claim,
+  ) && offtake_written(tx, claim)
+}
+
+fn validate_refund(
+  tx: Transaction,
+  datum: Option<GrantsState>,
+  ticket_id: ByteArray,
+) -> Bool {
+  expect Some(Ticket(note)) = datum
+  let slot = slot_of(tx)
+  expect note.ticket_id == ticket_id
+  expect slot >= note.refund_slot
+  expect note.units_remaining > 0
+  expect Some(next) = find_ticket(tx.outputs)
+  next.ticket_id == note.ticket_id && next.units_remaining == 0 && next.senior == note.senior && next.plant == note.plant && next.bioregion == note.bioregion
+}
+
+fn validate_close(
+  tx: Transaction,
+  datum: Option<GrantsState>,
+  ticket_id: ByteArray,
+  record_id: ByteArray,
+  config: GrantsConfig,
+) -> Bool {
+  expect Some(Ticket(note)) = datum
+  let slot = slot_of(tx)
+  expect note.ticket_id == ticket_id
+  expect record_id != #""
+  expect list.length(tx.reference_inputs) > 0
+  expect slot < note.refund_slot
+  expect note.units_remaining > 0
+  expect Some(next) = find_ticket(tx.outputs)
+  expect next.ticket_id == note.ticket_id && next.units_remaining == note.units_remaining - 1 && next.senior == note.senior
+  prime_paid(tx, note, config) && ada_cap(tx, note) && skim_and_seed(tx, note, config)
+}
+
+fn control_well_formed_claim(claim: OfftakeClaim) -> Bool {
+  control_well_formed(claim.control)
+}
+
+fn prime_paid(tx: Transaction, note: GrantNote, config: GrantsConfig) -> Bool {
+  when note.account is {
+    Design -> ultra_to(tx, config.prime_bucket, config, 1)
+    Machine -> ultra_to(tx, config.prime_bucket, config, 1)
+    Hours -> True
+    Civil -> True
+    Remediation -> True
+    Rent -> True
+  }
+}
+
+fn skim_and_seed(tx: Transaction, note: GrantNote, config: GrantsConfig) -> Bool {
+  let skim =
+    if note.fee_skim_bps == 0 {
+      True
+    } else {
+      ultra_to(tx, config.fee_pool, config, 1)
+    }
+  let seed =
+    if note.seed_lock_ultra == 0 {
+      True
+    } else {
+      ultra_to(tx, config.seed_pool, config, note.seed_lock_ultra)
+    }
+  skim && seed
+}
+
+fn ada_cap(tx: Transaction, note: GrantNote) -> Bool {
+  let paid = key_lovelace(tx.outputs)
+  ( paid * 10000 <= note.price * note.cap_ada_exit_bps ) || ( note.cap_ada_exit_bps == 0 && paid == 0 )
+}
+
+fn ultra_to(
+  tx: Transaction,
+  script: ByteArray,
+  config: GrantsConfig,
+  amount: Int,
+) -> Bool {
+  script != #"" && list.any(
+    tx.outputs,
+    fn(output) {
+      when output.address.payment_credential is {
+        Script(hash) ->
+          hash == script && quantity_of(
+            output.value,
+            config.token_policy,
+            config.token_name,
+          ) >= amount
+        _ -> False
+      }
+    },
+  )
+}
+
+fn key_lovelace(outputs: List<Output>) -> Int {
+  list.foldl(
+    outputs,
+    0,
+    fn(output, acc) {
+      when output.address.payment_credential is {
+        Script(_) -> acc
+        _ -> acc + lovelace_of(output.value)
+      }
+    },
+  )
+}
+
+fn ticket_written(tx: Transaction, note: GrantNote) -> Bool {
+  expect Some(written) = find_ticket(tx.outputs)
+  written == note
+}
+
+fn offtake_written(tx: Transaction, claim: OfftakeClaim) -> Bool {
+  list.any(
+    tx.outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect wrapped: GrantsState = data
+          when wrapped is {
+            Offtake(c) -> c == claim
+            _ -> False
+          }
+        }
+        _ -> False
+      }
+    },
+  )
+}
+
+fn find_ticket(outputs: List<Output>) -> Option<GrantNote> {
+  list.find_map(
+    outputs,
+    fn(output) {
+      when output.datum is {
+        InlineDatum(data) -> {
+          expect wrapped: GrantsState = data
+          when wrapped is {
+            Ticket(note) -> Some(note)
+            _ -> None
+          }
+        }
+        _ -> None
+      }
+    },
+  )
+}
+
+fn slot_of(tx: Transaction) -> Int {
+  when tx.validity_range.lower_bound.bound_type is {
+    Finite(s) -> s
+    _ -> 0
   }
 }
 

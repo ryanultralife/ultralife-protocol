@@ -274,6 +274,41 @@ export function escrowStatusReleased(releaseSlot) {
   };
 }
 
+const CONTROL_CLASS = { Unrestricted: 0, DualUse: 1, Medical: 2, Nuclear: 3, Other: 4 };
+const CRED_TYPE = {
+  PersonClass: 0,
+  EndUser: 1,
+  ExportLicense: 2,
+  ImportPermit: 3,
+  SanctionsScreen: 4,
+  FacilityClearance: 5,
+};
+
+export function controlBlock(raw = {}) {
+  const cls = raw.controlClass || raw.class || "Unrestricted";
+  const restricted = cls !== "Unrestricted";
+  const need = restricted
+    ? raw.controlNeed && raw.controlNeed.length
+      ? raw.controlNeed
+      : ["FacilityClearance", "SanctionsScreen", "ExportLicense"]
+    : [];
+  const dest = restricted ? raw.destPolicy || "intec-us" : "";
+  return {
+    constructor: 0,
+    fields: [
+      { constructor: CONTROL_CLASS[cls] ?? 4, fields: [] },
+      textBytes(dest),
+      { list: need.map((c) => ({ constructor: CRED_TYPE[c] ?? 0, fields: [] })) },
+      { int: Number(raw.qtyCap || 0) },
+      { list: (raw.issuers || []).map(textBytes) },
+    ],
+  };
+}
+
+export function optionText(value) {
+  return value ? { constructor: 0, fields: [textBytes(value)] } : { constructor: 1, fields: [] };
+}
+
 /**
  * WorkRequest fields in declaration order.
  */
@@ -294,6 +329,8 @@ export function workRequestFields(p) {
     { int: Number(p.workDeadline) },
     { int: Number(p.createdAt) },
     p.statusConstr || requestStatusOpen(),
+    controlBlock(p),
+    optionText(p.parentTicket),
   ];
 }
 
@@ -349,6 +386,8 @@ export function workEscrowFields(p) {
     { list: (p.requesterContentGrants || []).map(hexBytes) },
     { list: (p.workerContentGrants || []).map(hexBytes) },
     { list: (p.verificationUnlocks || []).map(hexBytes) },
+    controlBlock(p),
+    optionText(p.parentTicket),
   ];
 }
 
@@ -376,6 +415,8 @@ export function createRequestRedeemer(p) {
       { int: Number(p.workDeadline) },
       { list: (p.contentToShare || []).map(hexBytes) },
       { list: (p.expectedDeliverables || []).map(hexBytes) },
+      controlBlock(p),
+      optionText(p.parentTicket),
     ],
   };
 }

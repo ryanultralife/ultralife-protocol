@@ -19,9 +19,13 @@ use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
 }
 use ultralife/prc37.{current_cycle, cycle_end}
+use aiken/primitive/bytearray
+use ultralife/control.{
+  ControlAttest, MerkleRoot, RecordDatum, Reveal, Witness,
+}
 use ultralife/types.{
-  AvatarCycleStats, AvatarStats, BioregionCycleStats, BioregionStats, Record,
-  RecordsDatum, TransactionRecord, impact_sign, tx_type_code,
+  Attest, AvatarCycleStats, AvatarStats, BioregionCycleStats, BioregionStats,
+  Plant, Record, RecordsDatum, TransactionRecord, impact_sign, tx_type_code,
 }
 
 // =============================================================================
@@ -37,6 +41,14 @@ pub type RecordsRedeemer {
   AggregateBioregion { bioregion: ByteArray, cycle: Int }
   /// Finalize cycle stats (lock for UBI calculations)
   FinalizeCycle { cycle: Int }
+  /// Hash-only plant record. commit is blake2b(payload || nonce).
+  PostRecord { record: RecordDatum }
+  /// Opens a commitment as schema=Reveal. No plaintext argument.
+  RevealRecord { record_id: ByteArray }
+  /// L1 root of a Hydra shift. Payload stays off L1.
+  PostMerkleRoot { record: RecordDatum }
+  /// Live control witness. Produce / Transfer reference this UTxO.
+  AttestControl { attest: ControlAttest }
 }
 
 // =============================================================================
@@ -70,6 +82,10 @@ validator records(config: RecordsConfig) {
       AggregateBioregion { bioregion, cycle } ->
         validate_aggregate_bioregion(tx, bioregion, cycle, config)
       FinalizeCycle { cycle } -> validate_finalize_cycle(tx, cycle, config)
+      PostRecord { record } -> validate_post_record(tx, record)
+      RevealRecord { record_id } -> validate_reveal(tx, datum, record_id)
+      PostMerkleRoot { record } -> validate_merkle(tx, record)
+      AttestControl { attest } -> validate_attest(tx, attest)
     }
   }
 
@@ -317,6 +333,86 @@ fn validate_finalize_cycle(
 // =============================================================================
 // HELPERS
 // =============================================================================
+
+fn validate_post_record(tx: Transaction, record: RecordDatum) -> Bool {
+  record.schema != Reveal && record.schema != MerkleRoot && record.schema != Witness && spine_ok(
+    tx,
+    record,
+  ) && plant_written(tx, record)
+}
+
+fn validate_merkle(tx: Transaction, record: RecordDatum) -> Bool {
+  record.schema == MerkleRoot && spine_ok(tx, record) && plant_written(tx, record)
+}
+
+fn validate_reveal(
+  tx: Transaction,
+  datum: Option<RecordsDatum>,
+  record_id: ByteArray,
+) -> Bool {
+  expect Some(Plant(prev)) = datum
+  let slot = get_slot(tx)
+  expect prev.subject == record_id || prev.commit == record_id
+  expect Some(next) = find_plant(tx.outputs)
+  next.schema == Reveal && next.seal == None && next.subject == prev.subject && next.collective == prev.collective && next.bioregion == prev.bioregion && bytearray.length(
+    next.commit,
+  ) == 32 && next.slot == slot && next.prev == Some(prev.commit)
+}
+
+fn validate_attest(tx: Transaction, attest: ControlAttest) -> Bool {
+  let slot = get_slot(tx)
+  attest.issuer != #"" && attest.subject != #"" && attest.expiry_slot > slot && attest_written(
+    tx,
+    attest,
+  )
+}
+
+fn spine_ok(tx: Transaction, record: RecordDatum) -> Bool {
+  bytearray.length(record.commit) == 32 && record.slot == get_slot(
+    tx,
+  ) && list.all(record.auth.key_hashes, fn(k) { bytearray.length(k) == 28 }) && record.collective != #"" && record.bioregion != #""
+}
+
+fn plant_written(tx: Transaction, record: RecordDatum) -> Bool {
+  expect Some(written) = find_plant(tx.outputs)
+  written == record
+}
+
+fn find_plant(outputs: List<Output>) -> Option<RecordDatum> {
+  list.find_map(
+    outputs,
+    fn(out) {
+      when out.datum is {
+        InlineDatum(data) -> {
+          expect wrapped: RecordsDatum = data
+          when wrapped is {
+            Plant(rec) -> Some(rec)
+            _ -> None
+          }
+        }
+        _ -> None
+      }
+    },
+  )
+}
+
+fn attest_written(tx: Transaction, attest: ControlAttest) -> Bool {
+  list.any(
+    tx.outputs,
+    fn(out) {
+      when out.datum is {
+        InlineDatum(data) -> {
+          expect wrapped: RecordsDatum = data
+          when wrapped is {
+            Attest(a) -> a == attest
+            _ -> False
+          }
+        }
+        _ -> False
+      }
+    },
+  )
+}
 
 fn get_slot(tx: Transaction) -> Int {
   when tx.validity_range.lower_bound.bound_type is {

@@ -60,6 +60,17 @@ They don’t: `Transfer` remaining activity to another pNFT (another hospital, a
 
 They treat: `Administer { patient_commit, procedure_commit }`. Lot is done. Not resold. Patient and CPT stay off the public datum — see [TX_PRIVACY.md](TX_PRIVACY.md). Hospital inventory should own the lot; the patient should not.
 
+## ControlBlock
+
+Medical lots carry `control: ControlBlock` and `run_prev`.
+
+- `Unrestricted` is an empty `need`. A medical isotope lot is not unrestricted.
+- `Produce` requires `run_prev` (a closed Run) and live attests for every cred in `need`.
+- `Transfer` requires those same live attests and must keep `dest_policy`. A transfer that clears the destination policy is invalid.
+- A new lot mint (`isotope_policy`) halts when `fee_pool` ADA is under the floor, and it skims ULTRA into the pool.
+
+See [PLANT_SPINE.md](PLANT_SPINE.md) and [TWO_BIOREGIONS.md](TWO_BIOREGIONS.md). An Intec → Reno-TRIC move is a Transfer plus a new control check, not a retag.
+
 ## What is not anonymous
 
 Rule 5 still holds. Every lot has an owner pNFT. Every convert/administer is a lab pNFT. A mixer of I-131 is a crime, not a privacy feature.

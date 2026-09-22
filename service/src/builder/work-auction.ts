@@ -515,6 +515,11 @@ async function buildPostJob(
     bidDeadline,
     workDeadline,
     createdAt: slot,
+    controlClass: asString(args.control_class || args.controlClass || "Unrestricted"),
+    destPolicy: asString(args.dest_policy || args.destPolicy || ""),
+    controlNeed: Array.isArray(args.control_need) ? (args.control_need as string[]) : undefined,
+    issuers: Array.isArray(args.issuers) ? (args.issuers as string[]) : undefined,
+    parentTicket: asString(args.parent_ticket || args.parentTicket || ""),
   };
   const datum = wa.requestDatum(datumParams);
   const redeemer = wa.createRequestRedeemer({
@@ -529,6 +534,11 @@ async function buildPostJob(
     workDeadline,
     contentToShare: args.content_to_share || [],
     expectedDeliverables: args.expected_deliverables || [],
+    controlClass: asString(args.control_class || args.controlClass || "Unrestricted"),
+    destPolicy: asString(args.dest_policy || args.destPolicy || ""),
+    controlNeed: Array.isArray(args.control_need) ? (args.control_need as string[]) : undefined,
+    issuers: Array.isArray(args.issuers) ? (args.issuers as string[]) : undefined,
+    parentTicket: asString(args.parent_ticket || args.parentTicket || ""),
   });
 
   const ref = await tryRefScript(ctx, missing);

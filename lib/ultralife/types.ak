@@ -9,6 +9,7 @@
 
 use aiken/crypto.{VerificationKeyHash}
 use cardano/assets.{AssetName}
+use ultralife/control.{ControlAttest, RecordDatum}
 
 // =============================================================================
 // IDENTITY TYPES
@@ -836,6 +837,10 @@ pub type RecordsDatum {
   AvatarStats(AvatarCycleStats)
   /// Bioregion stats aggregation  
   BioregionStats(BioregionCycleStats)
+  /// Plant spine. Hash-only by default. Reveal has no plaintext field.
+  Plant(RecordDatum)
+  /// Live control witness referenced by isotope Produce / Transfer.
+  Attest(ControlAttest)
 }
 
 // =============================================================================

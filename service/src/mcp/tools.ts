@@ -4,6 +4,7 @@
  * DNA/Standard is spec not live. Labor loop is unsigned preprod only.
  */
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { PLANT_TOOLS } from './plant-tools.js';
 
 // =============================================================================
 // PROTOCOL CONTEXT (What the LLM knows about UltraLife)
@@ -773,6 +774,7 @@ const TOOLS: Tool[] = [
       required: ['actions'],
     },
   },
+  ...PLANT_TOOLS,
 ];
 
 export { ULTRALIFE_CONTEXT, TOOLS };

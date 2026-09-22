@@ -1,6 +1,14 @@
 import { BIOREGIONS, GENESIS_JOBS, GENESIS_OFFERINGS, GENESIS_POOLS, SCRIPT_ADDRESS, validatorByName } from "../protocol/data";
 import { DAUGHTER, HALF_LIFE, parseNuclide, remainingBq, type IsotopeLot, type Nuclide } from "../protocol/isotope";
 import {
+  blockFrom,
+  controlAllows,
+  emptyPlant,
+  l1MintOpen,
+
+  type PlantState,
+} from "../protocol/plant";
+import {
   FAKE_MIRROR_POLICY,
   GENESIS_ADDRESS,
   GENESIS_INDEX,
@@ -57,6 +65,7 @@ export type EngineState = {
   mempool: string[];
   lastTx: BuiltTx | null;
   lots: IsotopeLot[];
+  plant: PlantState;
 };
 
 const TREASURY = SCRIPT_ADDRESS.treasury;
@@ -322,6 +331,7 @@ export function freshEngine(): EngineState {
     delegations: [],
     auctions: GENESIS_JOBS.map((j) => ({ ...j })),
     lots: [],
+    plant: emptyPlant(),
     hydra: { status: "closed", verified: 0, feesUltra: 0, lane: "l1-wasm" },
     logs: [
       {
@@ -802,13 +812,26 @@ export async function registerLand(state: EngineState, label: string, hectares: 
 
 const LAB_PNFT = "pnft_lab_radiopharmacy_01";
 
-export async function presaleIsotope(state: EngineState, nuclideRaw: string, activityBq: number, priceUltra: number) {
+export async function presaleIsotope(
+  state: EngineState,
+  nuclideRaw: string,
+  activityBq: number,
+  priceUltra: number,
+  opts?: { controlClass?: string; destPolicy?: string; runId?: string },
+) {
   if (!state.wallet || !state.pnft) return log(state, "warn", "pNFT required to pre-buy an isotope lot.");
+  if (!l1MintOpen(state.plant)) {
+    return log(state, "warn", "fee_pool is under the floor. New L1 lot mints are halted. Hydra may continue.");
+  }
   const src = spendFromWallet(state, 3_000_000);
   if (!src) return log(state, "warn", "Need ADA for fees.");
   const nuclide: Nuclide = parseNuclide(nuclideRaw);
   const half = HALF_LIFE[nuclide];
   const id = `lot_${nuclide.replace("-", "")}_${Math.random().toString(36).slice(2, 7)}`;
+  const control = blockFrom({
+    class: opts?.controlClass ?? "Medical",
+    destPolicy: opts?.destPolicy,
+  });
   const lot: IsotopeLot = {
     id,
     nuclide,
@@ -822,6 +845,13 @@ export async function presaleIsotope(state: EngineState, nuclideRaw: string, act
     status: "PreSold",
     priceUltra: Math.max(1, Math.floor(priceUltra)),
     specHash: `ipfs://iso/${id}`,
+    controlClass: control.class,
+    destPolicy: control.destPolicy,
+    runPrev: opts?.runId,
+  };
+  const plant = {
+    ...state.plant,
+    feePool: { ...state.plant.feePool, ultra: state.plant.feePool.ultra + 1 },
   };
   const mint: AssetMap = { [assetKey(POLICIES.isotope, lot.id)]: 1 };
   return assemble(state, {
@@ -842,7 +872,7 @@ export async function presaleIsotope(state: EngineState, nuclideRaw: string, act
     ],
     mint,
     metadata: { ul: { op: "isotope-presale", lot: lot.id, nuclide, owner: state.pnft.id, custodian: LAB_PNFT } },
-    extra: { lots: [...state.lots, lot] },
+    extra: { lots: [...state.lots, lot], plant },
     lab: true,
   });
 }
@@ -852,6 +882,8 @@ export async function convertIsotope(state: EngineState, lotId: string, daughter
   const parent = state.lots.find((l) => l.id === lotId || l.nuclide === parseNuclide(lotId));
   if (!parent) return log(state, "warn", "No such lot. Pre-buy first.");
   if (parent.owner !== state.pnft.id) return log(state, "warn", "You do not own this lot.");
+  if (!parent.runPrev) return log(state, "warn", "Produce/convert refused. No closed Run on this lot.");
+  if (!l1MintOpen(state.plant)) return log(state, "warn", "fee_pool is under the floor. New L1 mints are halted.");
   const left = remainingBq(parent, state.slot);
   if (left <= 0 || state.slot >= parent.expirySlot) {
     return assemble(state, {
@@ -908,7 +940,11 @@ export async function transferIsotope(state: EngineState, lotId: string, newOwne
   if (lot.status === "Administered" || lot.status === "Converted") {
     return log(state, "warn", "Administered or converted lots cannot be sold.");
   }
-  const nextLot: IsotopeLot = { ...lot, owner: newOwner, status: "Held" };
+  const block = blockFrom({ class: lot.controlClass, destPolicy: lot.destPolicy });
+  if (!controlAllows(block, state.plant.attests, state.slot, lot.id)) {
+    return log(state, "warn", "Transfer refused. Restricted lot needs live ControlAttest. dest_policy stays.");
+  }
+  const nextLot: IsotopeLot = { ...lot, owner: newOwner, status: "Held", destPolicy: lot.destPolicy };
   const src = state.utxos.find((u) => u.address === ISOTOPE && (u.datum as IsotopeLot | undefined)?.id === lot.id);
   if (!src) return log(state, "warn", "Lot UTxO missing.");
   return assemble(state, {
@@ -1207,7 +1243,12 @@ export async function claimPoolRewards(state: EngineState, poolId?: string) {
   });
 }
 
-export async function listJob(state: EngineState, title: string, bidUltra: number) {
+export async function listJob(
+  state: EngineState,
+  title: string,
+  bidUltra: number,
+  opts?: { controlClass?: string; parentTicket?: string },
+) {
   if (!state.wallet || !state.pnft) return log(state, "warn", "pNFT required to post a job.");
   const src = spendFromWallet(state, 4_000_000);
   if (!src) return log(state, "warn", "Need a subsidy UTxO to post. The bid is in ULTRA.");
@@ -1220,6 +1261,8 @@ export async function listJob(state: EngineState, title: string, bidUltra: numbe
     poster: state.pnft.id,
     status: "open",
     txId: "pending",
+    controlClass: opts?.controlClass ?? "Unrestricted",
+    parentTicket: opts?.parentTicket,
   };
   return assemble(state, {
     intent: "list-job",
@@ -1458,6 +1501,27 @@ export function proveGenesisSeal(state: EngineState): EngineState {
     `Canonical policies stay ${POLICIES.ultra.slice(0, 8)}… (ULTRA) and ${POLICIES.pnft.slice(0, 8)}… (pNFT). A lookalike ticker is a different asset.`,
   );
   return next;
+}
+
+export async function commitPlant(state: EngineState, intent: string, scripts: string[], plant: PlantState) {
+  if (!state.wallet) return log(state, "warn", "Wallet required. The agent builds. The wallet signs.");
+  const src = spendFromWallet(state, 2_000_000);
+  if (!src) return log(state, "warn", "Need ADA in the fee subsidy. Users still settle in ULTRA.");
+  return assemble(state, {
+    intent,
+    scripts,
+    redeemers: [{ purpose: "spend", data: { op: intent } }],
+    spent: [src],
+    outputs: [
+      {
+        address: state.wallet.address,
+        value: { lovelace: src.value.lovelace - 1_500_000, assets: { ...src.value.assets } },
+      },
+    ],
+    mint: {},
+    metadata: { ul: { op: intent, signing: "unsigned-rehearsal" } },
+    extra: { plant },
+  });
 }
 
 export function assetQty(state: EngineState, policy: string, name: string) {

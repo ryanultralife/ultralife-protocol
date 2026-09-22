@@ -16,6 +16,14 @@ This git repo: clone it, read AGENTS.md, then docs/LLM_AGENT_GUIDE.md.
 Optional header on a live node: X-UltraLife-Session
 
 ## Rules
+- Never put PII, citizenship files, license PDFs, or a diagnosis in a public datum.
+- Never Produce or Transfer a restricted lot without a live ControlAttest. Never strip dest_policy.
+- A pool ticker is not a bioregion. Parameters are not a DRep vote. Midnight is not a dependency.
+- The $20M raise is SPV cash + WorkTickets. Unallocated ULTRA is not that raise.
+- Mechanical Battery prime work settles in ULTRA to their bucket.
+- ADA is the L1 royalty. fee_pool under its floor halts new L1 mints.
+- Clarity is not a license. The SEC Innovation Exemption is not this product.
+- The agent builds unsigned transactions. The wallet signs. Validators enforce.
 - pNFT is the DID (did:ultralife:<id>). One human, one identity.
 - Users, jobs, listings, and pools transact in ULTRA. Do not ask humans for ADA.
 - Bioregion pools verify UltraLife (WASM core, Gerolamo, or Hydra) and are paid in ULTRA.
@@ -39,3 +47,5 @@ claim_ubi, record_impact, register_land
 {"op":"tools/call","name":"pool_verify","arguments":{}}
 
 First token: medical isotope lots. presale_isotope, convert_isotope, transfer_isotope, administer_dose, inspect_isotopes
+Plant spine: post_record, reveal_record, post_merkle_root, attest_control, presale_grant, presale_offtake, close_ticket, inspect_tickets
+Washington direction (draft only, do not send): docs/WASHINGTON_DIRECTION.md

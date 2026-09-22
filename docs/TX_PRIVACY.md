@@ -44,21 +44,23 @@ This is already the shape of `ContentReference` in `types.ak`: `content_type: Me
 
 ## Three lanes (use the cheapest that fits)
 
-### 1. Commitments on L1 — works today
+### 1. Commitments on L1 — this phase
 
 Encrypted blob (IPFS / `PrivateStorage`) + 32-byte hashes on the lot datum. No new chain. Good for: isotope doses, clinic notes, most care.
+
+Plant records use the same lane. `commit = blake2b(payload || nonce)`. `seal` is an optional ciphertext reference and defaults to none. HR files and license PDFs are sealed UTxOs or hash-only. They are not public datum fields. `Reveal` writes a new commitment and does not take plaintext. Keys are hashes. Erase means revoke keys, not delete the lineage.
+
+Lane 1 is the only privacy lane in force. Do not wait on Midnight.
 
 ### 2. Hydra head — private among participants
 
 Hospital + lab + maybe insurer in one head. Procedure txs never hit L1 in the clear. Settlement is a merkle root of administered lots. Observers see “this lab settled N lots this epoch.”
 
-Still: every L2 tx terminates at a pNFT **inside the head**. Settlement does not have to name them.
+Still: every L2 tx terminates at a pNFT **inside the head**. Settlement does not have to name them. Hydra is not confidentiality. Every head member sees the payload. Sealed HR stays a commitment, not a cleartext head.
 
-### 3. ZK / Midnight / Starstream — prove without showing
+### 3. Not this phase
 
-Prove: “a Standard+ pNFT is the patient, the lot had remaining Bq, the lab is licensed.” Reveal nothing else. Identity is in the **witness**, not the transaction.
-
-We marked Midnight as a later overlay (waveform hashes, not the pNFT). Same overlay for procedure payloads. Not built. Do not wait on it for lane 1.
+A zero-knowledge witness that proves “a Standard+ pNFT is the patient, the lot had remaining Bq, the lab is licensed” is not built. Midnight is not a dependency. Lane 1 is enough to ship.
 
 ## What we will not do
 

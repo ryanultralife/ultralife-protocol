@@ -12,6 +12,7 @@
 
 use aiken/crypto.{VerificationKeyHash}
 use cardano/assets.{AssetName, PolicyId}
+use ultralife/control.{ControlBlock}
 
 // =============================================================================
 // UNIVERSAL OFFERING
@@ -44,6 +45,8 @@ pub type Offering {
   status: OfferingStatus,
   /// Created
   created_at: Int,
+  /// Import / export control. Unrestricted goods use an empty need.
+  control: ControlBlock,
 }
 
 pub type CategoryRef {
@@ -135,6 +138,9 @@ pub type Need {
   created_at: Int,
   /// Deadline for responses
   deadline: Option<Int>,
+  /// Same control block as a work_auction request. Parent is a GrantNote ticket.
+  control: ControlBlock,
+  parent_ticket: Option<ByteArray>,
 }
 
 pub type WhatNeeded {

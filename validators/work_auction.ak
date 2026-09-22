@@ -27,6 +27,10 @@ use cardano/assets.{AssetName, PolicyId, Value, flatten, quantity_of}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
 }
+use ultralife/control.{
+  ControlAttest, ControlBlock, control_allows, control_well_formed,
+  person_class_covers,
+}
 use ultralife/types.{
   ActivityImpact, AssetActivityRecord, CompoundCode, CompoundFlow, MassUnit,
   MeasurementMethod, PnftDatum, Standard, Steward, VerificationLevel, Verified,
@@ -68,6 +72,10 @@ pub type WorkRequest {
   created_at: Int,
   /// Status
   status: RequestStatus,
+  /// Import / export class. Unrestricted need is empty.
+  control: ControlBlock,
+  /// Mechanical Battery subcontract points at their GrantNote.
+  parent_ticket: Option<ByteArray>,
 }
 
 /// Types of work (from registry codes)
@@ -234,6 +242,9 @@ pub type WorkEscrow {
   worker_content_grants: List<ByteArray>,
   /// Additional content unlocked on verification
   verification_unlocks: List<ByteArray>,
+  /// Copied from the request. AcceptBid must not drop it.
+  control: ControlBlock,
+  parent_ticket: Option<ByteArray>,
 }
 
 /// Escrow status
@@ -278,6 +289,8 @@ pub type WorkAuctionRedeemer {
     content_to_share: List<ByteArray>,
     /// Expected deliverables worker must provide (auto-granted on verification)
     expected_deliverables: List<ByteArray>,
+    control: ControlBlock,
+    parent_ticket: Option<ByteArray>,
   }
   /// Cancel request (only if no accepted bid)
   CancelRequest { reason: ByteArray }
@@ -317,7 +330,11 @@ pub type WorkAuctionRedeemer {
     actual_impacts: List<CompoundFlow>,
   }
   /// Verify work (authorized verifiers only)
-  VerifyWork { escrow_id: ByteArray, verification_result: VerificationResult }
+  VerifyWork {
+    escrow_id: ByteArray,
+    verification_result: VerificationResult,
+    attests: List<ControlAttest>,
+  }
   // === Payment ===
   /// Release payment (after verification)
   ReleasePayment { escrow_id: ByteArray }
@@ -364,6 +381,10 @@ pub type WorkAuctionConfig {
   records_contract: ByteArray,
   /// Asset impact contract (for impact accumulation)
   asset_impact_contract: ByteArray,
+  /// energy.ak. A run cannot close without this hook.
+  energy_contract: ByteArray,
+  /// fee_pool script. ULTRA skim lands here, not as ADA payroll.
+  fee_pool: ByteArray,
   /// Governance contract (for disputes)
   governance_contract: ByteArray,
   /// Minimum bid deadline (slots from creation)
@@ -396,6 +417,8 @@ validator work_auction(config: WorkAuctionConfig) {
         required_certifications,
         bid_deadline,
         work_deadline,
+        control,
+        parent_ticket,
         ..
       } ->
         validate_create_request(
@@ -408,6 +431,8 @@ validator work_auction(config: WorkAuctionConfig) {
           required_certifications,
           bid_deadline,
           work_deadline,
+          control,
+          parent_ticket,
           config,
         )
       CancelRequest { reason } ->
@@ -454,8 +479,15 @@ validator work_auction(config: WorkAuctionConfig) {
           actual_impacts,
           config,
         )
-      VerifyWork { escrow_id, verification_result } ->
-        validate_verify_work(tx, datum, escrow_id, verification_result, config)
+      VerifyWork { escrow_id, verification_result, attests } ->
+        validate_verify_work(
+          tx,
+          datum,
+          escrow_id,
+          verification_result,
+          attests,
+          config,
+        )
       // === Payment ===
       ReleasePayment { escrow_id } ->
         validate_release_payment(tx, datum, escrow_id, config)
@@ -495,6 +527,8 @@ fn validate_create_request(
   required_certifications: List<ByteArray>,
   bid_deadline: Int,
   work_deadline: Int,
+  control: ControlBlock,
+  parent_ticket: Option<ByteArray>,
   config: WorkAuctionConfig,
 ) -> Bool {
   // 1. Requester must have valid pNFT (Standard+)
@@ -518,7 +552,9 @@ fn validate_create_request(
   expect InlineDatum(data) = output.datum
   expect RequestDatum(request): WorkAuctionDatum = data
   // 7. Verify request fields match
-  request.requester == requester.pnft_id && request.work_type == work_type && request.specifications_hash == specifications_hash && request.budget_min == budget_min && request.budget_max == budget_max && request.bid_deadline == bid_deadline && request.work_deadline == work_deadline && request.status == Open
+  request.requester == requester.pnft_id && request.work_type == work_type && request.specifications_hash == specifications_hash && request.budget_min == budget_min && request.budget_max == budget_max && request.bid_deadline == bid_deadline && request.work_deadline == work_deadline && request.status == Open && request.control == control && request.parent_ticket == parent_ticket && control_well_formed(
+    control,
+  )
 }
 
 fn validate_cancel_request(
@@ -657,7 +693,7 @@ fn validate_accept_bid(
   // 5. Escrow datum must be correct
   expect InlineDatum(data) = escrow_out.datum
   expect EscrowDatum(escrow): WorkAuctionDatum = data
-  escrow.request_id == request.request_id && escrow.bid_id == bid_id && escrow.requester == request.requester && escrow.worker == b.bidder && escrow.amount == b.bid_amount && escrow.status == Funded
+  escrow.request_id == request.request_id && escrow.bid_id == bid_id && escrow.requester == request.requester && escrow.worker == b.bidder && escrow.amount == b.bid_amount && escrow.status == Funded && escrow.control == request.control && escrow.parent_ticket == request.parent_ticket && escrow.control.dest_policy == request.control.dest_policy
 }
 
 fn validate_withdraw_bid(
@@ -790,6 +826,7 @@ fn validate_verify_work(
   datum: Option<WorkAuctionDatum>,
   escrow_id: ByteArray,
   verification_result: VerificationResult,
+  attests: List<ControlAttest>,
   config: WorkAuctionConfig,
 ) -> Bool {
   // 1. Must have escrow in WorkSubmitted status
@@ -856,7 +893,48 @@ fn validate_verify_work(
         // Escrow goes to dispute or refund
         True
     }
-  impacts_recorded && status_updated
+  let slot = get_current_slot(tx)
+  let control_ok =
+    control_allows(escrow.control, attests, slot, escrow.asset) && person_class_covers(
+      escrow.control.class,
+      attests,
+      slot,
+    )
+  let hooks =
+    when verification_result is {
+      WorkRejected { .. } -> True
+      _ -> impacts_recorded && energy_hook(tx, config) && control_ok
+    }
+  hooks && status_updated
+}
+
+fn energy_hook(tx: Transaction, config: WorkAuctionConfig) -> Bool {
+  config.energy_contract != #"" && list.any(
+    tx.inputs,
+    fn(input) {
+      when get_script_hash_from_input(input) is {
+        Some(hash) -> hash == config.energy_contract
+        None -> False
+      }
+    },
+  )
+}
+
+fn ultra_to_script(tx: Transaction, config: WorkAuctionConfig) -> Bool {
+  config.fee_pool != #"" && list.any(
+    tx.outputs,
+    fn(output) {
+      when output.address.payment_credential is {
+        Script(hash) ->
+          hash == config.fee_pool && quantity_of(
+            output.value,
+            config.token_policy,
+            config.token_name,
+          ) > 0
+        _ -> False
+      }
+    },
+  )
 }
 
 /// Verify that asset_impact contract is called to record the activity
@@ -932,8 +1010,9 @@ fn validate_release_payment(
   let worker_payment = escrow.amount - fee
   // 5. Verify correct amounts
   expect payment_to_worker >= worker_payment
-  // 6. Fee goes to treasury
-  // (Verified separately)
+  // Payroll is ULTRA. The skim is ULTRA into fee_pool, not an ADA wage.
+  expect fee == 0 || ultra_to_script(tx, config)
+  // 6. Fee goes to fee_pool (treasury address remains the config fallback)
   // 7. Update worker's efficiency rating
   // (Recorded based on actual vs expected impacts)
   True
@@ -1323,7 +1402,7 @@ fn is_designated_surveyor(pnft: PnftData, tx: Transaction) -> Bool {
   // is the on-chain proxy: Standard can transact but cannot verify work.
   // `tx` is reserved for a future surveyor UTXO in reference_inputs.
   let _refs = list.length(tx.reference_inputs)
-  pnft.level == Verified || pnft.level == Steward
+  voting_weight(pnft.level) >= 2
 }
 
 fn verify_escrow_updated_to_verified(

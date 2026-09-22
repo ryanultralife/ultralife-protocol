@@ -18,8 +18,13 @@ use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use aiken/interval.{Finite}
 use aiken/primitive/bytearray
-use cardano/assets.{AssetName, PolicyId}
-use cardano/transaction.{OutputReference, Transaction}
+use cardano/address.{Script}
+use cardano/assets.{AssetName, PolicyId, Value, flatten}
+use cardano/transaction.{InlineDatum, OutputReference, Transaction}
+use ultralife/control.{
+  ControlAttest, ControlBlock, FeePoolView, control_allows, l1_mint_open,
+}
+use ultralife/types.{Attest, RecordsDatum}
 
 pub type IsotopeConfig {
   pnft_policy: PolicyId,
@@ -28,6 +33,12 @@ pub type IsotopeConfig {
   labs: List<AssetName>,
   /// Minimum remaining Bq to convert or administer
   min_useful_bq: Int,
+  /// records.ak script hash. Live ControlAttest UTxOs sit here.
+  records_script: ByteArray,
+  /// fee_pool script hash. New lot mints halt when the pool is under the floor.
+  fee_pool: ByteArray,
+  fee_floor: Int,
+  ultra_policy: PolicyId,
 }
 
 pub type Nuclide {
@@ -73,6 +84,11 @@ pub type IsotopeLot {
   parent: Option<ByteArray>,
   status: LotStatus,
   spec_hash: ByteArray,
+  /// Restricted lots fail Produce / Transfer without live attests.
+  /// Transfer must keep dest_policy.
+  control: ControlBlock,
+  /// Produce requires a closed Run record id. No lot without a run.
+  run_prev: Option<ByteArray>,
 }
 
 pub type IsotopeRedeemer {
@@ -102,10 +118,25 @@ validator isotope(config: IsotopeConfig) {
         activity_bq > 0 && buyer != #"" && remaining_bq(lot, slot) == lot.activity_bq
       }
       Produce { .. } -> {
-        lot.status == PreSold && signer_is_lab(tx, config) && remaining_bq(lot, slot) > 0
+        let attests = referenced_attests(tx, config.records_script)
+        lot.status == PreSold && signer_is_lab(tx, config) && remaining_bq(
+          lot,
+          slot,
+        ) > 0 && has_run(lot) && control_allows(
+          lot.control,
+          attests,
+          slot,
+          lot.lot_id,
+        ) && keeps_dest(tx, config, lot)
       }
       Transfer { new_owner } -> {
-        transferable(lot) && signer_is_owner(tx, lot) && new_owner != #"" && slot < lot.expiry_slot
+        let attests = referenced_attests(tx, config.records_script)
+        transferable(lot) && signer_is_owner(tx, lot) && new_owner != #"" && slot < lot.expiry_slot && control_allows(
+          lot.control,
+          attests,
+          slot,
+          lot.lot_id,
+        ) && keeps_dest(tx, config, lot)
       }
       Convert { activity_out, .. } -> {
         convertible(lot) && signer_is_lab(tx, config) && activity_out > 0 && remaining_bq(
@@ -124,6 +155,20 @@ validator isotope(config: IsotopeConfig) {
       Recall { .. } -> signer_is_lab(tx, config) && lot.status != Administered
       Expire -> remaining_bq(lot, slot) < config.min_useful_bq || slot >= lot.expiry_slot
     }
+  }
+
+  else(_) {
+    fail
+  }
+}
+
+/// New L1 lot mint. Halts when fee_pool ADA is under the floor. Skims ULTRA.
+validator isotope_policy(config: IsotopeConfig) {
+  mint(_redeemer: Data, policy_id: PolicyId, tx: Transaction) {
+    policy_id == config.lot_policy && fee_pool_open(tx, config) && ultra_skim(
+      tx,
+      config,
+    )
   }
 
   else(_) {
@@ -191,6 +236,114 @@ fn signer_is_owner(tx: Transaction, lot: IsotopeLot) -> Bool {
 
 fn signer_is_lab(tx: Transaction, config: IsotopeConfig) -> Bool {
   list.length(tx.extra_signatories) > 0 && list.length(config.labs) > 0
+}
+
+fn has_run(lot: IsotopeLot) -> Bool {
+  when lot.run_prev is {
+    Some(id) -> id != #""
+    None -> False
+  }
+}
+
+fn referenced_attests(tx: Transaction, records_script: ByteArray) -> List<ControlAttest> {
+  list.filter_map(
+    tx.reference_inputs,
+    fn(input) {
+      when input.output.address.payment_credential is {
+        Script(hash) ->
+          if hash == records_script {
+            when input.output.datum is {
+              InlineDatum(data) -> {
+                expect wrapped: RecordsDatum = data
+                when wrapped is {
+                  Attest(a) -> Some(a)
+                  _ -> None
+                }
+              }
+              _ -> None
+            }
+          } else {
+            None
+          }
+        _ -> None
+      }
+    },
+  )
+}
+
+fn keeps_dest(tx: Transaction, config: IsotopeConfig, lot: IsotopeLot) -> Bool {
+  list.any(
+    tx.outputs,
+    fn(out) {
+      if holds_lot(out.value, config.lot_policy) {
+        when out.datum is {
+          InlineDatum(data) -> {
+            expect next: IsotopeLot = data
+            next.control.dest_policy == lot.control.dest_policy && next.control.class == lot.control.class && next.control.need == lot.control.need
+          }
+          _ -> False
+        }
+      } else {
+        False
+      }
+    },
+  )
+}
+
+fn holds_lot(value: Value, policy: PolicyId) -> Bool {
+  list.any(
+    flatten(value),
+    fn(asset) {
+      let (p, _, qty) = asset
+      p == policy && qty > 0
+    },
+  )
+}
+
+fn fee_pool_open(tx: Transaction, config: IsotopeConfig) -> Bool {
+  config.fee_pool != #"" && list.any(
+    tx.reference_inputs,
+    fn(input) {
+      when input.output.address.payment_credential is {
+        Script(hash) ->
+          if hash == config.fee_pool {
+            when input.output.datum is {
+              InlineDatum(data) -> {
+                expect pool: FeePoolView = data
+                l1_mint_open(pool, config.fee_floor)
+              }
+              _ -> False
+            }
+          } else {
+            False
+          }
+        _ -> False
+      }
+    },
+  )
+}
+
+fn ultra_skim(tx: Transaction, config: IsotopeConfig) -> Bool {
+  list.any(
+    tx.outputs,
+    fn(out) {
+      when out.address.payment_credential is {
+        Script(hash) ->
+          if hash == config.fee_pool {
+            list.any(
+              flatten(out.value),
+              fn(asset) {
+                let (p, _, qty) = asset
+                p == config.ultra_policy && qty > 0
+              },
+            )
+          } else {
+            False
+          }
+        _ -> False
+      }
+    },
+  )
 }
 
 // =============================================================================

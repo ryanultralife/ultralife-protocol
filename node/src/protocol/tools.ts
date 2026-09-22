@@ -22,6 +22,7 @@ import {
   convertIsotope,
   transferIsotope,
   administerDose,
+  commitPlant,
   registerPool,
   sendAda,
   assetQty,
@@ -33,6 +34,18 @@ import { POLICIES } from "../cardano/types";
 import { BIOREGIONS, VALIDATOR_CATALOG } from "./data";
 import { identityDidDocument } from "./did";
 import { remainingBq } from "./isotope";
+import {
+  addAttest,
+  blockFrom,
+  closeGrant,
+  issueGrant,
+  issueOfftake,
+  merkleSpine,
+  postSpine,
+  revealSpine,
+  type CredType,
+  type WorkAccount,
+} from "./plant";
 import { canonicalTool, rewriteArgs } from "./aliases";
 import { inspectPreprod } from "./chain";
 import { assertContract, contractFor, TOOL_CONTRACTS } from "./contracts";
@@ -292,6 +305,138 @@ export const AGENT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "post_record",
+      description:
+        "Post a plant spine record. commit is a hash. Default is hash-only. Do not put PII, citizenship files, or diagnosis in the payload that lands on a public field.",
+      parameters: {
+        type: "object",
+        properties: {
+          schema: { type: "string" },
+          collective: { type: "string" },
+          bioregion: { type: "string" },
+          subject: { type: "string" },
+          payload: { type: "string" },
+          seal: { type: "string" },
+        },
+        required: ["schema", "collective", "bioregion", "subject", "payload"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "reveal_record",
+      description: "Write schema=Reveal. No plaintext argument. GDPR erase revokes keys; lineage stays.",
+      parameters: {
+        type: "object",
+        properties: { recordId: { type: "string" } },
+        required: ["recordId"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "post_merkle_root",
+      description: "L1 root of a Hydra shift. Chromatograms stay off L1.",
+      parameters: {
+        type: "object",
+        properties: {
+          collective: { type: "string" },
+          bioregion: { type: "string" },
+          root: { type: "string" },
+        },
+        required: ["root"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "attest_control",
+      description: "Live ControlAttest. Restricted Produce and Transfer fail without one. Does not strip dest_policy.",
+      parameters: {
+        type: "object",
+        properties: {
+          cred: { type: "string" },
+          subject: { type: "string" },
+          destPolicy: { type: "string" },
+          class: { type: "string" },
+          issuer: { type: "string" },
+          expirySlot: { type: "number" },
+        },
+        required: ["cred", "subject", "destPolicy"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "presale_grant",
+      description:
+        "WorkTicket for the pre-EDF raise. Face is units times price. This does not mint ULTRA as the $20M.",
+      parameters: {
+        type: "object",
+        properties: {
+          plant: { type: "string" },
+          bioregion: { type: "string" },
+          account: { type: "string" },
+          units: { type: "number" },
+          price: { type: "number" },
+          tranche: { type: "string" },
+          senior: { type: "boolean" },
+        },
+        required: ["account", "units", "price"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "presale_offtake",
+      description: "Offtake claim. Junior senior=false. EDF later is a new senior claim and cannot eat junior units.",
+      parameters: {
+        type: "object",
+        properties: {
+          sku: { type: "string" },
+          qty: { type: "number" },
+          plant: { type: "string" },
+          bioregion: { type: "string" },
+          controlClass: { type: "string" },
+          destPolicy: { type: "string" },
+          senior: { type: "boolean" },
+          parentGrant: { type: "string" },
+        },
+        required: ["sku", "qty"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "close_ticket",
+      description: "Close one unit against a record. Design and machine accounts pay Mechanical Battery's bucket in ULTRA.",
+      parameters: {
+        type: "object",
+        properties: {
+          ticketId: { type: "string" },
+          recordId: { type: "string" },
+        },
+        required: ["ticketId", "recordId"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "inspect_tickets",
+      description: "Funded units, remaining units, prime bucket ULTRA, and fee_pool skim.",
+      parameters: { type: "object", properties: {}, additionalProperties: false },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "inspect_isotopes",
       description: "List isotope lots this node knows, with remaining Bq after decay.",
       parameters: { type: "object", properties: {}, additionalProperties: false },
@@ -337,6 +482,8 @@ export const AGENT_TOOLS = [
         properties: {
           title: { type: "string" },
           bidUltra: { type: "number" },
+          controlClass: { type: "string" },
+          parentTicket: { type: "string" },
         },
         required: ["title"],
       },
@@ -638,7 +785,11 @@ export async function executeTool(
       const price = Number(args.priceUltra ?? 40);
       return fromEngine(
         before,
-        await presaleIsotope(state, nuclide, bq, price),
+        await presaleIsotope(state, nuclide, bq, price, {
+          controlClass: args.controlClass ? String(args.controlClass) : undefined,
+          destPolicy: args.destPolicy ? String(args.destPolicy) : undefined,
+          runId: args.runId ? String(args.runId) : undefined,
+        }),
         `Pre-sold ${nuclide} lot. Your pNFT owns it until convert, sell, or dose.`,
       );
     }
@@ -660,6 +811,133 @@ export async function executeTool(
         await administerDose(state, String(args.lotId ?? ""), String(args.patient ?? "")),
         "Dose administered. Lot no longer transferable.",
       );
+    }
+    case "post_record": {
+      const posted = postSpine(state.plant, state.slot, {
+        schema: String(args.schema ?? "Run"),
+        collective: String(args.collective ?? "collective_intec"),
+        bioregion: String(args.bioregion ?? "intec-site"),
+        subject: String(args.subject ?? "run"),
+        payload: String(args.payload ?? ""),
+        seal: args.seal ? String(args.seal) : undefined,
+      });
+      if (!posted.ok) return { ok: false, summary: posted.error, next: state };
+      return fromEngine(
+        before,
+        await commitPlant(state, "post-record", ["records.records.spend"], posted.plant),
+        `Record ${posted.id} committed. Hash-only unless seal was set.`,
+      );
+    }
+    case "reveal_record": {
+      const opened = revealSpine(state.plant, state.slot, String(args.recordId ?? ""));
+      if (!opened.ok) return { ok: false, summary: opened.error, next: state };
+      return fromEngine(
+        before,
+        await commitPlant(state, "reveal-record", ["records.records.spend"], opened.plant),
+        "Reveal written. No plaintext on the ledger.",
+      );
+    }
+    case "post_merkle_root": {
+      const root = merkleSpine(state.plant, state.slot, {
+        collective: String(args.collective ?? "collective_intec"),
+        bioregion: String(args.bioregion ?? "intec-site"),
+        root: String(args.root ?? ""),
+      });
+      if (!root.ok) return { ok: false, summary: root.error, next: state };
+      return fromEngine(
+        before,
+        await commitPlant(state, "post-merkle-root", ["records.records.spend"], root.plant),
+        `Merkle root ${root.id} on L1.`,
+      );
+    }
+    case "attest_control": {
+      const attested = addAttest(state.plant, state.slot, {
+        cred: String(args.cred ?? "FacilityClearance") as CredType,
+        subject: String(args.subject ?? ""),
+        destPolicy: String(args.destPolicy ?? "intec-us"),
+        class: (args.class ? String(args.class) : "Medical") as "Medical",
+        issuer: String(args.issuer ?? "issuer-radiopharmacy"),
+        expirySlot: Number(args.expirySlot ?? state.slot + 1_000_000),
+      });
+      if (!attested.ok) return { ok: false, summary: attested.error, next: state };
+      return fromEngine(
+        before,
+        await commitPlant(state, "attest-control", ["records.records.spend"], attested.plant),
+        "ControlAttest posted. dest_policy unchanged.",
+      );
+    }
+    case "presale_grant": {
+      const account = String(args.account ?? "design") as WorkAccount;
+      const issued = issueGrant(state.plant, state.slot, {
+        plant: String(args.plant ?? "collective_intec"),
+        bioregion: String(args.bioregion ?? "intec-site"),
+        tranche: (args.tranche ? String(args.tranche) : "T0") as "T0",
+        account: account.toLowerCase() as WorkAccount,
+        units: Number(args.units ?? 1),
+        price: Number(args.price ?? 1),
+        capAdaExitBps: Number(args.capAdaExitBps ?? 0),
+        seedLockUltra: Number(args.seedLockUltra ?? 0),
+        feeSkimBps: Number(args.feeSkimBps ?? 100),
+        milestoneCommit: String(args.milestone ?? "milestone"),
+        refundSlot: Number(args.refundSlot ?? state.slot + 5_000_000),
+        senior: Boolean(args.senior),
+      });
+      if (!issued.ok) return { ok: false, summary: issued.error, next: state };
+      return fromEngine(
+        before,
+        await commitPlant(state, "presale-grant", ["grants.grants.spend"], issued.plant),
+        `WorkTicket ${issued.id}. Face is units × price. ULTRA was not minted as the raise.`,
+      );
+    }
+    case "presale_offtake": {
+      const claim = issueOfftake(state.plant, {
+        sku: String(args.sku ?? "isotope-lot"),
+        qty: Number(args.qty ?? 1),
+        windowStart: state.slot,
+        windowEnd: state.slot + 5_000_000,
+        plant: String(args.plant ?? "collective_intec"),
+        bioregion: String(args.bioregion ?? "intec-site"),
+        control: blockFrom({
+          class: args.controlClass ?? "Medical",
+          destPolicy: args.destPolicy,
+        }),
+        parentGrant: args.parentGrant ? String(args.parentGrant) : undefined,
+        senior: Boolean(args.senior),
+      });
+      if (!claim.ok) return { ok: false, summary: claim.error, next: state };
+      return fromEngine(
+        before,
+        await commitPlant(state, "presale-offtake", ["grants.grants.spend"], claim.plant),
+        `Offtake ${claim.id}. senior=${Boolean(args.senior)}.`,
+      );
+    }
+    case "close_ticket": {
+      const closed = closeGrant(state.plant, state.slot, String(args.ticketId ?? ""), String(args.recordId ?? ""));
+      if (!closed.ok) return { ok: false, summary: closed.error, next: state };
+      return fromEngine(
+        before,
+        await commitPlant(state, "close-ticket", ["grants.grants.spend"], closed.plant),
+        closed.refunded
+          ? "refund_slot passed. Remaining units voided. Junior lots were not eaten."
+          : "Ticket unit closed. Design or machine work pays the Mechanical Battery bucket in ULTRA.",
+      );
+    }
+    case "inspect_tickets": {
+      const face = state.plant.tickets.reduce((s, t) => s + t.units * t.price, 0);
+      const open = state.plant.tickets.reduce((s, t) => s + t.unitsRemaining * t.price, 0);
+      return {
+        ok: true,
+        summary: JSON.stringify({
+          face,
+          remainingFace: open,
+          primeBucketUltra: state.plant.primeBucketUltra,
+          feePool: state.plant.feePool,
+          tickets: state.plant.tickets,
+          claims: state.plant.claims,
+          records: state.plant.records.map((r) => ({ id: r.id, schema: r.schema, commit: r.commit, seal: r.seal ?? null })),
+        }),
+        next: state,
+      };
     }
     case "inspect_isotopes": {
       const lots = (state.lots ?? []).map((l) => ({
@@ -697,7 +975,14 @@ export async function executeTool(
     case "list_job": {
       const title = String(args.title ?? "Work").slice(0, 64);
       const bid = Number(args.bidUltra ?? 40);
-      return fromEngine(before, await listJob(state, title, bid), `Posted job “${title}” at ${bid} ULTRA.`);
+      return fromEngine(
+        before,
+        await listJob(state, title, bid, {
+          controlClass: args.controlClass ? String(args.controlClass) : undefined,
+          parentTicket: args.parentTicket ? String(args.parentTicket) : undefined,
+        }),
+        `Posted job “${title}” at ${bid} ULTRA.`,
+      );
     }
     case "bid_job": {
       const q = String(args.query ?? "");

@@ -4,7 +4,8 @@
 //
 // LAYER 2: PLACE
 //
-// Bioregions are ecological boundaries (not political).
+// Bioregions are ecological boundaries (not political, not a pool ticker).
+// First plants: intec-site and reno-tric. Facility credentials do not cross.
 // - Required for Standard+ verification
 // - Health index affects UBI distribution
 // - Local governance scope

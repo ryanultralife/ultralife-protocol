@@ -34,6 +34,27 @@ L1 fee subsidy the human never handles. Identity is a non-transferable pNFT
 Sequence on a cold node: `boot_node` → `create_wallet` → `mint_pnft` → then
 market / jobs / pools.
 
+## Plant rules (do not violate)
+
+1. Never put PII, citizenship files, license PDFs, or a diagnosis in a public datum field.
+2. Never Produce or Transfer a restricted lot without a live ControlAttest.
+3. Never treat a Cardano pool ticker as a bioregion.
+4. Never set UltraLife parameters by a DRep or Voltaire vote.
+5. Never use unallocated ULTRA as the $20M raise.
+6. Never strip ControlBlock or `dest_policy` for EDF or anyone else.
+7. Never depend on Midnight.
+8. Mechanical Battery prime work settles in ULTRA to their bucket.
+9. The $20M private raise is SPV cash plus WorkTickets (grant, offtake, hours).
+10. ADA is the L1 royalty. `fee_pool` under its floor halts new L1 mints.
+11. A new chain only if the genesis and the operator set are ours and the set is diluted.
+12. Clarity is not a license. The SEC Innovation Exemption is not this product.
+
+The agent builds unsigned transactions. The wallet signs. Validators enforce.
+
+Read `docs/PLANT_SPINE.md`, `docs/PRE_EDF_RAISE.md`, and `docs/TWO_BIOREGIONS.md` before touching lots, tickets, or the two plant sites.
+
+`docs/WASHINGTON_DIRECTION.md` is the intent for SEC and BIS correspondence. Draft from it. Do not send.
+
 ## Invariants (do not violate)
 
 1. **One human, one pNFT.** Non-transferable. DID is `did:ultralife:<pnft_id>`.
@@ -57,7 +78,9 @@ market / jobs / pools.
 `prove_seal`, `red_team`, `resolve_did`, `boot_node`, `create_wallet`, `mint_pnft`,
 `list_offering`, `buy_offering`, `list_job`, `bid_job`, `register_pool`,
 `delegate_ultra`, `claim_pool_rewards`, `open_hydra`, `pool_verify`,
-`claim_ubi`, `record_impact`, `register_land`.
+`claim_ubi`, `record_impact`, `register_land`,
+`post_record`, `reveal_record`, `post_merkle_root`, `attest_control`,
+`presale_grant`, `presale_offtake`, `close_ticket`, `inspect_tickets`.
 
 Each tool maps to named validators in `src/lib/protocol/contracts.ts` of
 `ultralife-node` and the `.ak` files here. No other scripts may fire.

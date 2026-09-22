@@ -5,7 +5,9 @@
 // ECONOMIC INFRASTRUCTURE LAYER
 //
 // Stake pools are the bridge between Cardano's consensus and UltraLife's
-// bioregional economy. Validators opt into the UltraLife ecosystem by:
+// bioregional economy. A pool ticker is not a bioregion. Protocol-owned seed
+// pools come first. Affiliate SPOs are paid ULTRA and do not own the map.
+// Validators opt into the UltraLife ecosystem by:
 //
 // 1. Registering their pool with a specific bioregion
 // 2. Accepting UltraLife token delegations alongside ADA

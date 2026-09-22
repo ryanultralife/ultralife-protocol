@@ -150,6 +150,8 @@ export type Auction = {
   poster: string;
   status: "open" | "awarded";
   txId: string;
+  controlClass?: string;
+  parentTicket?: string;
 };
 
 export type HydraHead = {

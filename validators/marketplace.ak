@@ -24,6 +24,7 @@ use cardano/assets.{AssetName, PolicyId, Value, flatten, quantity_of}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
 }
+use ultralife/control.{ControlBlock, control_well_formed}
 use ultralife/types.{
   Basic, CompoundBalance, CompoundFlow, PnftDatum, Standard, Steward,
   VerificationLevel, Verified, Ward,
@@ -339,6 +340,8 @@ pub type ListingDatum {
   interest_count: Int,
   /// Tags for search
   tags: List<ByteArray>,
+  /// Kept across update and sale. Transfer of a restricted offering does not clear dest_policy.
+  control: ControlBlock,
 }
 
 pub type ListingStatus {
@@ -398,6 +401,7 @@ pub type MarketplaceRedeemer {
     price: PriceStructure,
     tags: List<ByteArray>,
     expires_at: Option<Int>,
+    control: ControlBlock,
   }
   /// Update listing
   UpdateListing {
@@ -457,13 +461,14 @@ validator marketplace(config: MarketplaceConfig) {
     tx: Transaction,
   ) {
     when redeemer is {
-      CreateListing { listing_type, price, tags, expires_at } ->
+      CreateListing { listing_type, price, tags, expires_at, control } ->
         validate_create_listing(
           tx,
           listing_type,
           price,
           tags,
           expires_at,
+          control,
           config,
         )
       UpdateListing {
@@ -513,6 +518,7 @@ fn validate_create_listing(
   price: PriceStructure,
   tags: List<ByteArray>,
   expires_at: Option<Int>,
+  control: ControlBlock,
   config: MarketplaceConfig,
 ) -> Bool {
   // 1. Seller must sign
@@ -533,7 +539,9 @@ fn validate_create_listing(
     )
   // 5. Validate listing type specifics
   expect validate_listing_type(listing_type, seller.pnft_id, tx, config)
-  // 6. Create listing datum
+  // 6. Control block is well formed (empty need iff unrestricted).
+  expect control_well_formed(control)
+  // 7. Create listing datum
   let current_slot = get_current_slot(tx)
   let listing =
     ListingDatum {
@@ -548,6 +556,7 @@ fn validate_create_listing(
       status: Active,
       interest_count: 0,
       tags,
+      control,
     }
   // 7. Verify listing output
   let output = find_listing_output(tx.outputs)
@@ -651,7 +660,9 @@ fn validate_mark_sold(
       ..listing,
       status: Sold { buyer, sold_at: get_current_slot(tx) },
     }
-  // 5. Verify output
+  // 5. Sale does not strip dest_policy.
+  expect updated.control.dest_policy == listing.control.dest_policy
+  expect updated.control.need == listing.control.need
   True
 }
 

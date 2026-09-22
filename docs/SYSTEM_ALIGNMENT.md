@@ -4,6 +4,14 @@
 
 This document maps all 27 validators to their TypeScript types, MCP tools, and documentation.
 
+Plant law added on top of that map, without a new validator:
+
+- [PLANT_SPINE.md](PLANT_SPINE.md) — `lib/ultralife/control.ak`, records `Plant`/`Attest`, isotope `run_prev`, work_auction energy hook, fee skim
+- [PRE_EDF_RAISE.md](PRE_EDF_RAISE.md) — `grants.ak` `Ticket` / `Offtake`
+- [TWO_BIOREGIONS.md](TWO_BIOREGIONS.md) — `intec-site`, `reno-tric`
+
+Tools: `post_record`, `reveal_record`, `post_merkle_root`, `attest_control`, `presale_grant`, `presale_offtake`, `close_ticket`, `inspect_tickets`. Isotope tools call the control check. `post_job` / `list_job` carry `control_class` and `parent_ticket`.
+
 ---
 
 ## Validators → Types → Tools → Docs

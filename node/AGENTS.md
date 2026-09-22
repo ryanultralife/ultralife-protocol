@@ -12,3 +12,5 @@ Canonical live repo: https://github.com/ryanultralife/ultralife-node
 - `src/protocol/did.ts` — did:ultralife
 
 Do not reintroduce a singleton marketplace UTxO. Users transact in ULTRA.
+
+Plant tools (`post_record`, `attest_control`, `presale_grant`, `close_ticket`, and the rest in `src/protocol/tools.ts`) follow `docs/PLANT_SPINE.md`. They build unsigned transactions. They do not mint the $20M raise as ULTRA and they do not depend on Midnight.

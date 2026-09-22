@@ -28,6 +28,9 @@ export type IsotopeLot = {
   status: LotStatus;
   priceUltra: number;
   specHash: string;
+  controlClass: "Unrestricted" | "DualUse" | "Medical" | "Nuclear" | "Other";
+  destPolicy: string;
+  runPrev?: string;
 };
 
 /** Half-lives in slots (≈ seconds). */

@@ -234,6 +234,9 @@ fn validate_execute(
   proposal_id: ByteArray,
   config: GovernanceConfig,
 ) -> Bool {
+  // Local governance only. This script does not read Voltaire / DRep votes.
+  // dest_policy and lot mints are not proposal fields. Those content hashes are refused.
+  expect governance_may_execute(proposal)
   // 1. Voting must be complete
   let current_slot = get_slot(tx)
   let voting_complete = current_slot > proposal.voting_end
@@ -263,6 +266,10 @@ fn validate_execute(
       config.pnft_policy,
     )
   voting_complete && executed && proposal_updated && stake_returned
+}
+
+fn governance_may_execute(proposal: ProposalDatum) -> Bool {
+  proposal.content_hash != "dest_policy" && proposal.content_hash != "drep" && proposal.content_hash != "voltaire" && proposal.content_hash != "mint_lot"
 }
 
 fn execute_proposal(

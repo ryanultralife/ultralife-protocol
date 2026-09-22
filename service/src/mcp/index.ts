@@ -23,6 +23,7 @@ import { ComposableTxBuilder, CompositionBundles } from '../builder/composable.j
 import type { UltraLifeConfig, CategoryRef, WhatOffered, LocationScope, Terms, CompoundFlow, ComposedActionInput } from '../types/index.js';
 
 import { TOOLS, ULTRALIFE_CONTEXT } from './tools.js';
+import { plantUnsigned } from './plant-tools.js';
 
 // =============================================================================
 // MCP SERVER
@@ -259,6 +260,16 @@ export class UltraLifeMcpServer {
 
       case 'estimate_composed_fees':
         return this.estimateComposedFees(args);
+
+      case 'post_record':
+      case 'reveal_record':
+      case 'post_merkle_root':
+      case 'attest_control':
+      case 'presale_grant':
+      case 'presale_offtake':
+      case 'close_ticket':
+      case 'inspect_tickets':
+        return plantUnsigned(name, args);
 
       default:
         throw new Error(`Unknown tool: ${name}`);

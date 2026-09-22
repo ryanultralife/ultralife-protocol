@@ -10,6 +10,24 @@ export type Bioregion = {
 
 export const BIOREGIONS: Bioregion[] = [
   {
+    id: "intec-site",
+    name: "Intec site",
+    realm: "Plant",
+    health: 0.8,
+    treasuryUltra: 0,
+    residents: 40,
+    note: "First plant collective. Seed pool ticker ULSEED-INTEC is not this id.",
+  },
+  {
+    id: "reno-tric",
+    name: "Reno / Tahoe-Reno Industrial Center",
+    realm: "Plant",
+    health: 0.8,
+    treasuryUltra: 0,
+    residents: 40,
+    note: "Second plant collective. Seed pool ticker ULSEED-TRIC is not this id. A to B lot move is a Transfer.",
+  },
+  {
     id: "sierra-nevada",
     name: "Sierra Nevada",
     realm: "Nearctic",
