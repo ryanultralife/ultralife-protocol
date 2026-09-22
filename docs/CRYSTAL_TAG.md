@@ -21,7 +21,7 @@ A separator is a machine tag. Each vessel carries its own. Doors and access poin
 
 | Kind | Meaning |
 |---|---|
-| Enroll | Bind a lapel to a person, or bind a crystal to a separator, door, or machine. The person doing the mount is the lapel on that record. |
+| Enroll | Create a tag for another person or for a machine. The creator's lapel is `subject`. The new tag is `asset`. The creator's pNFT is the first auth holder. Their live waveform is on the same record. |
 | Access | Lapel at a door or access point. |
 | Operate | Lapel at a machine. A separator run is Operate against that separator's tag. |
 | Check | An operator inspects a machine. Same pair of tags. The check is a record, not a side notebook. |
@@ -30,8 +30,9 @@ The on-chain record is `RecordSchema.TagEvent` in `validators/records.ak`.
 
 - `subject` is the lapel tag.
 - `asset` is the machine tag.
-- `prev` is the lapel's enrolled waveform hash.
-- `seal` is the operator's live waveform hash from this interaction.
+- `prev` is the creator's enrolled waveform hash.
+- `seal` is the creator's live waveform hash from this transaction.
+- `auth.holders` begins with the creator's pNFT. A tag for someone else, or for a machine, is not issued by an unnamed key.
 - `commit` binds the kind, both tags, and the live waveform hash.
 - The two waveform hashes must differ. A copy of the enrollment reading is a replay, the same rule as `validators/biometric.ak`.
 - The samples are not a public field. The log an operator checks is the pair of hashes.

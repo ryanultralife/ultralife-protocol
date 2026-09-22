@@ -14,7 +14,7 @@ export const PLANT_TOOLS: Tool[] = [
   tool(
     "log_interaction",
     "Lapel tag plus machine tag. Biometric KYC stays on the crystal. UltraLife stores the hash.",
-    ["personTag", "machineTag", "kind", "waveform", "enrollment"],
+    ["personTag", "machineTag", "kind", "waveform", "enrollment", "pnft"],
   ),
   tool("post_record", "Hash a plant record. No PII in public fields.", ["schema", "collective", "bioregion", "subject", "payload"]),
   tool("reveal_record", "schema=Reveal. No plaintext argument.", ["recordId"]),
@@ -50,6 +50,9 @@ export function plantUnsigned(name: string, args: Record<string, unknown>) {
     }
     if (!String(args.waveform ?? "").trim() || !String(args.enrollment ?? "").trim()) {
       throw new Error("The lapel log needs the operator's live waveform and the enrolled waveform.");
+    }
+    if (!String(args.pnft ?? "").trim()) {
+      throw new Error("The person creating or carrying a tag is logged by pNFT.");
     }
   }
   if (name === "attest_control" && !args.destPolicy) {

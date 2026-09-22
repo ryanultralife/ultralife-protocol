@@ -315,13 +315,14 @@ export const AGENT_TOOLS = [
           personTag: { type: "string" },
           machineTag: { type: "string" },
           kind: { type: "string", enum: ["Enroll", "Access", "Operate", "Check"] },
-          waveform: { type: "string", description: "Operator's live waveform from the lapel crystal." },
-          enrollment: { type: "string", description: "Lapel enrollment waveform, or its 32-byte hash." },
+          waveform: { type: "string", description: "Live waveform of the person creating or carrying the tag." },
+          enrollment: { type: "string", description: "That person's enrolled waveform, or its 32-byte hash." },
+          pnft: { type: "string", description: "pNFT of the person creating a tag for someone else or for a machine, or passing a door." },
           collective: { type: "string" },
           bioregion: { type: "string" },
           payload: { type: "string" },
         },
-        required: ["personTag", "machineTag", "kind", "waveform", "enrollment"],
+        required: ["personTag", "machineTag", "kind", "waveform", "enrollment", "pnft"],
       },
     },
   },
@@ -849,12 +850,13 @@ export async function executeTool(
         payload: String(args.payload ?? ""),
         waveform: String(args.waveform ?? ""),
         enrollment: String(args.enrollment ?? ""),
+        pnft: String(args.pnft ?? state.pnft?.id ?? ""),
       });
       if (!logged.ok) return { ok: false, summary: logged.error, next: state };
       return fromEngine(
         before,
         await commitPlant(state, "log-interaction", ["records.records.spend", "biometric.identity.spend"], logged.plant),
-        `${kind} ${logged.id}. Lapel, machine tag, and the operator's waveform hash are in the log.`,
+        `${kind} ${logged.id}. Creator pNFT, live waveform, lapel, and machine tag are on this record.`,
       );
     }
     case "post_record": {

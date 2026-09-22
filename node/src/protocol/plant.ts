@@ -62,6 +62,7 @@ export type SpineRecord = {
   prev?: string;
   commit: string;
   seal?: string;
+  creatorPnft?: string;
   slot: number;
 };
 
@@ -352,14 +353,19 @@ export function logInteraction(
     payload: string;
     waveform: string;
     enrollment: string;
+    pnft: string;
   },
 ): { ok: true; plant: PlantState; id: string } | { ok: false; error: string } {
   const person = input.personTag.trim();
   const machine = input.machineTag.trim();
   const waveform = input.waveform.trim();
   const enrollment = input.enrollment.trim();
+  const pnft = input.pnft.trim();
   if (!person || !machine || person === machine) {
     return { ok: false, error: "Every interaction names a lapel tag and a different machine tag." };
+  }
+  if (!pnft) {
+    return { ok: false, error: "The person creating or carrying a tag is logged by pNFT." };
   }
   if (!waveform || !enrollment) {
     return { ok: false, error: "The lapel log needs the operator's live waveform and the enrolled waveform." };
@@ -382,7 +388,8 @@ export function logInteraction(
     subject: person,
     prev: enrolled,
     seal: live,
-    commit: commitOf(`${input.kind}|${person}|${machine}|${live}|${input.payload}`),
+    creatorPnft: pnft,
+    commit: commitOf(`${input.kind}|${person}|${machine}|${pnft}|${live}|${input.payload}`),
     slot,
   };
   return { ok: true, id, plant: { ...plant, records: [...plant.records, record] } };

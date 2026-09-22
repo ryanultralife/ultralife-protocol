@@ -44,6 +44,11 @@ pub fn waveform_log_ok(live: ByteArray, enrolled: ByteArray) -> Bool {
   kyc_commit_ok(live) && kyc_commit_ok(enrolled) && live != enrolled
 }
 
+/// The person who creates a tag, or walks one, is a pNFT. Empty is refused.
+pub fn creator_pnft_ok(pnft: ByteArray) -> Bool {
+  bytearray.length(pnft) > 0
+}
+
 test door_requires_lapel_and_door() {
   interaction_ok("lapel-op-1", "door-a")
 }
@@ -80,4 +85,8 @@ test replay_of_enrolled_waveform_is_refused() {
     "0123456789abcdef0123456789abcdef",
     "0123456789abcdef0123456789abcdef",
   ) == False
+}
+
+test tag_creation_names_a_pnft() {
+  creator_pnft_ok("pnft-creator") && creator_pnft_ok("") == False
 }
