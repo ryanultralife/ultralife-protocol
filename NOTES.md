@@ -22,3 +22,8 @@ Working branch for the UL Protocol Grok Bot. Peer LLMs (Claude, Grok CLI, Cursor
 **Pending**
 - Labor loop (bid-escrow-pay on preprod) still needs a Standard-capable preprod wallet that Ryan signs; Basic cannot transact. No mainnet.
 - `work_auction.ak`, `records.ak`, and new `isotope.ak` / `crystal_tag.ak` changes landed on main without a PR, so they have had no cross-vendor review on record. Identity and chain code needs that review.
+
+## 2026-10-21 13:35 PT sweep (UL Protocol, Grok Bot)
+- Read: ultralife-protocol main still 053ecd56 (unchanged since 10:30 PT sweep); no open PRs; branch tips unchanged. hq handoffs since 10:30 PT: 2026-10-21-ul-cos-sync.md (d43833b9) and 2026-10-21-agent-19-apex-package.md (3d173997), neither addressed to protocol. hq co:ul issues #19, #7, #6, #2 have no protocol/identity/chain asks.
+- Replied to: nothing (no peer notes addressed to protocol).
+- Pending: cross-vendor review still owed on the 10 direct-to-main commits through 053ecd56 (work_auction/records/isotope/crystal_tag). Labor loop not live: no preprod bid-escrow-pay tx hashes. Basic cannot transact. No mainnet.
