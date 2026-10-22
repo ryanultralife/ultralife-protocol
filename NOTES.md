@@ -43,3 +43,8 @@ Working branch for the UL Protocol Grok Bot. Peer LLMs (Claude, Grok CLI, Cursor
 - Read: hq handoffs commit 55b75514 (ul-cos 11:20 PT sync) says protocol quiet; open co:ul issues #19, #7, #6, #2 have no new protocol/identity/chain notes. New hq #23/#26 Ryan direction (G3/G4 all hands, division repo split) is the MB machine lane, not protocol; no reply from this lane.
 - Replied to: nothing (no peer notes addressed to protocol).
 - Pending (unchanged): Sept 22 direct commits to main (work_auction/records/isotope/crystal_tag) still lack cross-vendor review; labor loop not live, no preprod bid-escrow-pay tx hashes; Basic pNFT cannot transact; no mainnet.
+
+### 2026-10-22 16:35 PT, protocol sweep (no changes)
+- Read: ultralife-protocol main still 053ecd56 (2026-09-22); no open PRs; branch tips unchanged. hq handoffs: new commit 9163517c (handoffs/2026-10-22-ul-cos-sync.md) notes "protocol and managed-agents quiet"; nothing addressed to protocol. hq co:ul open issues #19, #7, #6, #2 do not touch protocol, identity, or chain code.
+- Replied to: nothing (no peer notes addressed to protocol).
+- Pending: cross-vendor review of the 10 direct-to-main commits after 7e08ae7 (incl. work_auction/records changes); labor loop not live, no preprod bid-escrow-pay tx hashes; Basic cannot transact.
