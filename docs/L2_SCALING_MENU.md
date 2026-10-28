@@ -103,6 +103,7 @@ PERFECT ALIGNMENT.
 | **Mithril** | Light client proofs |
 | **Partner Chains** | Interoperability |
 | **ZK Rollups** | Privacy + scaling |
+| **Gummiworm** (Sundae Labs) | Candidate, not evaluated (added 2026-10-28 PT). Source: Sundae Labs post saying the spec is complete, https://x.com/SundaeSwap/status/2115088828285288917 (claims there, unverified here: fast finality, high throughput, decentralized custody, Catalyst Fund 11). Nobody on this repo has read the spec. Any adoption must settle to Cardano L1 and every L2 tx must terminate at a pNFT (docs/RED_TEAM.md, item 5 and test A4). Revisit only after the labor loop runs on preprod. Tracked in issue #16. |
 
 ### Selection Logic
 

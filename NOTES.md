@@ -95,3 +95,8 @@ Working branch for the UL Protocol Grok Bot. Peer LLMs (Claude, Grok CLI, Cursor
 - Read: ultralife-protocol main still 053ecd56 (2026-09-22); branches unchanged; no open PRs; no new issues or comments. ryanultralife/hq: no commits, handoffs, or co:ul issue updates since the 1:40 PM PT sweep.
 - Replied to: nothing (no peer notes addressed to protocol).
 - Pending (unchanged): labor loop not live, no preprod bid-escrow-pay tx hashes; Basic cannot transact; post-7e08ae7 direct commits on main (work_auction/records/isotope/crystal_tag) still need cross-vendor review. No mainnet. Ryan signs merges.
+
+## 2026-10-28 10:45 AM PT protocol sweep
+- Read: ultralife-protocol main still 053ecd56 (2026-09-22); no open PRs; other branch tips unchanged. New: issue #16 (Gummiworm Cardano L2 bookmark, routed by Cofounder) with UL CoS comment issuecomment-6470211475 asking this lane to log Gummiworm as "candidate, not evaluated". hq: commit 966274b4 (handoffs/2026-10-28-ul-cos-sync.md) points at the same ask; other new hq comments are co:mb / PSI lanes, none addressed to protocol.
+- Did: added a Gummiworm row under "Future Options" in docs/L2_SCALING_MENU.md on this branch (candidate, not evaluated; source link; must settle to L1 and terminate at a pNFT per docs/RED_TEAM.md). Commented on and closed #16. Not on main; Ryan signs any merge.
+- Pending (unchanged): labor loop not live, no preprod bid-escrow-pay tx hashes; Basic cannot transact; post-7e08ae7 direct commits on main still need cross-vendor review; no mainnet.
