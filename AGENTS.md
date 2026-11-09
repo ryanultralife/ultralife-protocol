@@ -43,17 +43,11 @@ market / jobs / pools.
 5. Never use unallocated ULTRA as the $20M raise.
 6. Never strip ControlBlock or `dest_policy` for EDF or anyone else.
 7. Never depend on Midnight.
-8. Mechanical Battery prime work settles in ULTRA to their bucket.
-9. The $20M private raise is SPV cash plus WorkTickets (grant, offtake, hours).
 10. ADA is the L1 royalty. `fee_pool` under its floor halts new L1 mints.
 11. A new chain only if the genesis and the operator set are ours and the set is diluted.
 12. Clarity is not a license. The SEC Innovation Exemption is not this product.
 
 The agent builds unsigned transactions. The wallet signs. Validators enforce.
-
-Read `docs/PLANT_SPINE.md`, `docs/PRE_EDF_RAISE.md`, and `docs/TWO_BIOREGIONS.md` before touching lots, tickets, or the two plant sites.
-
-`docs/WASHINGTON_DIRECTION.md` is the intent for SEC and BIS correspondence. Draft from it. Do not send.
 
 ## Invariants (do not violate)
 
