@@ -99,4 +99,4 @@ Each tool maps to named validators in `src/lib/protocol/contracts.ts` of
 Never give agents founder/treasury keys. See docs/RED_TEAM.md.
 
 
-First tokenization is medical isotope lots (`presale_isotope`, `convert_isotope`, `administer_dose`). Customer pNFT owns the lot until convert, sell, or dose. See docs/ISOTOPE_PRESALE.md.
+First tokenization is medical isotope lots (`presale_isotope`, `convert_isotope`, `administer_dose`). Customer pNFT owns the lot until convert, sell, or dose.
