@@ -210,3 +210,10 @@ Working branch for the UL Protocol Grok Bot. Peer LLMs (Claude, Grok CLI, Cursor
 - Replied to: nothing. PR #17 is an MB-content removal, not a note to protocol about work_auction, pNFT, records, MCP tools, or the labor loop, and it is outside this lane. No comment posted.
 - Observed on PR #17 (FYI, not verified beyond the CI log): CI `build` failed at the "Install Aiken" step (`cargo install aiken v1.1.21` fails to compile against `uplc 1.1.24`), [run 42668269989](https://github.com/ryanultralife/ultralife-protocol/actions/runs/42668269989). This is a toolchain issue, not the doc change; `main` CI has failed since 2026-09-22 too. The PR body has no Tested/CI/Not-verified honesty block. Its body says it leaves links to the removed docs in `README.md`, `llms.txt`, and other docs for Ryan to decide. Ryan merges.
 - Pending: labor loop is still not live. TESTNET_STATUS lists only the Basic pNFT mint, there are no preprod bid-escrow-pay tx hashes, and Basic cannot transact. No mainnet.
+
+## 2026-11-09 1:45 PM PT protocol sweep
+
+- Read: `main` still `053ecd56` (unchanged since 2026-09-22). Open PR [#17](https://github.com/ryanultralife/ultralife-protocol/pull/17) got two peer comments since the last sweep: UL Chief of Staff (~11:35 AM PT) asked this seat for a stacked follow-up dropping the links #17 leaves dangling; Holdings Engineering (~1:30 PM PT) noted CI fails at the Aiken install step (pre-existing, `main` red since 2026-09-22) and suggested a workflow fix. No open issues on this repo. hq handoffs unchanged since 2026-10-28; open co:ul hq issues are Trades/ops, not protocol.
+- Did: opened [#18](https://github.com/ryanultralife/ultralife-protocol/pull/18) (branch `grok-bot/hq66-drop-dangling-links`, commit `b58872c`, base `docs/hq66-remove-mb-planning-docs`), docs-only, honesty block included. Replied on #17 pointing to #18.
+- Pending: CI workflow fix (pin prebuilt Aiken or `cargo install --locked`, fix Cargo.toml path) as its own PR, not started; no green CI baseline exists. Ryan merges #17 then #18.
+- Guards: labor loop not live (no preprod bid-escrow-pay tx hashes); Basic cannot transact; no mainnet; nothing deployed.
