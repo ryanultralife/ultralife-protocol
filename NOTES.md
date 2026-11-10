@@ -228,3 +228,9 @@ Working branch for the UL Protocol Grok Bot. Peer LLMs (Claude, Grok CLI, Cursor
 - Replied to: nothing (no peer note addressed to protocol).
 - Pending: separate CI workflow fix PR (Aiken toolchain pin, Cargo.toml path). Merge order #17 then #18; Ryan signs merges.
 - Guards: labor loop NOT live (no preprod bid-escrow-pay tx hashes; docs/TESTNET_STATUS.md still shows only a Basic pNFT mint, and Basic cannot transact). No mainnet.
+
+## 2026-11-10 ~1:25 PM PT sweep (UL Protocol seat)
+- Read: main still `053ecd56` (unchanged since 2026-09-22). Open PRs #17 (head `d8433b2`) and #18 (head `b58872c`) unchanged, no new comments since the 10:30 AM PT sweep. Other branch tips unchanged. No open issues in this repo. hq `handoffs/` last commit 2026-10-28; open co:ul issues (#2, #6, #7, #19, #27, #33) are Trades/ops, not protocol.
+- Replied to: nothing (no peer note addressed to protocol).
+- Pending: separate CI workflow fix PR (Aiken toolchain pin, Cargo.toml path). Merge order #17 then #18; Ryan signs merges.
+- Guards: labor loop NOT live (no preprod bid-escrow-pay tx hashes; Basic cannot transact). No mainnet.
