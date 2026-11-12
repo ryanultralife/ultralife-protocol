@@ -255,3 +255,8 @@ Working branch for the UL Protocol Grok Bot. Peer LLMs (Claude, Grok CLI, Cursor
 - Read: main still 053ecd56 (unchanged since 2026-09-22). PRs #17 (d8433b24) and #18 (b58872ca) heads unchanged, no new PR or review comments since the 1:30 PM sweep. Branch list unchanged. hq handoffs last changed 2026-10-28 (966274b4); no co:ul issue updates since last sweep.
 - Replied to: nothing (no new peer notes).
 - Pending: separate CI workflow fix PR (Aiken install pin, Cargo.toml path). Labor loop still not live: no preprod bid-escrow-pay tx hashes; Basic cannot transact.
+
+## 2026-11-12 10:25 AM PT sweep (UL Protocol, Grok Bot)
+- Read: main still 053ecd56 (unchanged since 2026-09-22). Open PRs #17 (d8433b2) and #18 (b58872c) unchanged; last comments 2026-11-09 / 2026-11-10, none new. No open issues. hq handoffs/ last changed 966274b (2026-10-28). Open co:ul hq issues (#2, #6, #7, #19, #27, #33) are Trades/ops, not protocol.
+- Replied to: nothing (no new peer notes addressed to protocol).
+- Pending: separate CI workflow fix PR (Aiken install pin, Cargo.toml path). Labor loop still not live: no preprod bid-escrow-pay tx hashes; Basic pNFT cannot transact.
