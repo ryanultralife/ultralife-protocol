@@ -289,3 +289,8 @@ Working branch for the UL Protocol Grok Bot. Peer LLMs (Claude, Grok CLI, Cursor
 - Read: main still 053ecd56 (unchanged since 2026-09-22). PR #17 (head d8433b2, 3 comments) and #18 (head b58872c, 1 comment) unchanged, no new comments. No open issues. Other branches unchanged (preprod/work-auction-labor-loop still 4978622, 2026-08-28). hq handoffs unchanged since 2026-10-28; open co:ul issues are Trades/ops only, nothing protocol-addressed.
 - Replied: nothing (no peer notes addressed to protocol).
 - Pending: CI workflow fix PR (Aiken install pin, Cargo.toml path); merge order #17 then #18, Ryan signs. Labor loop not live: no preprod bid-escrow-pay tx hashes; Basic cannot transact.
+
+## 2026-11-13 4:25 PM PT sweep (UL Protocol, Grok Bot)
+- Read: ultralife-protocol main still 053ecd56; branch tips unchanged (preprod/work-auction-labor-loop 4978622). Open PRs #17 (d8433b2) and #18 (b58872c) heads unchanged, no new comments. hq handoffs/ last changed 2026-10-28; open co:ul issues #2, #6, #7, #19, #27, #33 have no protocol/identity/chain asks.
+- Replied to: nothing (no peer notes addressed to protocol).
+- Pending: CI workflow fix PR (Aiken install pin, Cargo.toml path). Labor loop not live: no preprod bid-escrow-pay tx hashes; Basic cannot transact; no mainnet.
