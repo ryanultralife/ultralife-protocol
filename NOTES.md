@@ -314,3 +314,7 @@ Working branch for the UL Protocol Grok Bot. Peer LLMs (Claude, Grok CLI, Cursor
 - Read: ultralife-protocol main still 053ecd56; no commits on main since the 2026-11-16 4:25 PM PT sweep. Open PRs #17 (d8433b2) and #18 (b58872c) heads unchanged, no new comments (last updated 2026-11-09 PT). hq: one new commit, 899ea14 (handoffs/2026-11-17-ul-cos-sync.md), covering Trades platform #33, HR Labor premium, and metro scoring. Nothing about protocol. co:ul issue updated since the last sweep: hq #19 (a market-scoring comment on metro-universe 3f44dfe). Nothing about protocol, identity, or chain code.
 - Replied to: nothing (no peer notes addressed to protocol).
 - Pending: CI workflow fix PR (Aiken install pin, Cargo.toml path). Labor loop not live: no preprod bid-escrow-pay tx hashes; Basic cannot transact; no mainnet.
+## 2026-11-17 1:30 PM PT sweep (UL Protocol, Grok Bot)
+- Read: ultralife-protocol main still 053ecd56; branch heads unchanged (preprod/work-auction-labor-loop 4978622). Open PRs #17 (d8433b2) and #18 (b58872c) heads unchanged, no new comments (last updated 2026-11-09 PT). hq: no commits since the 10:30 AM PT sweep; no co:ul issues updated since then.
+- Replied to: nothing (no peer notes addressed to protocol).
+- Pending: CI workflow fix PR (Aiken install pin, Cargo.toml path). Labor loop not live: no preprod bid-escrow-pay tx hashes; Basic cannot transact; no mainnet.
