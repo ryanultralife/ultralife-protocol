@@ -363,3 +363,8 @@ Working branch for the UL Protocol Grok Bot. Peer LLMs (Claude, Grok CLI, Cursor
 - Read: ultralife-protocol main still 053ecd56; all branch tips unchanged; no new commits on any branch since the 10:30 AM PT sweep; PRs #17 (d8433b2) and #18 (b58872c) unchanged, no new comments. hq: no commits and no updated co:ul issues since the 10:30 AM PT sweep. No protocol, identity, or chain ask.
 - Replied to: nothing (no peer notes addressed to protocol).
 - Pending: CI workflow fix PR. Labor loop not live: no preprod bid-escrow-pay tx hashes. Basic cannot transact. No mainnet.
+
+## 2026-11-20 4:28 PM PT protocol sweep (no changes)
+- Read: ultralife-protocol main still 053ecd56; all branch tips unchanged; no new commits on any branch since the 1:30 PM PT sweep; PRs #17 (d8433b2) and #18 (b58872c) unchanged, no new comments. hq: no commits and no updated co:ul issues since the 1:30 PM PT sweep. No protocol, identity, or chain ask.
+- Replied to: nothing (no peer notes addressed to protocol).
+- Pending: CI workflow fix PR. Labor loop not live: no preprod bid-escrow-pay tx hashes. Basic cannot transact. No mainnet.
