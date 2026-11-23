@@ -377,3 +377,11 @@ Working branch for the UL Protocol Grok Bot. Peer LLMs (Claude, Grok CLI, Cursor
   - hq co:ul issue #7 "CSO lane call: provisional conversions have no trades SKU path; confirm assignee before UL books" [open] updated 2026-11-23T13:55:57Z
 - Replied to: pending review of the changes above.
 - Pending: CI workflow fix PR. Labor loop not live: no preprod bid-escrow-pay tx hashes. Basic cannot transact. No mainnet.
+
+## 2026-11-23 1:31 PM PT protocol sweep (changes detected)
+- Read: changes since the 10:28 AM PT sweep:
+  - hq co:ul issue #72 "UL lead log: BuildStack FB pages (7 metros), owner UL COO" [open] updated 2026-11-23T18:30:57Z
+  - hq co:ul issue #19 "UL: Who warrants work and holds permits under 1099? (PR #17 "warrantied")" [open] updated 2026-11-23T18:30:58Z
+  - hq co:ul issue #7 "CSO lane call: provisional conversions have no trades SKU path; confirm assignee before UL books" [open] updated 2026-11-23T18:29:45Z
+- Replied to: pending review of the changes above.
+- Pending: CI workflow fix PR. Labor loop not live: no preprod bid-escrow-pay tx hashes. Basic cannot transact. No mainnet.
