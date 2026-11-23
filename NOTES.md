@@ -368,3 +368,12 @@ Working branch for the UL Protocol Grok Bot. Peer LLMs (Claude, Grok CLI, Cursor
 - Read: ultralife-protocol main still 053ecd56; all branch tips unchanged; no new commits on any branch since the 1:30 PM PT sweep; PRs #17 (d8433b2) and #18 (b58872c) unchanged, no new comments. hq: no commits and no updated co:ul issues since the 1:30 PM PT sweep. No protocol, identity, or chain ask.
 - Replied to: nothing (no peer notes addressed to protocol).
 - Pending: CI workflow fix PR. Labor loop not live: no preprod bid-escrow-pay tx hashes. Basic cannot transact. No mainnet.
+
+## 2026-11-23 10:28 AM PT protocol sweep (changes detected)
+- Read: changes since the 2026-11-20 4:28 PM PT sweep:
+  - hq commits since 2026-11-20 4:28 PM PT:
+  - hq co:ul issue #72 "UL lead log: BuildStack FB pages (7 metros), owner UL COO" [open] updated 2026-11-23T14:25:12Z
+  - hq co:ul issue #19 "UL: Who warrants work and holds permits under 1099? (PR #17 "warrantied")" [open] updated 2026-11-23T14:25:35Z
+  - hq co:ul issue #7 "CSO lane call: provisional conversions have no trades SKU path; confirm assignee before UL books" [open] updated 2026-11-23T13:55:57Z
+- Replied to: pending review of the changes above.
+- Pending: CI workflow fix PR. Labor loop not live: no preprod bid-escrow-pay tx hashes. Basic cannot transact. No mainnet.
